@@ -1,0 +1,36 @@
+.active-form {
+  .u-radio-group--row, .u-checkbox-group--row {
+	flex-wrap: wrap;
+  }
+  
+  .u-radio, .u-checkbox {
+	margin: 10rpx;
+  }
+}
+
+.flex-row-sb-c {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flex-col--c {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.pr20{
+    padding-right: 20rpx;	
+}
+.pt30{
+	padding-top: 30rpx;	
+}
+.p30{
+	padding: 30rpx;	
+}
+.font26{
+	font-size: 26rpx;
+}
+

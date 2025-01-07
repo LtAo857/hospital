@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.api.db.dao.IllnessDao">
+
+
+    <select id="searchIllnessInfo" parameterType="Map"  resultType="HashMap">
+select * from HOSPITAL.ILLNESS   LIMIT ${length} OFFSET ${start}
+    </select>
+    <update id="update"  parameterType="com.example.hospital.api.db.pojo.IllnessEntity">
+        UPSERT INTO HOSPITAL.ILLNESS(
+        "id","name","cause","symptom","method","description"
+    )
+    VALUES (
+        ${id}, #{name}, #{cause}, #{symptom}, #{method},
+        #{description}
+        )
+    </update>
+
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.IllnessEntity">
+        UPSERT INTO HOSPITAL.ILLNESS(
+        "id","name","cause","symptom","method","description"
+    )
+    VALUES (
+        NEXT VALUE FOR HOSPITAL.DOCTOR_SEQUENCE, #{name}, #{cause}, #{symptom}, #{method},
+        #{description}
+        )
+    </insert>
+
+    <select id="searchById" parameterType="int" resultType="HashMap">
+        SELECT *
+        FROM HOSPITAL.ILLNESS
+        WHERE "id" = ${id}
+    </select>
+
+    <update id="deleteByIds">
+        DELETE FROM HOSPITAL.ILLNESS
+        WHERE "id" IN
+        <foreach collection="array" open="(" item="one" separator="," close=")">
+            ${one}
+        </foreach>
+    </update>
+
+
+</mapper>

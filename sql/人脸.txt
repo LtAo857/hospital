@@ -1,0 +1,57 @@
+-- 患者端用户表 -----------------------------------------------
+DROP TABLE IF EXISTS hospital.patient_user;
+CREATE TABLE hospital.patient_user
+(
+    "id"          INTEGER NOT NULL PRIMARY KEY,
+    "open_id"     VARCHAR,
+    "nickname"    VARCHAR(50),
+    "photo"       VARCHAR,
+    "sex"         VARCHAR(1),
+--   状态：1代表正常，2代表禁用
+    "status"      TINYINT,
+    "create_time" DATE
+);
+DROP SEQUENCE IF EXISTS hospital.patient_user_sequence;
+CREATE SEQUENCE hospital.patient_user_sequence START WITH 1 increment BY 1;
+CREATE INDEX patient_user_idx_1 ON hospital.patient_user ("open_id");
+CREATE INDEX patient_user_idx_2 ON hospital.patient_user ("status");
+
+
+-- 患者端用户基本信息表 -----------------------------------------------
+DROP TABLE IF EXISTS hospital.patient_user_info_card;
+CREATE TABLE hospital.patient_user_info_card
+(
+    "id"              INTEGER NOT NULL PRIMARY KEY,
+    "user_id"         INTEGER,
+    "uuid"            CHAR(32),
+    "name"            VARCHAR(20),
+    "sex"             VARCHAR(1),
+    "pid"             CHAR(18),
+    "tel"             CHAR(11),
+    "birthday"        DATE,
+    -- 疾病史
+    "medical_history" VARCHAR,
+    -- 保险类型
+    "insurance_type"  VARCHAR,
+--     是否人脸录入面部信息
+    "exist_face_model" BOOLEAN
+);
+
+DROP SEQUENCE IF EXISTS hospital.patient_user_info_card_sequence;
+CREATE SEQUENCE hospital.patient_user_info_card_sequence START WITH 1 increment BY 1;
+CREATE INDEX patient_user_info_card_idx_1 ON hospital.patient_user_info_card ("user_id");
+CREATE INDEX patient_user_info_card_idx_2 ON hospital.patient_user_info_card ("uuid");
+CREATE INDEX patient_user_info_card_idx_3 ON hospital.patient_user_info_card ("pid");
+
+-- 人脸认证记录表-----------------------------------------------
+DROP TABLE IF EXISTS hospital.patient_face_auth;
+CREATE TABLE hospital.patient_face_auth(
+    "id" INTEGER NOT NULL PRIMARY KEY ,
+    "patient_card_id" INTEGER,
+    "date" DATE
+);
+
+DROP SEQUENCE IF EXISTS hospital.patient_face_auth_sequence;
+CREATE SEQUENCE hospital.patient_face_auth_sequence START WITH 1 increment BY 1;
+CREATE INDEX patient_face_auth_idx_1 ON hospital.patient_face_auth ("patient_card_id");
+CREATE INDEX patient_face_auth_idx_2 ON hospital.patient_face_auth ("date");

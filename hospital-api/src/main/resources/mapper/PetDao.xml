@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.api.db.dao.PetDao">
+
+
+    <select id="searchByPage" parameterType="Map"  resultType="HashMap">
+select * from HOSPITAL.PET_DOC   LIMIT ${length} OFFSET ${start}
+    </select>
+
+    <select id="searchByPageAndId" parameterType="Map"  resultType="HashMap">
+select * from HOSPITAL.PET_DOC         WHERE "master_id" = ${masterId}   LIMIT ${length} OFFSET ${start}
+    </select>
+
+
+
+    <update id="update"  parameterType="com.example.hospital.api.db.pojo.PetEntity">
+        UPSERT INTO HOSPITAL.PET_DOC(
+        "id","name","master_id","sex","hobby","birthday","disease_history","breed","weight","image","vaccine"
+    )
+    VALUES (
+        ${id}, #{name}, #{master_id}, #{sex}, #{hobby},
+        TO_DATE('${birthday}'),#{disease_history}, #{breed}, #{weight}, #{image}, #{vaccine}
+        )
+    </update>
+
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.PetEntity">
+               UPSERT INTO HOSPITAL.PET_DOC(
+        "id","name","master_id","sex","hobby","birthday","disease_history","breed","weight","image","vaccine"
+    )
+    VALUES (
+         NEXT VALUE FOR HOSPITAL.PET_DOC_SEQUENCE, #{name}, #{master_id},#{sex}, #{hobby},
+        TO_DATE('${birthday}'),#{disease_history}, #{breed}, #{weight}, #{image}, #{vaccine}
+        )
+    </insert>
+
+    <select id="searchById" parameterType="int" resultType="HashMap">
+        SELECT *
+        FROM HOSPITAL.PET_DOC
+        WHERE "id" = ${id}
+    </select>
+
+    <update id="deleteByIds">
+        DELETE FROM HOSPITAL.PET_DOC
+        WHERE "id" IN
+        <foreach collection="array" open="(" item="one" separator="," close=")">
+            ${one}
+        </foreach>
+    </update>
+
+
+</mapper>
