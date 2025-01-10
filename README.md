@@ -23,8 +23,8 @@
 +   参与封装了前端MIS系统的同步/异步Ajax 请求与异常处理。
 +    利用 TRTC 技术实现移动端和 Web 端的视频问诊。
 +    参与开发了门诊挂号、移动支付、线上问诊、出诊管理等模块的开发。
-
-
+![输入图片说明](Minio/patient-wx/banner/banner-1.jpg)
+![输入图片说明](Minio/patient-wx/swiper/swiper-1.jpg)
 ![输入图片说明](swiper/1721383236227.jpg)
 ![输入图片说明](swiper/swiper-5.jpg)
 
