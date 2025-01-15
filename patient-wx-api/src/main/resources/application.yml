@@ -29,9 +29,9 @@ spring:
 
   redis:
     database: 0
-    host: 43.143.231.180
+    host: 127.0.0.1
     port: 6379
-    password: abc123456
+#    password: abc123456
     jedis:
       pool:
         max-active: 1000
@@ -93,7 +93,7 @@ tencent:
     expire: 86400
 
 minio:
-  endpoint: http://43.143.231.180:9010
+  endpoint: http://62.234.37.187:9000
   access-key: root
   secret-key: abc123456
 
