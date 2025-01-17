@@ -1,0 +1,9 @@
+maven配置：https://blog.csdn.net/qq_45368632/article/details/132164311
+
+nvm配置：   https://blog.csdn.net/panerchao/article/details/139253927
+node_mirror: https://npmmirror.com/mirrors/node/
+npm_mirror: https://npmmirror.com/mirrors/npm/
+
+Mysql8配置： https://blog.csdn.net/i_for/article/details/131133383
+
+redis：https://blog.csdn.net/m0_72853403/article/details/134550752
