@@ -5,7 +5,7 @@
 			<view class="info">
 				<view v-if="flag == 'logout'" open-type="getUserInfo" @tap="loginOrRegister">
 					<text class="operate">注册 / 登陆</text>
-					<text class="remark">请登陆医疗小程序</text>
+					<text class="remark">请登陆医疗挂号挂号小程序</text>
 				</view>
 				<view  v-if="flag == 'login'">
 					<view class="left">
@@ -48,10 +48,10 @@
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">百科</text>
 				</u-grid-item>
-<!-- 				<u-grid-item name="视频问诊">
+				<u-grid-item name="视频问诊">
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">视频问诊</text>
-				</u-grid-item> -->
+				</u-grid-item> 
 <!-- 				<u-grid-item name="导诊问询">
 					<button open-type="contact" session-from="sessionFrom" plain="true" class="btn">
 									<view class="navigator-icon"><view class="navigator-icon-1" /></view>
@@ -61,8 +61,8 @@
 
 			</u-grid>
 		</view>
-		<!-- <view class="publicity-container"><image :src="publicityBannerUrl" mode="widthFix" class="banner" /></view> -->
-		<!-- <view class="mine-container">
+		<view class="publicity-container"><image :src="publicityBannerUrl" mode="widthFix" class="banner" /></view>
+		 <view class="mine-container">
 			<view class="title-row">
 				<text class="title">我的问诊</text>
 				<u-icon label="更多" labelPos="left" size="15" name="arrow-right"></u-icon>
@@ -92,13 +92,13 @@
 				</u-grid>
 				<image :src="otherBannerUrl" mode="widthFix" class="banner"></image>
 			</view>
-		</view> -->
-<!-- 		<view class="ad-container"><image :src="adBannerUrl[0]" mode="widthFix" class="banner" /></view>
-	 -->
+		</view> 
+		<view class="ad-container"><image :src="adBannerUrl[0]" mode="widthFix" class="banner" /></view>
+	
 				 <u-toast ref="uToast" />
-<!-- 		<view class="service-container">
+		<view class="service-container">
 			<view class="title-row">
-				<text class="title">医疗服务</text>
+				<text class="title">医疗挂号挂号服务</text>
 				<u-icon label="更多" labelPos="left" size="15" name="arrow-right"></u-icon>
 			</view>
 			<view class="content">
@@ -168,7 +168,7 @@
 		</view> 
 		<view class="ad-container"><image :src="adBannerUrl[1]" mode="widthFix" class="banner" /></view>
 		<u-toast ref="uToast" />
-		-->
+		
 	</view>
 </template>
 

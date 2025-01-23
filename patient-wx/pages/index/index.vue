@@ -219,10 +219,10 @@
 				},
 				list1: [
 
-					`${this.patientUrl}/swiper/swiper-8.png`,
-					`${this.patientUrl}/swiper/swiper-9.png`,
-					`${this.patientUrl}/swiper/swiper-10.png`,
-					`${this.patientUrl}/swiper/swiper-11.png`
+					`${this.patientUrl}/swiper/swiper-5.jpg`,
+					`${this.patientUrl}/swiper/swiper-6.jpg`,
+					`${this.patientUrl}/swiper/swiper-7.jpg`,
+					`${this.patientUrl}/swiper/swiper-8.jpg`
 				],
 				otherBannerUrl: `${this.patientUrl}/banner/banner-1.jpg`,
 				publicityBannerUrl: `${this.patientUrl}/banner/banner-2.jpg`,
