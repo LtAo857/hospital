@@ -63,8 +63,8 @@ import router from '../router/index.js';
 export default {
     data: function() {
         return {
-            username: null,
-            password: null,
+            username: 'admin',
+            password: 'abc123456',
             qrCodeVisible: false,
             qrCode: '',
             uuid: null,
@@ -76,22 +76,22 @@ export default {
     methods: {
         login: function() {
             let that = this;
-            if (!isUsername(that.username)) {
-                ElMessage({
-                	message: '用户名格式不正确',
-                	type: 'error',
-                    duration: 1200
-                });
-            } else if (!isPassword(that.password)) {
-                ElMessage({
-                	message: '密码格式不正确',
-                	type: 'error',
-                    duration: 1200
-                });
-            } else {
-                let data = { username: that.username, password: that.password };
+            // if (!isUsername(that.username)) {
+            //     ElMessage({
+            //     	message: '用户名格式不正确',
+            //     	type: 'error',
+            //         duration: 1200
+            //     });
+            // } else if (!isPassword(that.password)) {
+            //     ElMessage({
+            //     	message: '密码格式不正确',
+            //     	type: 'error',
+            //         duration: 1200
+            //     });
+            // } else {
+                let data = { username: 'admin', password: 'abc123456' };
                 //发送登陆请求
-                that.$http('/mis_user/login', 'POST', data, true, function(resp) {
+          this.$http('/mis_user/login', 'POST', data, true, function(resp) {
                     if (resp.result) {
                         //在浏览器的storage中存储用户权限列表
                         let permissions = resp.permissions;
@@ -110,7 +110,7 @@ export default {
                         });
                     }
                 });
-            }
+            // }
         },
         
         
