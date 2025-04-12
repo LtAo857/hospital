@@ -5,9 +5,9 @@ server:
       selectors: 8
       min: 8
       max: 200
-  port: 8092
+  port: 8094
   servlet:
-    context-path: /patient-wx-api
+    context-path: /hospital-api
 
 spring:
   datasource:
@@ -16,6 +16,7 @@ spring:
       url: jdbc:mysql://localhost:3306/hospital_mysql?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
       username: root
       password: 123456
+
   servlet:
     multipart:
       enabled: true
@@ -36,7 +37,6 @@ spring:
 
   quartz:
     job-store-type: memory
-
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
@@ -61,10 +61,10 @@ sa-token:
   token-style: uuid
   isReadCookie: false
 
-
-wechat:
-  app-id: wx3e302392b738718d
-  app-secret: 4abaeb547f7d580865be4324e2a8dbf0
+#
+#wechat:
+#  app-id: 你的微信小程序APPID
+#  app-secret: 你的微信小程序密钥
 #  pay:
 #    v3:
 #      patient-wx-api:
@@ -73,7 +73,7 @@ wechat:
 #        mch-id: 微信商户平台ID
 #        domain: http://内网穿透的外网IP地址和端口/hospital-wx-api
 #        cert-path: apiclient_cert.p12
-
+#
 tencent:
   cloud:
     appId: 1308222269
@@ -86,7 +86,6 @@ tencent:
     appId: 1600018532
     secretKey: 196c9dc9e34ea1ef27c4c25c917569cff3aa5f65b5d6006134a578ee59f78321
     expire: 86400
-
 minio:
   endpoint: http://62.234.37.187:9000
   access-key: root

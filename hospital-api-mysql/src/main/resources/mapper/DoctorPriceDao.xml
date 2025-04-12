@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.api.db.dao.DoctorPriceDao">
+    <select id="searchByPage" parameterType="Map" resultType="HashMap">
+        SELECT d."id" AS "id",
+        d."name" AS "doctorName",
+        d."sex" AS "sex",
+        d."tel" AS "tel",
+        d."job" AS "job",
+        md."name" AS "deptName",
+        ds."name" AS "deptSubName",
+        p."price_1" AS "price_1",
+        p."price_2" AS "price_2"
+        FROM DOCTOR d
+        JOIN MEDICAL_DEPT_SUB_AND_DOCTOR sd ON sd."doctor_id" = d."id"
+        JOIN MEDICAL_DEPT_SUB ds ON sd."dept_sub_id" = ds."id"
+        JOIN MEDICAL_DEPT md ON ds."dept_id" = md."id"
+        JOIN DOCTOR_PRICE p ON p."doctor_id" = d."id"
+        WHERE 1=1
+        <if test="name!=null">
+            AND d."name" LIKE '%${name}%'
+        </if>
+<!--        <if test="deptId!=null">-->
+<!--            AND md."id" = ${deptId}-->
+<!--        </if>-->
+        <if test="job!=null">
+            AND d."job" = #{job}
+        </if>
+        LIMIT ${length} OFFSET #{start}
+    </select>
+
+
+    <select id="searchByDoctorId" parameterType="int" resultType="HashMap">
+        SELECT * from DOCTOR_PRICE
+        WHERE "doctor_id" = ${doctorId}
+    </select>
+
+    <update id="update"  parameterType="Map">
+        UPSERT INTO DOCTOR_PRICE(
+        "price_1","price_2"
+    )
+    VALUES (
+        10,10
+        )
+          WHERE "doctor_id" = 10
+    </update>
+
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorPriceEntity">
+                UPSERT INTO DOCTOR_PRICE(
+        "id","doctor_id","level","price_1","price_2"
+    )
+    VALUES (
+        NEXT VALUE FOR DOCTOR_PRICE_SEQUENCE, #{doctorId}, '科室主任', #{price_1},
+        #{price_2}
+        )
+
+    </insert>
+
+</mapper>
