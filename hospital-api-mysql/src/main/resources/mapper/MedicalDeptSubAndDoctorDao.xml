@@ -3,18 +3,21 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.api.db.dao.MedicalDeptSubAndDoctorDao">
-    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.MedicalDeptSubAndDoctorEntity">
-        UPSERT INTO MEDICAL_DEPT_SUB_AND_DOCTOR("id", "dept_sub_id", "doctor_id")
-    VALUES (
-        NEXT VALUE FOR EDICAL_DEPT_SUB_AND_DOCTOR_SEQUENCE,
-        ${deptSubId},
-        ${doctorId}
-        )
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.MedicalDeptSubAndDoctorEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO medical_dept_sub_and_doctor(dept_sub_id, doctor_id)
+        VALUES (
+                   #{deptSubId},
+                   #{doctorId}
+               )
+            ON DUPLICATE KEY UPDATE
+                                 dept_sub_id = VALUES(dept_sub_id),
+                                 doctor_id = VALUES(doctor_id)
     </insert>
 
+    <!-- 更新医生所属科室 -->
     <update id="updateDoctorSubDept" parameterType="Map">
-        UPSERT INTO MEDICAL_DEPT_SUB_AND_DOCTOR("id", "dept_sub_id")
-        SELECT "id", ${subId} FROM MEDICAL_DEPT_SUB_AND_DOCTOR
-        WHERE "doctor_id" = ${doctorId}
+        UPDATE medical_dept_sub_and_doctor
+        SET dept_sub_id = #{subId}
+        WHERE doctor_id = #{doctorId}
     </update>
 </mapper>

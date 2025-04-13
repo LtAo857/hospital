@@ -4,43 +4,55 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.api.db.dao.IllnessDao">
 
-
-    <select id="searchIllnessInfo" parameterType="Map"  resultType="HashMap">
-select * from ILLNESS   LIMIT ${length} OFFSET ${start}
+    <!-- 分页查询疾病信息 -->
+    <select id="searchIllnessInfo" parameterType="Map" resultType="HashMap">
+        SELECT id, name, cause, symptom, method, description
+        FROM illness
+                 LIMIT #{length} OFFSET  ${start}
     </select>
-    <update id="update"  parameterType="com.example.hospital.api.db.pojo.IllnessEntity">
-        UPSERT INTO ILLNESS(
-        id,name,cause,symptom,method,description
-    )
-    VALUES (
-        ${id}, #{name}, #{cause}, #{symptom}, #{method},
-        #{description}
+
+    <!-- 更新疾病信息 -->
+    <update id="update" parameterType="com.example.hospital.api.db.pojo.IllnessEntity">
+        INSERT INTO illness(
+            id, name, cause, symptom, method, description
         )
+        VALUES (
+                   #{id}, #{name}, #{cause}, #{symptom}, #{method},
+                   #{description}
+               )
+            ON DUPLICATE KEY UPDATE
+                                 name = VALUES(name),
+                                 cause = VALUES(cause),
+                                 symptom = VALUES(symptom),
+                                 method = VALUES(method),
+                                 description = VALUES(description)
     </update>
 
-    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.IllnessEntity">
-        UPSERT INTO ILLNESS(
-           id,name,cause,symptom,method,description
-    )
-    VALUES (
-        NEXT VALUE FOR DOCTOR_SEQUENCE, #{name}, #{cause}, #{symptom}, #{method},
-        #{description}
+    <!-- 新增疾病信息 -->
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.IllnessEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO illness(
+            name, cause, symptom, method, description
         )
+        VALUES (
+                   #{name}, #{cause}, #{symptom}, #{method},
+                   #{description}
+               )
     </insert>
 
+    <!-- 根据ID查询疾病详情 -->
     <select id="searchById" parameterType="int" resultType="HashMap">
-        SELECT *
-        FROM ILLNESS
-        WHERE id = ${id}
+        SELECT id, name, cause, symptom, method, description
+        FROM illness
+        WHERE id = #{id}
     </select>
 
-    <update id="deleteByIds">
-        DELETE FROM ILLNESS
+    <!-- 批量删除疾病 -->
+    <delete id="deleteByIds">
+        DELETE FROM illness
         WHERE id IN
         <foreach collection="array" open="(" item="one" separator="," close=")">
-            ${one}
+            #{one}
         </foreach>
-    </update>
-
+    </delete>
 
 </mapper>

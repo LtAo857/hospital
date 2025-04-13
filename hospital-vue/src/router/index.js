@@ -18,7 +18,7 @@ import DoctorPrice from "../views/doctor_price.vue"
 import DoctorSchedule from "../views/doctor_schedule.vue"
 import VideoDiagnose from "../views/video_diagnose.vue"
 import Illness from "../views/illness.vue"
-import Pet from "../views/pet.vue"
+// import Pet from "../views/pet.vue"
 import NotFound from "../views/404.vue"
 
 
@@ -140,15 +140,7 @@ const routes = [{
 					isTab: true
 				}
 			},
-			{
-				path: '/pet',
-				name: 'Pet',
-				component: Pet,
-				meta: {
-					title: '宠物信息',
-					isTab: true
-				}
-			},
+
 
 
 		]

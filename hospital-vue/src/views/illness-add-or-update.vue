@@ -92,77 +92,7 @@ export default {
                         message: '姓名格式错误'
                     }
                 ],
-                pid: [
-                    {
-                        required: true,
-                        message: '身份证号不能为空'
-                    },
-                    {
-                        pattern:
-                            '^[1-9]\\d{5}(18|19|([23]\\d))\\d{2}((0[1-9])|(10|11|12))(([0-2][1-9])|10|20|30|31)\\d{3}[0-9Xx]$',
-                        message: '身份证号不正确'
-                    }
-                ],
-                birthday: [
-                    {
-                        required: true,
-                        message: '出生日期不能为空'
-                    }
-                ],
-                school: [
-                    {
-                        required: true,
-                        message: '毕业学校不能为空'
-                    }
-                ],
-                tel: [
-                    { required: true, message: '电话不能为空' },
-                    {
-                        pattern: '^1[1-9][0-9]{9}$',
-                        message: '电话格式错误'
-                    }
-                ],
-                address: [
-                    {
-                        required: true,
-                        message: '家庭住址不能为空'
-                    }
-                ],
-                email: [
-                    {
-                        required: true,
-                        message: '电子信箱不能为空'
-                    },
-                    {
-                        pattern: '^([a-zA-Z]|[0-9])(\\w|\\-)+@[a-zA-Z0-9]+\\.([a-zA-Z]{2,4})$',
-                        message: '电子信箱格式错误'
-                    }
-                ],
-                job: [
-                    {
-                        required: true,
-                        message: '职务不能为空'
-                    }
-                ],
-                deptSub: [
-                    {
-                        required: true,
-                        message: '科室部门不能为空'
-                    }
-                ],
-                remark: [
-                    {
-                        required: true,
-                        message: '备注信息不能为空'
-                    }
-                ],
-                description: [
-                    {
-                        required: true,
-                        message: '医师介绍不能为空'
-                    }
-                ],
-                hiredate: [{ required: true, message: '入职日期不能为空' }]
+
             }
         };
     },
@@ -266,8 +196,9 @@ export default {
         },
         dataFormSubmit: function() {
             let that = this;
-            that.$refs['dataForm'].validate(function(valid) {
-                if (valid) {
+          console.log(11)
+            // that.$refs['dataForm'].validate(function(valid) {
+                // if (valid) {
                     let data = {
                         id: that.dataForm.id,
                         name: that.dataForm.name,
@@ -287,8 +218,8 @@ export default {
                         that.visible = false;
                         that.$emit('refreshDataList');
                     });
-                }
-            });
+                // }
+            // });
         }
 
 

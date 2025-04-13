@@ -3,92 +3,92 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.api.db.dao.VideoDiagnoseDao">
-    <!--根据挂号单ID，查询付款结果-->
     <select id="searchPaymentStatus" parameterType="int" resultType="HashMap">
-        SELECT "doctor_id" AS "doctorId",
-               "payment_status" AS "paymentStatus"
-        FROM VIDEO_DIAGNOSE
-        WHERE "id" = ${id}
+        SELECT doctor_id AS doctorId,
+               payment_status AS paymentStatus
+        FROM video_diagnose
+        WHERE id = #{id}
     </select>
 
-    <!--关闭挂号单-->
     <update id="closePayment" parameterType="Map">
-        UPSERT INTO VIDEO_DIAGNOSE("id", "payment_status")
-        SELECT "id", 3
-        FROM VIDEO_DIAGNOSE
-        WHERE "payment_status" = 1
-        <if test="id!=null">
-            AND "id" = ${id}
+        UPDATE video_diagnose
+        SET payment_status = 3
+        WHERE payment_status = 1
+        <if test="id != null">
+            AND id = #{id}
         </if>
-        <if test="timer!=null">
-            AND (NOW()-"create_time") &gt;= 0.00695
+        <if test="timer != null">
+            AND TIMESTAMPDIFF(MINUTE, create_time, NOW()) >= 10
         </if>
     </update>
 
     <select id="searchVideoDiagnoseInfo" parameterType="int" resultType="HashMap">
-        SELECT vd."id"                                           AS "diagnoseId",
-               pc."name"                                         AS "name",
-               pc."tel"                                          AS "tel",
-               pu."photo"                                        AS "photo",
-               TO_CHAR(vd."expect_start", 'yyyy-MM-dd HH:mm:ss') AS "expectStart",
-               TO_CHAR(vd."expect_end", 'yyyy-MM-dd HH:mm:ss')   AS "expectEnd",
-               vd."status"                                       AS "status"
-        FROM VIDEO_DIAGNOSE vd
-                 JOIN PATIENT_USER_INFO_CARD pc ON vd."patient_card_id" = pc."id"
-                 JOIN PATIENT_USER pu ON pc."user_id" = pu."id"
-        WHERE vd."id" = ${diagnoseId}
+        SELECT vd.id AS diagnoseId,
+               pc.name AS name,
+               pc.tel AS tel,
+               pu.photo AS photo,
+               DATE_FORMAT(vd.expect_start, '%Y-%m-%d %H:%i:%s') AS expectStart,
+               DATE_FORMAT(vd.expect_end, '%Y-%m-%d %H:%i:%s') AS expectEnd,
+               vd.status AS status
+        FROM video_diagnose vd
+                 JOIN patient_user_info_card pc ON vd.patient_card_id = pc.id
+                 JOIN patient_user pu ON pc.user_id = pu.id
+        WHERE vd.id = #{diagnoseId}
     </select>
 
-
-
     <update id="updateStatus" parameterType="HashMap">
-        UPSERT INTO  VIDEO_DIAGNOSE(
-        "id", "status"
-        <if test="realStart!=null">
-            ,"real_start"
+        INSERT INTO video_diagnose(
+        id, status
+        <if test="realStart != null">
+            , real_start
         </if>
-        <if test="realEnd!=null">
-            ,"real_end"
+        <if test="realEnd != null">
+            , real_end
         </if>
         )
         VALUES(
-        ${id}, ${status}
-        <if test="realStart!=null">
-            ,TO_DATE('${realStart}')
+        #{id}, #{status}
+        <if test="realStart != null">
+            , STR_TO_DATE(#{realStart}, '%Y-%m-%d %H:%i:%s')
         </if>
-        <if test="realEnd!=null">
-            ,TO_DATE('${realEnd}')
+        <if test="realEnd != null">
+            , STR_TO_DATE(#{realEnd}, '%Y-%m-%d %H:%i:%s')
         </if>
         )
+        ON DUPLICATE KEY UPDATE
+        status = VALUES(status)
+        <if test="realStart != null">
+            , real_start = VALUES(real_start)
+        </if>
+        <if test="realEnd != null">
+            , real_end = VALUES(real_end)
+        </if>
     </update>
 
     <update id="closeVideoDiagnose">
-        UPSERT INTO VIDEO_DIAGNOSE("id", "status")
-        SELECT "id", 3
-        FROM VIDEO_DIAGNOSE
-        WHERE "status" IN(1,2)
-          AND (NOW()-"expect_end") &gt;= 0.003472
+        UPDATE video_diagnose
+        SET status = 3
+        WHERE status IN (1,2)
+          AND TIMESTAMPDIFF(MINUTE, expect_end, NOW()) >= 5
     </update>
 
-    <!--查询某位医生最近7天接单统计-->
     <select id="searchStatisticsOfSevenDays" parameterType="int" resultType="HashMap">
-        SELECT TO_CHAR("create_time",'yyyy-MM-dd') AS "date",
-               COUNT(*) AS "count"
-        FROM VIDEO_DIAGNOSE
-        WHERE "doctor_id" = ${doctorId}
-        GROUP BY TO_CHAR("create_time",'yyyy-MM-dd')
-        ORDER BY TO_CHAR("create_time",'yyyy-MM-dd') DESC
-            LIMIT 7 OFFSET 0
-    </select>
-    <!--查询某位医生当年每月接单统计-->
-    <select id="searchStatisticsOfYear" parameterType="int" resultType="HashMap">
-        SELECT TO_CHAR("create_time",'yyyy-MM') AS "month",
-               COUNT(*) AS "count"
-        FROM VIDEO_DIAGNOSE
-        WHERE "doctor_id" = ${doctorId}
-          AND TO_CHAR(NOW(),'yyyy') = TO_CHAR("create_time",'yyyy')
-        GROUP BY TO_CHAR("create_time",'yyyy-MM')
-        ORDER BY TO_CHAR("create_time",'yyyy-MM')
+        SELECT DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+               COUNT(*) AS count
+        FROM video_diagnose
+        WHERE doctor_id = #{doctorId}
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY DATE_FORMAT(create_time, '%Y-%m-%d') DESC
+            LIMIT 7
     </select>
 
+    <select id="searchStatisticsOfYear" parameterType="int" resultType="HashMap">
+        SELECT DATE_FORMAT(create_time, '%Y-%m') AS month,
+               COUNT(*) AS count
+        FROM video_diagnose
+        WHERE doctor_id = #{doctorId}
+          AND DATE_FORMAT(NOW(), '%Y') = DATE_FORMAT(create_time, '%Y')
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY DATE_FORMAT(create_time, '%Y-%m')
+    </select>
 </mapper>

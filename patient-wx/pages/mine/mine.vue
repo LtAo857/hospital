@@ -21,8 +21,6 @@
 			margin-bottom: 5rpx;margin-left: 250rpx;" class="logout" @tap="logout">退出登录</text>
 					</view>
 
-
-					
 				</view>
 			</view>
 		</view>

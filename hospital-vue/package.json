@@ -10,7 +10,7 @@
     "dayjs": "1.11.5",
     "echarts": "5.4.0",
     "element-plus": "2.2.16",
-    "fast-glob": "3.2.11nvm",
+    "fast-glob": "3.2.11",
     "html2canvas": "1.4.1",
     "jquery": "3.6.1",
     "jspdf": "2.5.1",

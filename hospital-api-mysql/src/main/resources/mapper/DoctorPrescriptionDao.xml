@@ -3,14 +3,32 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.api.db.dao.DoctorPrescriptionDao">
-    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorPrescriptionEntity">
-        UPSERT INTO DOCTOR_PRESCRIPTION(
-        "id", "uuid", "patient_card_id", "diagnosis", "sub_dept_id", "doctor_id", "registration_id", "rp"
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorPrescriptionEntity">  INSERT INTO doctor_prescription(
+
+        patient_card_id,
+        diagnosis,
+        sub_dept_id,
+        doctor_id,
+        registration_id,
+        rp
     )
-    VALUES (
-        NEXT VALUE FOR DOCTOR_PRESCRIPTION_SEQUENCE, #{uuid}, ${patientCardId}, #{diagnosis},
-        ${subDeptId}, ${doctorId}, ${registrationId}, #{rp}
-        )
+                                                                                                    VALUES (
+                                                                                                               #{uuid},
+                                                                                                               #{patientCardId},
+                                                                                                               #{diagnosis},
+                                                                                                               #{subDeptId},
+                                                                                                               #{doctorId},
+                                                                                                               #{registrationId},
+                                                                                                               #{rp}
+                                                                                                           )
+                                                                                                        ON DUPLICATE KEY UPDATE
+                                                                                                                             uuid = VALUES(uuid),
+                                                                                                                             patient_card_id = VALUES(patient_card_id),
+                                                                                                                             diagnosis = VALUES(diagnosis),
+                                                                                                                             sub_dept_id = VALUES(sub_dept_id),
+                                                                                                                             doctor_id = VALUES(doctor_id),
+                                                                                                                             registration_id = VALUES(registration_id),
+                                                                                                                             rp = VALUES(rp)
     </insert>
 
 

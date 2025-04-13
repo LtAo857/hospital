@@ -3,191 +3,208 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.api.db.dao.DoctorDao">
+    <!-- 分页查询医生列表 -->
     <select id="searchByPage" parameterType="Map" resultType="HashMap">
-        SELECT d."id" AS "id",
-        d."name" AS "name",
-        d."sex" AS "sex",
-        d."tel" AS "tel",
-        d."school" AS "school",
-        d."degree" AS "degree",
-        d."job" AS "job",
-        md."name" AS "deptName",
-        ds."name" AS "subName",
-        d."recommended" AS "recommended",
-        d."status" AS "status"
-        FROM DOCTOR d
-        JOIN MEDICAL_DEPT_SUB_AND_DOCTOR sd ON sd."doctor_id" = d."id"
-        JOIN MEDICAL_DEPT_SUB ds ON sd."dept_sub_id" = ds."id"
-        JOIN MEDICAL_DEPT md ON ds."dept_id" = md."id"
+        SELECT d.id AS id,
+        d.name AS name,
+        d.sex AS sex,
+        d.tel AS tel,
+        d.school AS school,
+        d.degree AS degree,
+        d.job AS job,
+        md.name AS deptName,
+        ds.name AS subName,
+        d.recommended AS recommended,
+        d.status AS status
+        FROM doctor d
+        JOIN medical_dept_sub_and_doctor sd ON sd.doctor_id = d.id
+        JOIN medical_dept_sub ds ON sd.dept_sub_id = ds.id
+        JOIN medical_dept md ON ds.dept_id = md.id
         WHERE 1=1
         <if test="name!=null">
-            AND d."name" LIKE '%${name}%'
+            AND d.name LIKE CONCAT('%', #{name}, '%')
         </if>
         <if test="deptId!=null">
-            AND md."id" = ${deptId}
+            AND md.id = #{deptId}
         </if>
         <if test="degree!=null">
-            AND d."degree" = #{degree}
+            AND d.degree = #{degree}
         </if>
         <if test="job!=null">
-            AND d."job" = #{job}
+            AND d.job = #{job}
         </if>
         <if test="recommended!=null">
-            AND d."recommended" = ${recommended}
+            AND d.recommended = #{recommended}
         </if>
-        AND d."status" = ${status}
+        AND d.status = #{status}
         <if test="order!=null">
-            ORDER BY md."id" ${order}
+            ORDER BY md.id ${order}
         </if>
-        LIMIT ${length} OFFSET #{start}
+        LIMIT #{length} OFFSET #{start}
     </select>
 
+    <!-- 查询医生总数 -->
     <select id="searchCount" parameterType="Map" resultType="long">
         SELECT COUNT(*)
-        FROM DOCTOR d
-        JOIN MEDICAL_DEPT_SUB_AND_DOCTOR sd ON sd."doctor_id" = d."id"
-        JOIN MEDICAL_DEPT_SUB ds ON sd."dept_sub_id" = ds."id"
-        JOIN MEDICAL_DEPT md ON ds."dept_id" = md."id"
+        FROM doctor d
+        JOIN medical_dept_sub_and_doctor sd ON sd.doctor_id = d.id
+        JOIN medical_dept_sub ds ON sd.dept_sub_id = ds.id
+        JOIN medical_dept md ON ds.dept_id = md.id
         WHERE 1=1
         <if test="name!=null">
-            AND d."name" LIKE '%${name}%'
+            AND d.name LIKE CONCAT('%', #{name}, '%')
         </if>
         <if test="deptId!=null">
-            AND md."id" = ${deptId}
+            AND md.id = #{deptId}
         </if>
         <if test="degree!=null">
-            AND d."degree" = #{degree}
+            AND d.degree = #{degree}
         </if>
         <if test="job!=null">
-            AND d."job" = #{job}
+            AND d.job = #{job}
         </if>
         <if test="recommended!=null">
-            AND d."recommended" = ${recommended}
+            AND d.recommended = #{recommended}
         </if>
-        AND d."status" = ${status}
+        AND d.status = #{status}
     </select>
 
+    <!-- 查询医生详细信息 -->
     <select id="searchContent" parameterType="int" resultType="HashMap">
-        SELECT "photo",
-               "pid",
-               "birthday",
-               "uuid",
-               "hiredate",
-               "email",
-               "remark",
-               "tag",
-               "address",
-               "description"
-        FROM DOCTOR
-        WHERE "id" = ${id}
+        SELECT photo,
+               pid,
+               DATE_FORMAT(birthday, '%Y-%m-%d') AS birthday,
+               uuid,
+               DATE_FORMAT(hiredate, '%Y-%m-%d') AS hiredate,
+               email,
+               remark,
+               tag,
+               address,
+               description
+        FROM doctor
+        WHERE id = #{id}
     </select>
 
+    <!-- 更新医生照片 -->
     <update id="updatePhoto" parameterType="Map">
-        UPSERT INTO DOCTOR("id", "photo")
-    VALUES(${id}, #{photo})
+        INSERT INTO doctor(id, photo)
+        VALUES(#{id}, #{photo})
+            ON DUPLICATE KEY UPDATE photo = #{photo}
     </update>
 
-
-    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorEntity">
-        UPSERT INTO DOCTOR(
-        "id", "name", "pid", "uuid", "sex", "birthday",
-        "school", "degree", "tel", "address", "email", "job", "remark",
-        "description", "hiredate", "tag","recommended","status", "create_time"
-    )
-    VALUES (
-        NEXT VALUE FOR DOCTOR_SEQUENCE, #{name}, #{pid}, #{uuid}, #{sex}, TO_DATE('${birthday}'),
-        #{school}, #{degree}, #{tel}, #{address}, #{email}, #{job}, #{remark},
-        #{description}, #{hiredate}, #{tag}, ${recommended}, ${status}, NOW()
+    <!-- 新增医生 -->
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO doctor(
+            name, pid, uuid, sex, birthday,
+            school, degree, tel, address, email, job, remark,
+            description, hiredate, tag, recommended, status, create_time
         )
+        VALUES (
+                   #{name}, #{pid}, #{uuid}, #{sex}, STR_TO_DATE(#{birthday}, '%Y-%m-%d'),
+                   #{school}, #{degree}, #{tel}, #{address}, #{email}, #{job}, #{remark},
+                   #{description}, STR_TO_DATE(#{hiredate}, '%Y-%m-%d'), #{tag},
+                   #{recommended}, #{status}, NOW()
+               )
     </insert>
 
+    <!-- 根据UUID查询医生ID -->
     <select id="searchIdByUuid" parameterType="String" resultType="Integer">
-        SELECT "id"
-        FROM DOCTOR
-        WHERE "uuid" = #{uuid}
+        SELECT id
+        FROM doctor
+        WHERE uuid = #{uuid}
     </select>
-    <select id="searchDeptAndSub" resultType="java.util.HashMap"></select>
 
-
+    <!-- 查询医生详细信息（带科室） -->
     <select id="searchById" parameterType="int" resultType="HashMap">
-        SELECT d."id" AS "id",
-               d."name" AS "name",
-               d."pid" AS "pid",
-               d."uuid" AS"uuid",
-               d."sex" AS "sex",
-               d."birthday" AS "birthday",
-               d."school" AS "school",
-               d."degree" AS "degree",
-               d."tel" AS "tel",
-               d."address" AS "address",
-               d."email" AS "email",
-               d."job" AS "job",
-               d."remark" AS "remark",
-               d."description" AS "description",
-               d."hiredate" AS "hiredate",
-               d."tag" AS "tag",
-               d."recommended" AS "recommended",
-               d."status" AS "status",
-               md."name" AS "deptName",
-               sd."dept_sub_id" AS "deptSubId"
-        FROM DOCTOR d
-                 JOIN MEDICAL_DEPT_SUB_AND_DOCTOR sd ON sd."doctor_id" = d."id"
-                 JOIN MEDICAL_DEPT_SUB s ON sd."dept_sub_id" = s."id"
-                 JOIN MEDICAL_DEPT md ON s."dept_id" = md."id"
-        WHERE d."id" = ${id}
+        SELECT d.id AS id,
+               d.name AS name,
+               d.pid AS pid,
+               d.uuid AS uuid,
+               d.sex AS sex,
+               DATE_FORMAT(d.birthday, '%Y-%m-%d') AS birthday,
+               d.school AS school,
+               d.degree AS degree,
+               d.tel AS tel,
+               d.address AS address,
+               d.email AS email,
+               d.job AS job,
+               d.remark AS remark,
+               d.description AS description,
+               DATE_FORMAT(d.hiredate, '%Y-%m-%d') AS hiredate,
+               d.tag AS tag,
+               d.recommended AS recommended,
+               d.status AS status,
+               md.name AS deptName,
+               sd.dept_sub_id AS deptSubId
+        FROM doctor d
+                 JOIN medical_dept_sub_and_doctor sd ON sd.doctor_id = d.id
+                 JOIN medical_dept_sub s ON sd.dept_sub_id = s.id
+                 JOIN medical_dept md ON s.dept_id = md.id
+        WHERE d.id = #{id}
     </select>
 
+    <!-- 更新医生信息 -->
     <update id="update" parameterType="Map">
-        UPSERT INTO DOCTOR(
-        "id", "name", "pid", "sex", "birthday",
-        "school", "degree", "tel", "address", "email", "job", "remark",
-        "description", "hiredate", "tag","recommended","status"
-    )
-    VALUES (
-        ${id}, #{name}, #{pid}, #{sex}, TO_DATE('${birthday}'),
-        #{school}, #{degree}, #{tel}, #{address}, #{email}, #{job}, #{remark},
-        #{description}, #{hiredate}, #{tag}, ${recommended}, ${status}
-        )
+        UPDATE doctor
+        SET
+            name = #{name},
+            pid = #{pid},
+            sex = #{sex},
+            birthday = STR_TO_DATE(#{birthday}, '%Y-%m-%d'),
+            school = #{school},
+            degree = #{degree},
+            tel = #{tel},
+            address = #{address},
+            email = #{email},
+            job = #{job},
+            remark = #{remark},
+            description = #{description},
+            hiredate = STR_TO_DATE(#{hiredate}, '%Y-%m-%d'),
+            tag = #{tag},
+            recommended = #{recommended},
+            status = #{status}
+        WHERE id = #{id}
     </update>
 
+    <!-- 批量删除医生（逻辑删除） -->
     <update id="deleteByIds">
-        UPSERT INTO DOCTOR("id", "status")
-        SELECT "id", 4
-        FROM DOCTOR
-        WHERE "id" IN
-        <foreach collection="array" open="(" item="one" separator="," close=")">
-            ${one}
+        UPDATE doctor
+        SET status = 4
+        WHERE id IN
+        <foreach collection="array" item="one" open="(" separator="," close=")">
+            #{one}
         </foreach>
     </update>
 
+    <!-- 查询科室下医生 -->
     <select id="searchByDeptSubId" parameterType="int" resultType="HashMap">
-        SELECT d."id" AS "id",
-               d."name" AS "name"
-        FROM DOCTOR d
-                 JOIN MEDICAL_DEPT_SUB_AND_DOCTOR sd ON sd."doctor_id" = d."id"
-        WHERE sd."dept_sub_id" = ${deptSubId}
-          AND d."status" = 1
+        SELECT d.id AS id,
+               d.name AS name
+        FROM doctor d
+        JOIN medical_dept_sub_and_doctor sd ON sd.doctor_id = d.id
+        WHERE sd.dept_sub_id = #{deptSubId}
+          AND d.status = 1
     </select>
 
+    <!-- 查询在线问诊缓存数据 -->
     <select id="searchDataForOnlineCache" parameterType="int" resultType="HashMap">
-        select d."id" AS "doctorId",
-               d."uuid" AS "uuid",
-               d."name" AS "name",
-               d."photo" AS "photo",
-               d."job" AS "job",
-               d."description" AS "description",
-               d."remark" AS "remark",
-               md."id" AS "deptId",
-               md."name" AS "deptName",
-               ds."id" AS "subId",
-               ds."name" AS "subName",
-               TO_CHAR(dp."price_2") AS "price"
-        FROM DOCTOR d
-                 JOIN MEDICAL_DEPT_SUB_AND_DOCTOR sd ON sd."doctor_id" = d."id"
-                 JOIN MEDICAL_DEPT_SUB ds ON sd."dept_sub_id" = ds."id"
-                 JOIN MEDICAL_DEPT md ON md."id" = ds."dept_id"
-                 JOIN DOCTOR_PRICE dp ON dp."doctor_id" = d."id"
-        WHERE d."id" = ${doctorId}
+        SELECT d.id AS doctorId,
+               d.uuid AS uuid,
+               d.name AS name,
+               d.photo AS photo,
+               d.job AS job,
+               d.description AS description,
+               d.remark AS remark,
+               md.id AS deptId,
+               md.name AS deptName,
+               ds.id AS subId,
+               ds.name AS subName,
+               FORMAT(dp.price_2, 2) AS price
+        FROM doctor d
+                 JOIN medical_dept_sub_and_doctor sd ON sd.doctor_id = d.id
+                 JOIN medical_dept_sub ds ON sd.dept_sub_id = ds.id
+                 JOIN medical_dept md ON md.id = ds.dept_id
+                 JOIN doctor_price dp ON dp.doctor_id = d.id
+        WHERE d.id = #{doctorId}
     </select>
-
 </mapper>

@@ -19,16 +19,16 @@
     </select>
 
     <select id="searchRefId" parameterType="int" resultType="HashMap">
-        SELECT "job",
-               "ref_id" AS "refId"
+        SELECT job,
+               ref_id AS refId
         FROM MIS_USER
-        WHERE "id" = ${id}
+        WHERE id = ${id}
     </select>
 
     <select id="searchUserId" parameterType="HashMap" resultType="Integer">
-        SELECT "id"
+        SELECT id
         FROM MIS_USER
-        WHERE "ref_id" = ${refId}
-          AND "job" = #{job}
+        WHERE ref_id = ${refId}
+          AND job = #{job}
     </select>
 </mapper>

@@ -218,10 +218,7 @@ export default {
                 that.dataListLoading = false;
 
             });
-            that.$http('/pet/searchByPage', 'POST', data, true, function(resp) {
-            
 
-            });
         },
         
         // 查询科室列表记录

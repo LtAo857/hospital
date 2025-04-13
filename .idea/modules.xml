@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/hos.iml" filepath="$PROJECT_DIR$/.idea/hos.iml" />
-      <module fileurl="file://$PROJECT_DIR$/hospital-api/hospital-api.iml" filepath="$PROJECT_DIR$/hospital-api/hospital-api.iml" />
       <module fileurl="file://$PROJECT_DIR$/patient-wx-api/patient-wx-api.iml" filepath="$PROJECT_DIR$/patient-wx-api/patient-wx-api.iml" />
     </modules>
   </component>
