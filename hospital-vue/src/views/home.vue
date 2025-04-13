@@ -2,7 +2,7 @@
 	<div class="home">
 		<el-row :gutter="70" type="flex" justify="center">
 			<el-col :span="9" class="left">
-				<h2>智慧医疗系统</h2>
+				<h2>智慧医疗挂号系统</h2>
 				<div class="desc">
 					<p>医疗健康&nbsp;&nbsp;模式创新</p>
 					<p>汇集名医&nbsp;&nbsp;让诊疗更简单</p>

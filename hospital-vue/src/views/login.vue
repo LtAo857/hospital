@@ -12,7 +12,7 @@
                     <el-col :span="12">
                         <div class="right">
                             <div class="title-container">
-                                <h2>智慧医疗系统</h2>
+                                <h2>智慧医疗挂号系统</h2>
                                 <span>V1.0</span>
                             </div>
                             <div v-if="!qrCodeVisible">

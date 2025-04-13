@@ -8,7 +8,7 @@
 		<nav class="site-navbar" :class="'site-navbar--' + navbarLayoutType">
 			<div class="site-navbar__header">
 				<h1 class="site-navbar__brand">
-					<a class="site-navbar__brand-lg">智慧医疗系统</a>
+					<a class="site-navbar__brand-lg">智慧医疗挂号系统</a>
 					<a class="site-navbar__brand-mini">医院</a>
 				</h1>
 			</div>
