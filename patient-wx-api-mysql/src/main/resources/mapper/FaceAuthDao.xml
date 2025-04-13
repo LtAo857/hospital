@@ -3,23 +3,25 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.FaceAuthDao">
+
+    <!-- 检查当日是否已有人脸认证 -->
     <select id="hasFaceAuthInDay" parameterType="Map" resultType="Integer">
-        SELECT a."id" AS "id"
-        FROM PATIENT_FACE_AUTH a
-                 JOIN PATIENT_USER_INFO_CARD c ON a."patient_card_id" = c."id"
-        WHERE c."user_id" = ${userId}
-          AND a."date" = TO_DATE('${today}')
+        SELECT a.id
+        FROM patient_face_auth a
+                 JOIN patient_user_info_card c ON a.patient_card_id = c.id
+        WHERE c.user_id = #{userId}
+          AND a STR_TO_DATE(#{today}, '%Y-%m-%d')
             LIMIT 1
     </select>
 
-    <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.FaceAuthEntity">
-        UPSERT INTO PATIENT_FACE_AUTH(
-        "id", "patient_card_id", "date"
-    )
-    VALUES(
-        NEXT VALUE FOR PATIENT_FACE_AUTH_SEQUENCE, ${patientCardId} , TO_DATE('${date}')
-        )
+    <!-- 新增人脸认证记录 -->
+    <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.FaceAuthEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO patient_face_auth(patient_card_id, date)
+        VALUES(#{patientCardId}, STR_TO_DATE(#{date}, '%Y-%m-%d'))
+        ON DUPLICATE KEY UPDATE
+            patient_card_id = VALUES(patient_card_id),
+            date = VALUES(date)
     </insert>
-
 
 </mapper>

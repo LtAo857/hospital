@@ -3,33 +3,32 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanScheduleDao">
+    <!-- 查询医生排班时段 -->
     <select id="searchDoctorWorkPlanSchedule" parameterType="Map" resultType="HashMap">
-        SELECT p."id"      AS "workPlanId",
-               s."id"      AS "scheduleId",
-               s."slot"    AS "slot",
-               s."maximum" AS "maximum",
-               s."num"     AS "num"
-        FROM DOCTOR_WORK_PLAN p
-                 JOIN DOCTOR_WORK_PLAN_SCHEDULE s ON p."id" = s."work_plan_id"
-        WHERE p."date" = TO_DATE('${date}')
-          AND p."doctor_id" = ${doctorId}
-        ORDER BY s."id"
+        SELECT p.id AS workPlanId,
+               s.id AS scheduleId,
+               s.slot,
+               s.maximum AS maximum,
+               s.num AS num
+        FROM doctor_work_plan p
+                 JOIN doctor_work_plan_schedule s ON p.id =work_plan_id
+        WHERE p.date = STR_TO_DATE(#{date}, '%Y-%m-%d')
+          AND p.doctor_id = #{doctorId}
+        ORDER BY s.id
     </select>
 
+    <!-- 更新时段号源数量 -->
     <update id="updateNumById" parameterType="Map">
-        UPSERT INTO DOCTOR_WORK_PLAN_SCHEDULE("id","num")
-        SELECT "id",
-               "num" + ${n} AS "num"
-        FROM DOCTOR_WORK_PLAN_SCHEDULE
-        WHERE "id" = ${id}
+        UPDATE doctor_work_plan_schedule
+        SET num = num + #{n}
+        WHERE id = #{id}
     </update>
 
+    <!-- 根据订单号释放号源 -->
     <update id="releaseNumByOutTradeNo" parameterType="String">
-        UPSERT INTO DOCTOR_WORK_PLAN_SCHEDULE("id","num")
-        SELECT s."id", s."num" - 1 AS "num"
-        FROM MEDICAL_REGISTRATION r
-                 JOIN DOCTOR_WORK_PLAN_SCHEDULE s ON r."doctor_schedule_id" = s."id"
-        WHERE r."out_trade_no" = #{outTradeNo}
+        UPDATE doctor_work_plan_schedule s
+            JOIN medical_registration r ON r.doctor_schedule_id = s.id
+            SET s.num = s.num - 1
+        WHERE r.out_trade_no = #{outTradeNo}
     </update>
-
 </mapper>

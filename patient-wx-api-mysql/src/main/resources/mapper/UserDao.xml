@@ -3,33 +3,33 @@
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.UserDao">
 
     <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.UserEntity">
-        UPSERT INTO PATIENT_USER(
-        "id", "open_id", "nickname", "photo", "sex", "status", "create_time"
+        INSERT INTO PATIENT_USER(
+        open_id, nickname, photo, sex, status, create_time
     )
     VALUES(
-        NEXT VALUE FOR PATIENT_USER_SEQUENCE, #{openId}, #{nickname}, #{photo}, #{sex}, #{status}, NOW()
+       #{openId}, #{nickname}, #{photo}, #{sex}, #{status}, NOW()
         )
     </insert>
 
     <select id="searchAlreadyRegistered" parameterType="String" resultType="Integer">
-        SELECT "id"
+        SELECT id
         FROM PATIENT_USER
-        WHERE "open_id" = #{openId}
+        WHERE open_id = #{openId}
             LIMIT 1
     </select>
 
     <select id="searchUserInfo" parameterType="int" resultType="HashMap">
-        SELECT "nickname", "sex", "photo"
+        SELECT nickname, sex, photo
         FROM PATIENT_USER
-        WHERE "id" = ${userId}
+        WHERE id = ${userId}
     </select>
 
     <select id="searchOpenId" parameterType="int" resultType="HashMap">
-        SELECT u."open_id" AS "openId",
-               c."id" AS "patientCardId"
+        SELECT u.open_id AS openId,
+               c.id AS patientCardId
         FROM PATIENT_USER u
-                 JOIN PATIENT_USER_INFO_CARD c ON c."user_id"=u."id"
-        WHERE u."id" = #{userId}
+                 JOIN PATIENT_USER_INFO_CARD c ON c.user_id=u.id
+        WHERE u.id = #{userId}
     </select>
 
 

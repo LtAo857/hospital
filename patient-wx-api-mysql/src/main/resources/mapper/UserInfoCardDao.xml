@@ -1,70 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.UserInfoCardDao">
+
+    <!-- 查询用户电话 -->
     <select id="searchUserTel" parameterType="int" resultType="String">
-        SELECT "tel"
-        FROM PATIENT_USER_INFO_CARD
-        WHERE "user_id" = ${userId}
+        SELECT tel
+        FROM patient_user_info_card
+        WHERE user_id = #{userId}
             LIMIT 1
     </select>
 
-    <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.UserInfoCardEntity">
-        UPSERT INTO PATIENT_USER_INFO_CARD(
-        "id",
-        "user_id", "uuid", "name", "sex", "pid",
-        "tel", "birthday", "medical_history", "insurance_type"
-    )
-    VALUES (
-        NEXT VALUE FOR PATIENT_USER_INFO_CARD_SEQUENCE,
-        ${userId}, #{uuid}, #{name}, #{sex}, #{pid},
-        #{tel}, #{birthday}, #{medicalHistory}, #{insuranceType}
+    <!-- 新增患者信息卡 -->
+    <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.UserInfoCardEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO patient_user_info_card(
+            user_id, uuid, name, sex, pid,
+            tel, birthday, medical_history, insurance_type
         )
+        VALUES (
+                   #{userId}, #{uuid}, #{name}, #{sex}, #{pid},
+                   #{tel}, #{birthday}, #{medicalHistory}, #{insuranceType}
+               )
+            ON DUPLICATE KEY UPDATE
+                                 name = VALUES(name),
+                                 sex = VALUES(sex),
+                                 pid = VALUES(pid),
+                                 tel = VALUES(tel),
+                                 birthday = VALUES(birthday),
+                                 medical_history = VALUES(medical_history),
+                                 insurance_type = VALUES(insurance_type)
     </insert>
 
+    <!-- 查询患者信息卡 -->
     <select id="searchUserInfoCard" parameterType="int" resultType="HashMap">
-        SELECT "id", "uuid", "name", "sex", "pid", "tel", "birthday",
-               "medical_history" AS "medicalHistory",
-               "insurance_type"  AS "insuranceType"
-        FROM PATIENT_USER_INFO_CARD
-        WHERE "user_id" = ${userId}
+        SELECT id, uuid, name, sex, pid, tel, birthday,
+               medical_history AS medicalHistory,
+               insurance_type AS insuranceType
+        FROM patient_user_info_card
+        WHERE user_id = #{userId}
     </select>
+
+    <!-- 更新患者信息 -->
     <update id="update" parameterType="com.example.hospital.patient.wx.api.db.pojo.UserInfoCardEntity">
-        UPSERT INTO PATIENT_USER_INFO_CARD(
-        "id", "name", "sex", "pid",
-        "tel", "birthday", "medical_history", "insurance_type"
-    )
-    VALUES (
-        ${id}, #{name}, #{sex}, #{pid},
-        #{tel}, #{birthday}, #{medicalHistory}, #{insuranceType}
-        )
+        UPDATE patient_user_info_card
+        SET name = #{name},
+            sex = #{sex},
+            pid = #{pid},
+            tel = #{tel},
+            birthday = #{birthday},
+            medical_history = #{medicalHistory},
+            insurance_type = #{insuranceType}
+        WHERE id = #{id}
     </update>
 
+    <!-- 检查是否存在信息卡 -->
     <select id="hasUserInfoCard" parameterType="int" resultType="Integer">
-        SELECT "id"
-        FROM PATIENT_USER_INFO_CARD
-        WHERE "user_id" = ${userId}
+        SELECT id
+        FROM patient_user_info_card
+        WHERE user_id = #{userId}
             LIMIT 1
     </select>
 
+    <!-- 查询是否有人脸模型 -->
     <select id="searchExistFaceModel" parameterType="int" resultType="Boolean">
-        SELECT "exist_face_model" AS "existFaceModel"
-        FROM PATIENT_USER_INFO_CARD
-        WHERE "user_id" = ${userId}
+        SELECT exist_face_model
+        FROM patient_user_info_card
+        WHERE user_id = #{userId}
             LIMIT 1
     </select>
 
+    <!-- 更新人脸模型状态 -->
     <update id="updateExistFaceModel" parameterType="Map">
-        UPSERT INTO PATIENT_USER_INFO_CARD(
-            "id","exist_face_model"
-        )
-        SELECT "id", ${existFaceModel} FROM PATIENT_USER_INFO_CARD
-        WHERE "user_id" = ${userId}
+        UPDATE patient_user_info_card
+        SET exist_face_model = #{existFaceModel}
+        WHERE user_id = #{userId}
     </update>
 
+    <!-- 查询信息卡ID -->
     <select id="searchIdByUserId" parameterType="int" resultType="Integer">
-        SELECT "id" FROM PATIENT_USER_INFO_CARD
-        WHERE "user_id" = ${userId}
+        SELECT id
+        FROM patient_user_info_card
+        WHERE user_id = #{userId}
     </select>
-
 
 </mapper>

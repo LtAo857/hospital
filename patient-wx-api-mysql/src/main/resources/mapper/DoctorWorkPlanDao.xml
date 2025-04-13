@@ -3,65 +3,67 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanDao">
+    <!-- 查询指定日期范围内的工作计划 -->
     <select id="searchWorkPlanInRange" parameterType="Map" resultType="HashMap">
-        SELECT md."name" AS "deptName",
-        ds."id"   AS "deptSubId",
-        ds."name" AS "deptSubName",
-        d."name"  AS "doctorName",
-        wp."id"   AS "workPlanId",
-        wp."date" AS "date"
-        FROM DOCTOR_WORK_PLAN wp
-        JOIN DOCTOR d ON wp."doctor_id" = d."id"
-        JOIN MEDICAL_DEPT_SUB ds ON ds."id" = wp."dept_sub_id"
-        JOIN MEDICAL_DEPT md ON ds."dept_id" = md."id"
-        WHERE wp."date" BETWEEN TO_DATE('${startDate}') AND TO_DATE('${endDate}')
-        <if test="deptId!=null">
-            AND ds."dept_id" = ${deptId}
+        SELECT md.name AS deptName,
+        ds.id AS deptSubId,
+        ds.name AS deptSubName,
+        d.name AS doctorName,
+        wp.id AS workPlanId,
+        DATE_FORMAT(wp.date, '%Y-%m-%d') AS date
+        FROM doctor_work_plan wp
+        JOIN doctor d ON wp.doctor_id = d.id
+        JOIN medical_dept_sub ds ON ds.id = wp.dept_sub_id
+        JOIN medical_dept md ON ds.dept_id = md.id
+        WHERE wp.date BETWEEN STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+        AND STR_TO_DATE(#{endDate}, '%Y-%m-%d')
+        <if test="deptId != null">
+            AND ds.dept_id = #{deptId}
         </if>
-        <if test="doctorName!=null">
-            AND d."name" LIKE '%${doctorName}%'
+        <if test="doctorName != null">
+            AND d.name LIKE CONCAT('%', #{doctorName}, '%')
         </if>
-        ORDER BY ds."id",wp."date"
+        ORDER BY ds.id, wp.date
     </select>
 
+    <!-- 查询可挂号日期范围 -->
     <select id="searchCanRegisterInDateRange" parameterType="Map" resultType="String">
-        SELECT DISTINCT "date"
-        FROM DOCTOR_WORK_PLAN
-        WHERE "dept_sub_id" = ${deptSubId}
-        AND "date" BETWEEN TO_DATE('${startDate}') AND TO_DATE('${endDate}')
+        SELECT DISTINCT DATE_FORMAT(date, '%Y-%m-%d')
+        FROM doctor_work_plan
+        WHERE dept_sub_id = #{deptSubId}
+          AND date BETWEEN STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+          AND STR_TO_DATE(#{endDate}, '%Y-%m-%d')
     </select>
 
+    <!-- 查询科室当日医生排班 -->
     <select id="searchDeptSubDoctorPlanInDay" parameterType="Map" resultType="HashMap">
-        SELECT d."id"          AS "id",
-               d."name"        AS "name",
-               d."photo"       AS "photo",
-               d."job"         AS "job",
-               d."description" AS "description",
-               p."num"         AS "num",
-               p."maximum"     AS "maximum",
-               TO_CHAR(dp."price_1", '#00.00') AS "price"
-        FROM DOCTOR_WORK_PLAN p
-                 JOIN DOCTOR d ON p."doctor_id" = d."id"
-                 JOIN DOCTOR_PRICE dp ON p."doctor_id" = dp."doctor_id"
-        WHERE p."dept_sub_id" = ${deptSubId}
-          AND p."date" = TO_DATE('${date}')
+        SELECT d.id AS id,
+               d.name AS name,
+               d.photo AS photo,
+               d.job AS job,
+               d.description AS description,
+               p.num AS num,
+               p.maximum AS maximum,
+               FORMAT(dp.price_1, 2) AS price
+        FROM doctor_work_plan p
+                 JOIN doctor d ON p.doctor_id = d.id
+                 JOIN doctor_price dp ON p.doctor_id = dp.doctor_id
+        WHERE p.dept_sub_id = #{deptSubId}
+          AND p.date = STR_TO_DATE(#{date}, '%Y-%m-%d')
     </select>
 
+    <!-- 更新号源数量 -->
     <update id="updateNumById" parameterType="Map">
-        UPSERT INTO DOCTOR_WORK_PLAN("id","num")
-        SELECT "id",
-               "num" + ${n} AS "num"
-        FROM DOCTOR_WORK_PLAN
-        WHERE "id" = ${id}
+        UPDATE doctor_work_plan
+        SET num = num + #{n}
+        WHERE id = #{id}
     </update>
 
+    <!-- 根据订单号释放号源 -->
     <update id="releaseNumByOutTradeNo" parameterType="String">
-        UPSERT INTO DOCTOR_WORK_PLAN("id","num")
-        SELECT p."id", p."num"-1 AS "num"
-        FROM MEDICAL_REGISTRATION r
-                 JOIN DOCTOR_WORK_PLAN p ON r."work_plan_id" = p."id"
-        WHERE r."out_trade_no" = #{outTradeNo}
+        UPDATE doctor_work_plan p
+            JOIN medical_registration r ON r.work_plan_id = p.id
+            SET p.num = p.num - 1
+        WHERE r.out_trade_no = #{outTradeNo}
     </update>
-
-
 </mapper>
