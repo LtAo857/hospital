@@ -4,15 +4,14 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.DoctorDao">
     <select id="searchDoctorInfoById" parameterType="int" resultType="HashMap">
-        SELECT
-            d.name AS name,
+        SELECT d.name AS name,
                d.photo AS photo,
-            d.job AS job,
-            d.remark AS remark,
-            d.description AS description,
-               TO_CHAR(p.price_1,'###.##') AS price
-        FROM DOCTOR d
-                 JOIN DOCTOR_PRICE p ON d.id=p.doctor_id
+               d.job AS job,
+               d.remark AS remark,
+               d.description AS description,
+               FORMAT(p.price_1, 2) AS price
+        FROM doctor d
+                 JOIN doctor_price p ON d.id = p.doctor_id
         WHERE d.id = #{id}
     </select>
 

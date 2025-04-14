@@ -10,7 +10,7 @@
         FROM patient_face_auth a
                  JOIN patient_user_info_card c ON a.patient_card_id = c.id
         WHERE c.user_id = #{userId}
-          AND a STR_TO_DATE(#{today}, '%Y-%m-%d')
+          AND a.date = STR_TO_DATE(#{today}, '%Y-%m-%d')
             LIMIT 1
     </select>
 

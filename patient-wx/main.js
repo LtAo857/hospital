@@ -43,7 +43,7 @@ Vue.prototype.tencent = {
 }
 
 let baseUrl = "http://127.0.0.1:8092/patient-wx-api"
-// let baseUrl = "http://172.20.10.8:8092/patient-wx-api"
+// let baseUrl = "http://172.20.10.5:8092/patient-wx-api"
 
 
 Vue.prototype.api = {
@@ -52,7 +52,6 @@ Vue.prototype.api = {
     updateUserInfoCard: baseUrl + "/user/info/card/update",
     searchUserInfo:baseUrl + "/user/searchUserInfo",
     searchUserInfoCard: baseUrl + "/user/info/card/searchUserInfoCard",
-    updateUserInfoCard: baseUrl + "/user/info/card/update",
     hasUserInfoCard: baseUrl + "/user/info/card/hasUserInfoCard",
     searchMedicalDeptList: baseUrl + "/medical/dept/searchMedicalDeptList",
 	searchIllnessList: baseUrl + "/illness/searchIllnessInfoList",
