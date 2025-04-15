@@ -14,6 +14,7 @@ import MedicalDept from "../views/medical_dept.vue"
 import MedicalDeptSub from "../views/medical_dept_sub.vue"
 import MedicalDeptSubWorkPlan from "../views/medical_dept_sub_work_plan.vue"
 import Doctor from "../views/doctor.vue"
+import DoctorAccount from "../views/doctor_account.vue"
 import DoctorPrice from "../views/doctor_price.vue"
 import DoctorSchedule from "../views/doctor_schedule.vue"
 import VideoDiagnose from "../views/video_diagnose.vue"
@@ -100,6 +101,15 @@ const routes = [{
 				component: DoctorPrice,
 				meta: {
 					title: '诊费设置',
+					isTab: true
+				}
+			},
+			{
+				path: '/doctor_account',
+				name: 'DoctorAccount',
+				component: DoctorAccount,
+				meta: {
+					title: '医生账号',
 					isTab: true
 				}
 			},

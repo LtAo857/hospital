@@ -208,6 +208,14 @@
                     >
                         修改
                     </el-button>
+                  <el-button
+                      type="text"
+                      size="medium"
+                      :disabled="!isAuth(['ROOT', 'DOCTOR:UPDATE'])"
+                      @click="updateHandle1(scope.row)"
+                  >
+                    添加医生账号
+                  </el-button>
                     <el-button
                         type="text"
                         size="medium"
@@ -230,15 +238,19 @@
         ></el-pagination>
         <add-or-update ref="addOrUpdate" @refreshDataList="loadDataList"></add-or-update>
 
-        
+        <account-add-or-update ref="accountAddOrUpdate"></account-add-or-update>
     </div>
 </template>
 
 <script>
+import AccountAddOrUpdate from './doctor-account-add-or-update.vue';
 import AddOrUpdate from './doctor-add-or-update.vue';
 export default {
+
+
     components: {
-        AddOrUpdate
+        AddOrUpdate,
+      AccountAddOrUpdate
     },
     data() {
         return {
@@ -416,7 +428,12 @@ export default {
                       this.$refs.addOrUpdate.init(id);
                   });
               },
-        
+      updateHandle1: function(id) {
+        this.$nextTick(() => {
+          this.$refs.accountAddOrUpdate.init(id);
+        });
+      },
+
               setPrice: function(doctorId) {
                   //设置出诊价格
                   that.$http('/price/insert', 'POST', { doctorId: doctorId }, true, function(resp) {

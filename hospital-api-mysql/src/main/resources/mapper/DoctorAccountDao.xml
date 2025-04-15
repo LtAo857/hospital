@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.example.hospital.api.db.dao.DoctorDao">
+<mapper namespace="com.example.hospital.api.db.dao.DoctorAccountDao">
     <!-- 分页查询医生列表 -->
     <select id="searchByPage" parameterType="Map" resultType="HashMap">
         SELECT d.id AS id,
@@ -13,7 +13,6 @@
         d.degree AS degree,
         d.job AS job,
         md.name AS deptName,
-        md.id AS deptId,
         ds.name AS subName,
         d.recommended AS recommended,
         d.status AS status
@@ -94,17 +93,32 @@
     </update>
 
     <!-- 新增医生 -->
-    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorEntity" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO doctor(
-            name, pid, uuid, sex, birthday,
-            school, degree, tel, address, email, job, remark,
-            description, hiredate, tag, recommended, status, create_time
+    <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorAccountEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mis_user(
+            `username`,
+            `password`,
+            `name`,
+            `sex`,
+            `tel`,
+            `email`,
+            `dept_id`,
+            `job`,
+            `ref_id`,
+            `status`,
+            `create_time`
         )
         VALUES (
-                   #{name}, #{pid}, #{uuid}, #{sex}, STR_TO_DATE(#{birthday}, '%Y-%m-%d'),
-                   #{school}, #{degree}, #{tel}, #{address}, #{email}, #{job}, #{remark},
-                   #{description}, STR_TO_DATE(#{hiredate}, '%Y-%m-%d'), #{tag},
-                   #{recommended}, #{status}, NOW()
+                   #{username},
+                   #{password},
+                   #{name},
+                   #{sex},
+                   #{tel},
+                   #{email},
+                   #{deptId},
+                   #{job},
+                   #{refId},
+                   #{status},
+                   NOW()
                )
     </insert>
 

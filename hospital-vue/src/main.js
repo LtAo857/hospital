@@ -96,7 +96,7 @@ let baseUrl = "http://localhost:8094/hospital-api"
 app.config.globalProperties.$baseUrl = baseUrl //设置全局变量$baseUrl
 
 //Minio服务器地址
-let minioUrl = "http://43.143.231.180:9010/hospital"
+let minioUrl = "http://62.234.37.187:9000/hospital"
 app.config.globalProperties.$minioUrl = minioUrl
 
 
