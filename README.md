@@ -28,3 +28,34 @@
 ![输入图片说明](swiper/1721383236227.jpg)
 ![输入图片说明](swiper/swiper-5.jpg)
 
+# 部署流程（具体见gitee代码里的docs文档，mysql版本）
+## 后端部署
+* 软件
+  * idea 2024
+*  环境
+    * jdk 15
+    *  maven
+    *  redis
+* 代码
+  * hospital-api-mysql 为管理系统的后端代码
+  * patient-wx-api-mysql 为小程序的后端代码
+  * 将代码导入到idea，同时修改ymal文件，即可运行
+## 前端部署
+  * 环境
+    * node（建议通过nvm版本控制器下载）
+  * 软件
+    * vscode
+      * npm i 安装包环境
+      * npm run dev 运行前端代码
+## 小程序部署
+* 软件
+   * Hbuilder
+   * 微信开发者工具
+* 环境
+  * Ocr扫描
+  * 腾讯云人脸识别
+* 小程序appid和密钥
+  * 获取方式：
+    * 微信公众平台 https://mp.weixin.qq.com/?token=&lang=zh_CN
+## 数据库部署
+  * 在sql中下载，导入到navicate。
