@@ -106,14 +106,14 @@
 							<span slot="title">医生管理</span>
 						</el-menu-item>
 
-            <el-menu-item
-                index="医生账号"
-                v-if="isAuth(['ROOT', 'DOCTOR:SELECT'])"
-                @click="$router.push({ name: 'DoctorAccount' })"
-            >
-              <SvgIcon name="doctor_fill" class="icon-svg" />
-              <span slot="title">医生账号</span>
-            </el-menu-item>
+<!--            <el-menu-item-->
+<!--                index="医生账号"-->
+<!--                v-if="isAuth(['ROOT', 'DOCTOR:SELECT'])"-->
+<!--                @click="$router.push({ name: 'DoctorAccount' })"-->
+<!--            >-->
+<!--              <SvgIcon name="doctor_fill" class="icon-svg" />-->
+<!--              <span slot="title">医生账号</span>-->
+<!--            </el-menu-item>-->
 						<!-- <el-menu-item
 							index="护士管理"
 							v-if="isAuth(['ROOT', 'NURSE:SELECT'])"

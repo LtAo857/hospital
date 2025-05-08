@@ -3,20 +3,20 @@
   <view class="template-grid">
     <view class="column-layout">
       <view class="column-1">
-        <view class="grid-scroll-container" @touchstart="_$self.$parent.$parent[('_handleGridTouchStart')]($event)" @touchend="_$self.$parent.$parent[('_handleGridTouchEnd')]($event)">
+        <view class="grid-scroll-container" @touchstart="_$self.$parent[('_handleGridTouchStart')]($event)" @touchend="_$self.$parent[('_handleGridTouchEnd')]($event)">
           
           <view id="grid-container-id" :class="'grid-container '+(visibleStreamList.length < 4 ? 'stream-' + visibleStreamList.length : 'stream-3')">
             
             <view :class="'view-container pusher-container '+(pusher.isVisible && ((gridCurrentPage === 1 && gridPlayerPerPage > 3) || gridPlayerPerPage < 4)?'':'none')">
-              <live-pusher class="pusher" :url="pusher.url" :mode="pusher.mode" :autopush="pusher.autopush" :enable-camera="pusher.enableCamera" :enable-mic="pusher.enableMic" :muted="(!pusher.enableMic)" :enable-agc="pusher.enableAgc" :enable-ans="pusher.enableAns" :enable-ear-monitor="pusher.enableEarMonitor" :auto-focus="pusher.enableAutoFocus" :zoom="pusher.enableZoom" :min-bitrate="pusher.minBitrate" :max-bitrate="pusher.maxBitrate" :video-width="pusher.videoWidth" :video-height="pusher.videoHeight" :beauty="pusher.beautyLevel" :whiteness="pusher.whitenessLevel" :orientation="pusher.videoOrientation" :aspect="pusher.videoAspect" :device-position="pusher.frontCamera" :remote-mirror="pusher.enableRemoteMirror" :local-mirror="pusher.localMirror" :background-mute="pusher.enableBackgroundMute" :audio-quality="pusher.audioQuality" :audio-volume-type="pusher.audioVolumeType" :audio-reverb-type="pusher.audioReverbType" :waiting-image="pusher.waitingImage" :debug="debug" :beauty-style="pusher.beautyStyle" :filter="pusher.filter" @statechange="_$self.$parent.$parent[('_pusherStateChangeHandler')]($event)" @netstatus="_$self.$parent.$parent[('_pusherNetStatusHandler')]($event)" @error="_$self.$parent.$parent[('_pusherErrorHandler')]($event)" @bgmstart="_$self.$parent.$parent[('_pusherBGMStartHandler')]($event)" @bgmprogress="_$self.$parent.$parent[('_pusherBGMProgressHandler')]($event)" @bgmcomplete="_$self.$parent.$parent[('_pusherBGMCompleteHandler')]($event)" @audiovolumenotify="_$self.$parent.$parent[('_pusherAudioVolumeNotify')]($event)"></live-pusher>
+              <live-pusher class="pusher" :url="pusher.url" :mode="pusher.mode" :autopush="pusher.autopush" :enable-camera="pusher.enableCamera" :enable-mic="pusher.enableMic" :muted="(!pusher.enableMic)" :enable-agc="pusher.enableAgc" :enable-ans="pusher.enableAns" :enable-ear-monitor="pusher.enableEarMonitor" :auto-focus="pusher.enableAutoFocus" :zoom="pusher.enableZoom" :min-bitrate="pusher.minBitrate" :max-bitrate="pusher.maxBitrate" :video-width="pusher.videoWidth" :video-height="pusher.videoHeight" :beauty="pusher.beautyLevel" :whiteness="pusher.whitenessLevel" :orientation="pusher.videoOrientation" :aspect="pusher.videoAspect" :device-position="pusher.frontCamera" :remote-mirror="pusher.enableRemoteMirror" :local-mirror="pusher.localMirror" :background-mute="pusher.enableBackgroundMute" :audio-quality="pusher.audioQuality" :audio-volume-type="pusher.audioVolumeType" :audio-reverb-type="pusher.audioReverbType" :waiting-image="pusher.waitingImage" :debug="debug" :beauty-style="pusher.beautyStyle" :filter="pusher.filter" @statechange="_$self.$parent[('_pusherStateChangeHandler')]($event)" @netstatus="_$self.$parent[('_pusherNetStatusHandler')]($event)" @error="_$self.$parent[('_pusherErrorHandler')]($event)" @bgmstart="_$self.$parent[('_pusherBGMStartHandler')]($event)" @bgmprogress="_$self.$parent[('_pusherBGMProgressHandler')]($event)" @bgmcomplete="_$self.$parent[('_pusherBGMCompleteHandler')]($event)" @audiovolumenotify="_$self.$parent[('_pusherAudioVolumeNotify')]($event)"></live-pusher>
               <view class="no-video" v-if="(!pusher.enableCamera)">
                 <image class="image" src="./static/mute-camera-white.png"></image>
               </view>
               
             </view>
 
-            <view v-for="(item,index) in (visibleStreamList)" :key="item.streamID" :class="'view-container player-container '+(item.isVisible?'':'none')" :id="'player-'+item.streamID" :data-userid="item.userID" :data-streamtype="item.streamType" @click="_$self.$parent.$parent[('_doubleTabToggleFullscreen')]($event)">
-              <live-player class="player" :id="item.streamID" :data-userid="item.userID" :data-streamid="item.streamID" :data-streamtype="item.streamType" :src="item.src" mode="RTC" :autoplay="item.autoplay" :mute-audio="item.muteAudio" :mute-video="item.muteVideo" :orientation="item.orientation" :object-fit="item.objectFit" :background-mute="item.enableBackgroundMute" :min-cache="item.minCache" :max-cache="item.maxCache" :sound-mode="item.soundMode" :enable-recv-message="item.enableRecvMessage" :auto-pause-if-navigate="item.autoPauseIfNavigate" :auto-pause-if-open-native="item.autoPauseIfOpenNative" :debug="debug" @statechange="_$self.$parent.$parent[('_playerStateChange')]($event)" @fullscreenchange="_$self.$parent.$parent[('_playerFullscreenChange')]($event)" @netstatus="_$self.$parent.$parent[('_playerNetStatus')]($event)" @audiovolumenotify="_$self.$parent.$parent[('_playerAudioVolumeNotify')]($event)"></live-player>
+            <view v-for="(item,index) in (visibleStreamList)" :key="item.streamID" :class="'view-container player-container '+(item.isVisible?'':'none')" :id="'player-'+item.streamID" :data-userid="item.userID" :data-streamtype="item.streamType" @click="_$self.$parent[('_doubleTabToggleFullscreen')]($event)">
+              <live-player class="player" :id="item.streamID" :data-userid="item.userID" :data-streamid="item.streamID" :data-streamtype="item.streamType" :src="item.src" mode="RTC" :autoplay="item.autoplay" :mute-audio="item.muteAudio" :mute-video="item.muteVideo" :orientation="item.orientation" :object-fit="item.objectFit" :background-mute="item.enableBackgroundMute" :min-cache="item.minCache" :max-cache="item.maxCache" :sound-mode="item.soundMode" :enable-recv-message="item.enableRecvMessage" :auto-pause-if-navigate="item.autoPauseIfNavigate" :auto-pause-if-open-native="item.autoPauseIfOpenNative" :debug="debug" @statechange="_$self.$parent[('_playerStateChange')]($event)" @fullscreenchange="_$self.$parent[('_playerFullscreenChange')]($event)" @netstatus="_$self.$parent[('_playerNetStatus')]($event)" @audiovolumenotify="_$self.$parent[('_playerAudioVolumeNotify')]($event)"></live-player>
               <view class="no-video" v-if="item.muteVideo">
                 <image class="image" src="./static/display-pause-white.png"></image>
                 <view class="text">
@@ -43,13 +43,13 @@
               </view>
               <view class="operation-bar">
                 <view class="operation-item-container">
-                  <view class="operation-item" @click.stop.prevent="_$self.$parent.$parent[('_handleSubscribeRemoteAudio')]($event)" :data-user-i-d="item.userID" :data-stream-type="item.streamType">
+                  <view class="operation-item" @click.stop.prevent="_$self.$parent[('_handleSubscribeRemoteAudio')]($event)" :data-user-i-d="item.userID" :data-stream-type="item.streamType">
                     <image class="item-image" :src="item.muteAudio? './static/speaker-false.png': './static/speaker-white.png'"></image>
                   </view>
-                  <view class="operation-item" @click.stop.prevent="_$self.$parent.$parent[('_handleSubscribeRemoteVideo')]($event)" :data-user-i-d="item.userID" :data-stream-type="item.streamType">
+                  <view class="operation-item" @click.stop.prevent="_$self.$parent[('_handleSubscribeRemoteVideo')]($event)" :data-user-i-d="item.userID" :data-stream-type="item.streamType">
                     <image class="item-image" :src="item.muteVideo? './static/display-pause-false.png': './static/display-play-white.png'"></image>
                   </view>
-                  <view class="operation-item" @click="_$self.$parent.$parent[('_toggleFullscreen')]($event)" :data-user-i-d="item.userID" :data-stream-type="item.streamType">
+                  <view class="operation-item" @click="_$self.$parent[('_toggleFullscreen')]($event)" :data-user-i-d="item.userID" :data-stream-type="item.streamType">
                     <image class="item-image" src="./static/fullscreen-white.png"></image>
                   </view>
                 </view>
@@ -64,16 +64,16 @@
       </view>
       <view class="column-2">
         <view class="menu" v-if="(!isShowMoreMenu)">
-          <view class="menu-item" @click="_$self.$parent.$parent[('_switchSettingPanel')]($event)">
+          <view class="menu-item" @click="_$self.$parent[('_switchSettingPanel')]($event)">
             <image class="image" src="./static/setting-white.png"></image>
           </view>
-          <view class="menu-item" @click="_$self.$parent.$parent[('_switchMemberListPanel')]($event)">
+          <view class="menu-item" @click="_$self.$parent[('_switchMemberListPanel')]($event)">
             <image class="image" src="./static/list-white.png"></image>
           </view>
-          <view class="menu-item" @click="_$self.$parent.$parent[('_hangUp')]($event)">
+          <view class="menu-item" @click="_$self.$parent[('_hangUp')]($event)">
             <image class="image" src="./static/hangup-red.png"></image>
           </view>
-          <view class="menu-item" @click="_$self.$parent.$parent[('_toggleIMPanel')]($event)">
+          <view class="menu-item" @click="_$self.$parent[('_toggleIMPanel')]($event)">
             <image class="image" :src="enableIM? './static/im-white.png': './static/im-disable.png'"></image>
           </view>
         </view>
@@ -85,7 +85,7 @@
       <view v-for="(item,index) in (gridPageCount)" :key="item.this" :class="'page-item '+(index+1 === gridCurrentPage? 'current':'')"></view>
     </view>
     <view :class="'panel memberlist-panel '+(panelName === 'memberlist-panel' ? '' : 'none')">
-      <view @click="_$self.$parent.$parent[('_handleMaskerClick')]($event)" class="close-btn">X</view>
+      <view @click="_$self.$parent[('_handleMaskerClick')]($event)" class="close-btn">X</view>
       <view class="panel-header">成员列表</view>
       <view class="panel-body">
         <view class="panel-tips" v-if="streamList.length === 0">暂无成员</view>
@@ -93,71 +93,71 @@
           <view v-for="(item,index) in (streamList)" :key="item.streamID" class="member-item">
             <view class="member-id">{{item.userID}}</view>
             <view class="member-btns">
-              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" data-key="objectFit" data-value="fillCrop|contain" @click="_$self.$parent.$parent[('_setPlayerProperty')]($event)">{{item.objectFit === 'fillCrop'? '填充':'适应'}}</button>
-              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" data-key="orientation" data-value="vertical|horizontal" @click="_$self.$parent.$parent[('_setPlayerProperty')]($event)">{{item.orientation === 'vertical'? '竖屏':'横屏'}}</button>
-              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" @click="_$self.$parent.$parent[('_switchStreamType')]($event)" v-if="item.streamType === 'main'">{{item._definitionType === 'small'? '小画面':'主画面'}}</button>
-              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" @click="_$self.$parent.$parent[('_handleSnapshotClick')]($event)">截屏</button>
+              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" data-key="objectFit" data-value="fillCrop|contain" @click="_$self.$parent[('_setPlayerProperty')]($event)">{{item.objectFit === 'fillCrop'? '填充':'适应'}}</button>
+              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" data-key="orientation" data-value="vertical|horizontal" @click="_$self.$parent[('_setPlayerProperty')]($event)">{{item.orientation === 'vertical'? '竖屏':'横屏'}}</button>
+              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" @click="_$self.$parent[('_switchStreamType')]($event)" v-if="item.streamType === 'main'">{{item._definitionType === 'small'? '小画面':'主画面'}}</button>
+              <button class="btn" hover-class="btn-hover" :data-userid="item.userID" :data-streamtype="item.streamType" @click="_$self.$parent[('_handleSnapshotClick')]($event)">截屏</button>
             </view>
           </view>
         </scroll-view>
       </view>
     </view>
     <view :class="'panel setting-panel '+(panelName === 'setting-panel' ? '' : 'none')">
-      <view @click="_$self.$parent.$parent[('_handleMaskerClick')]($event)" class="close-btn">X</view>
+      <view @click="_$self.$parent[('_handleMaskerClick')]($event)" class="close-btn">X</view>
       <view class="panel-header">推流设置</view>
       <view class="panel-body">
         <scroll-view class="scroll-container" scroll-y="true">
           <view class="setting-option">
             <view class="label">启用摄像头</view>
-            <view class="btn-normal" @click="_$self.$parent.$parent[('_toggleVideo')]($event)">
+            <view class="btn-normal" @click="_$self.$parent[('_toggleVideo')]($event)">
               <image class="btn-image" :src="pusher.enableCamera? './static/camera-true.png': './static/camera-false.png'"></image>
             </view>
           </view>
           <view class="setting-option">
             <view class="label">启用麦克风</view>
-            <view class="btn-normal" @click="_$self.$parent.$parent[('_toggleAudio')]($event)">
+            <view class="btn-normal" @click="_$self.$parent[('_toggleAudio')]($event)">
               <image class="btn-image" :src="pusher.enableMic? './static/audio-true.png': './static/audio-false.png'"></image>
             </view>
           </view>
           <view class="setting-option">
             <view class="label">切换摄像头</view>
-            <view class="btn-normal" @click="_$self.$parent.$parent[('switchCamera')]($event)">
+            <view class="btn-normal" @click="_$self.$parent[('switchCamera')]($event)">
               <image class="btn-image" src="./static/switch.png"></image>
             </view>
           </view>
           <view class="setting-option">
             <view class="label">开启美颜</view>
-            <switch class="setting-switch" color="#006eff" :checked="pusher.beautyLevel == 9 ? true: false" data-key="beautyLevel" data-value="9|0" data-value-type="number" @change="_$self.$parent.$parent[('_setPuserProperty')]($event)"></switch>
+            <switch class="setting-switch" color="#006eff" :checked="pusher.beautyLevel == 9 ? true: false" data-key="beautyLevel" data-value="9|0" data-value-type="number" @change="_$self.$parent[('_setPuserProperty')]($event)"></switch>
           </view>
           <view class="setting-option">
             <view class="label">开启AGC</view>
-            <switch class="setting-switch" color="#006eff" :checked="pusher.enableAgc" data-key="enableAgc" data-value="true" data-value-type="boolean" @change="_$self.$parent.$parent[('_setPuserProperty')]($event)"></switch>
+            <switch class="setting-switch" color="#006eff" :checked="pusher.enableAgc" data-key="enableAgc" data-value="true" data-value-type="boolean" @change="_$self.$parent[('_setPuserProperty')]($event)"></switch>
           </view>
           <view class="setting-option">
             <view class="label">开启ANS</view>
-            <switch class="setting-switch" color="#006eff" :checked="pusher.enableAns" data-key="enableAns" data-value="true" data-value-type="boolean" @change="_$self.$parent.$parent[('_setPuserProperty')]($event)"></switch>
+            <switch class="setting-switch" color="#006eff" :checked="pusher.enableAns" data-key="enableAns" data-value="true" data-value-type="boolean" @change="_$self.$parent[('_setPuserProperty')]($event)"></switch>
           </view>
           <view class="setting-option">
             <view class="label">开启横屏推流</view>
-            <switch class="setting-switch" color="#006eff" :checked="pusher.videoOrientation === 'vertical' ? false: true" data-key="videoOrientation" data-value="horizontal|vertical" data-value-type="string" @change="_$self.$parent.$parent[('_setPuserProperty')]($event)"></switch>
+            <switch class="setting-switch" color="#006eff" :checked="pusher.videoOrientation === 'vertical' ? false: true" data-key="videoOrientation" data-value="horizontal|vertical" data-value-type="string" @change="_$self.$parent[('_setPuserProperty')]($event)"></switch>
           </view>
         </scroll-view>
       </view>
     </view>
     <view :class="'panel bgm-panel '+(panelName === 'bgm-panel' ? '' : 'none')">
-      <view @click="_$self.$parent.$parent[('_handleMaskerClick')]($event)" class="close-btn">X</view>
+      <view @click="_$self.$parent[('_handleMaskerClick')]($event)" class="close-btn">X</view>
       <view class="panel-header">背景音乐</view>
       <view class="panel-body">
         <view class="setting-option">
           <view class="label">MIC音量</view>
           <view class="slider-content">
-            <slider :value="MICVolume" min="0" max="100" show-value="true" activeColor="#006eff" @change="_$self.$parent.$parent[('_changeProperty')]($event)" data-property-name="MICVolume"></slider>
+            <slider :value="MICVolume" min="0" max="100" show-value="true" activeColor="#006eff" @change="_$self.$parent[('_changeProperty')]($event)" data-property-name="MICVolume"></slider>
           </view>
         </view>
         <view class="setting-option">
           <view class="label">BGM音量</view>
           <view class="slider-content">
-            <slider :value="BGMVolume" min="0" max="100" show-value="true" activeColor="#006eff" @change="_$self.$parent.$parent[('_changeProperty')]($event)" data-property-name="BGMVolume"></slider>
+            <slider :value="BGMVolume" min="0" max="100" show-value="true" activeColor="#006eff" @change="_$self.$parent[('_changeProperty')]($event)" data-property-name="BGMVolume"></slider>
           </view>
         </view>
         <view class="setting-option">
@@ -167,22 +167,22 @@
           </view>
         </view>
         <view class="menu">
-          <view class="menu-item" @click="_$self.$parent.$parent[('_handleBGMOperation')]($event)" data-operation-name="playBGM">
+          <view class="menu-item" @click="_$self.$parent[('_handleBGMOperation')]($event)" data-operation-name="playBGM">
             <view class="label">播放</view>
           </view>
-          <view class="menu-item" @click="_$self.$parent.$parent[('_handleBGMOperation')]($event)" data-operation-name="pauseBGM">
+          <view class="menu-item" @click="_$self.$parent[('_handleBGMOperation')]($event)" data-operation-name="pauseBGM">
             <view class="label">暂停</view>
           </view>
-          <view class="menu-item" @click="_$self.$parent.$parent[('_handleBGMOperation')]($event)" data-operation-name="resumeBGM">
+          <view class="menu-item" @click="_$self.$parent[('_handleBGMOperation')]($event)" data-operation-name="resumeBGM">
             <view class="label">继续</view>
           </view>
-          <view class="menu-item" @click="_$self.$parent.$parent[('_handleBGMOperation')]($event)" data-operation-name="stopBGM">
+          <view class="menu-item" @click="_$self.$parent[('_handleBGMOperation')]($event)" data-operation-name="stopBGM">
             <view class="label">停止</view>
           </view>
         </view>
       </view>
     </view>
-    <view :class="'masker '+(panelName =='' ? 'none' : '')" @click="_$self.$parent.$parent[('_handleMaskerClick')]($event)"></view>
+    <view :class="'masker '+(panelName =='' ? 'none' : '')" @click="_$self.$parent[('_handleMaskerClick')]($event)"></view>
   </view>
 </template></uni-shadow-root>
 </template>
