@@ -19,7 +19,7 @@ import DoctorPrice from "../views/doctor_price.vue"
 import DoctorSchedule from "../views/doctor_schedule.vue"
 import VideoDiagnose from "../views/video_diagnose.vue"
 import Illness from "../views/illness.vue"
-// import Pet from "../views/pet.vue"
+import Patient from "../views/patient.vue"
 import NotFound from "../views/404.vue"
 
 
@@ -147,6 +147,15 @@ const routes = [{
 				component: Illness,
 				meta: {
 					title: '疾病百科',
+					isTab: true
+				}
+			},
+			{
+				path: '/patient',
+				name: 'Patient',
+				component:Patient,
+				meta: {
+					title: '患者信息',
 					isTab: true
 				}
 			},

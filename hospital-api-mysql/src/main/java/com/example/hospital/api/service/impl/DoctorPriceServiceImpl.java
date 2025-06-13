@@ -31,6 +31,7 @@ public class DoctorPriceServiceImpl implements DoctorPriceService {
 
     @Override
     public void update(Map param) {
+
         doctorPriceDao.update(param);
     }
 

@@ -42,8 +42,8 @@ Vue.prototype.tencent = {
 	}
 }
 
-// let baseUrl = "http://127.0.0.1:8092/patient-wx-api"
-let baseUrl = "http://192.168.0.156:8092/patient-wx-api"
+let baseUrl = "http://127.0.0.1:8092/patient-wx-api"
+// let baseUrl = "http://192.168.0.156:8092/patient-wx-api"
 
 
 Vue.prototype.api = {

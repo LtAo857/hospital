@@ -34,8 +34,8 @@
         WHERE doctor_id = #{doctorId}
     </select>
     <update id="update" parameterType="Map">
-        UPDATE doctor_price SET price_1 = 10, price_2 = 10
-        WHERE doctor_id = 10
+        UPDATE doctor_price SET price_1 = #{priceMenZhen}, price_2 = #{priceShiPing}
+        WHERE doctor_id = #{doctorId}
     </update>
 
     <insert id="insert" parameterType="com.example.hospital.api.db.pojo.DoctorPriceEntity" useGeneratedKeys="true" keyProperty="id">

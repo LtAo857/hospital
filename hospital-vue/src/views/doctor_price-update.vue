@@ -126,8 +126,8 @@ export default {
                 if (valid) {
                     let data = {
                         doctorId: typeof(that.dataForm.id)=='object'?that.dataForm.doctorId:that.dataForm. id,
-                        price_1: that.dataForm.price_1*1.0,
-                        price_2: that.dataForm.price_2*1.0,
+                      priceMenZhen: that.dataForm.price_1*1.0,
+                      priceShiPing: that.dataForm.price_2*1.0,
                     };
                     that.$http(`/price/${typeof(that.dataForm.id)=='object'? 'insert' : 'update'}`, 'POST', data, true, function(
                         resp

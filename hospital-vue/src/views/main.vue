@@ -197,6 +197,25 @@
 						</el-menu-item>
 					</el-sub-menu>
 
+
+          <el-sub-menu index="患者管理" :popper-class="'site-sidebar--' + sidebarLayoutSkin + '-popper'">
+            <template #title>
+              <SvgIcon name="night_fill" class="icon-svg" />
+              <span slot="title">患者管理</span>
+            </template>
+
+            <!-- v-if="isAuth(['VIDEO_DIAGNOSE:SELECT'])" -->
+            <el-menu-item
+                index="患者信息"
+                @click="$router.push({ name: 'Patient' })"
+
+            >
+
+              <SvgIcon name="camera_fill" class="icon-svg" />
+              <span slot="title">患者信息</span>
+            </el-menu-item>
+          </el-sub-menu>
+
 					<!-- <el-sub-menu index="宠物管理" :popper-class="'site-sidebar--' + sidebarLayoutSkin + '-popper'">
 						<template #title>
 							<SvgIcon name="night_fill" class="icon-svg" />
