@@ -80,18 +80,19 @@ sa-token:
 #
 tencent:
   cloud:
-    appId: 1308222269
-    secretId: AKID3zf7b4Skv7AzZyGVar8KRixNC9eJzhRK
-    secretKey: zut273qVxDGIOTOLGA527KPPFqGWZSDn
+    appId: xxx
+    secretId: xxx
+    secretKey: xxx
     face:
       groupName: hospital
       region: ap-beijing
   trtc:
-    appId: 1600018532
-    secretKey: 196c9dc9e34ea1ef27c4c25c917569cff3aa5f65b5d6006134a578ee59f78321
-    expire: 86400
+    appId: xxx
+    secretKey: xx
+    expire: xxx
+
 minio:
-  endpoint: http://62.234.37.187:9000
-  access-key: root
-  secret-key: abc123456
+  endpoint: xxx
+  access-key: xxx
+  secret-key: xx
 
