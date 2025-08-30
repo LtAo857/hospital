@@ -23,7 +23,7 @@
             </el-form-item>
             <el-form-item>
                 <el-select
-                    v-model="dataForm.degree"
+                    v-model="dataForm.degree"sha
                     class="input"
                     placeholder="学历"
                     size="medium"
@@ -353,7 +353,7 @@ export default {
                   cancelButtonText: '取消',
                   type: 'warning'
               }).then(() => {
-                  that.$http('/illness/deleteByIds', 'POST', { ids: ids }, true, function(resp) {
+                  that.$http('/patient/deleteByIds', 'POST', { ids: ids }, true, function(resp) {
                       ElMessage({
                           message: '操作成功',
                           type: 'success',
