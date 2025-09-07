@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.api.db.dao.PatientDao">
     <select id="searchAllPatient" resultType="HashMap">
-        SELECT *  FROM PATIENT_USER
+        SELECT *  FROM patient_user
     </select>
 
     <!-- 查询用户电话 -->

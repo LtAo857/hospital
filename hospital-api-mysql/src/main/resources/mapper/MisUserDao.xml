@@ -5,15 +5,15 @@
 <mapper namespace="com.example.hospital.api.db.dao.MisUserDao">
     <select id="searchUserPermissions" parameterType="int" resultType="String">
         SELECT p.permission_code AS permission
-        FROM MIS_USER u
-                 JOIN MIS_USER_ROLE ur ON u.id = ur.user_id
-                 JOIN MIS_ROLE_PERMISSION rp ON rp.role_id= ur.role_id
-                 JOIN MIS_PERMISSION p ON rp.permission_id = p.id
+        FROM mis_user u
+                 JOIN mis_user_roleur ON u.id = ur.user_id
+                 JOIN mis_role_permission rp ON rp.role_id= ur.role_id
+                 JOIN mis_permission p ON rp.permission_id = p.id
         WHERE u.id = ${userId}
     </select>
     <select id="login" parameterType="Map" resultType="Integer">
         SELECT id
-        FROM MIS_USER
+        FROM mis_user
         WHERE username = #{username}
           AND password = #{password}
     </select>
@@ -21,13 +21,13 @@
     <select id="searchRefId" parameterType="int" resultType="HashMap">
         SELECT job,
                ref_id AS refId
-        FROM MIS_USER
+        FROM mis_user
         WHERE id = ${id}
     </select>
 
     <select id="searchUserId" parameterType="HashMap" resultType="Integer">
         SELECT id
-        FROM MIS_USER
+        FROM mis_user
         WHERE ref_id = ${refId}
           AND job = #{job}
     </select>
