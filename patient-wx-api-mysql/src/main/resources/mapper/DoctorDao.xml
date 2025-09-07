@@ -16,7 +16,7 @@
     </select>
 
     <select id="searchDoctorInfo" parameterType="Map"  resultType="HashMap">
-select * from DOCTOR   LIMIT ${length} OFFSET ${start}
+select * from doctor   LIMIT ${length} OFFSET ${start}
     </select>
 
 

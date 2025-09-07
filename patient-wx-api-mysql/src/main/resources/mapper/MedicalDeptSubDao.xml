@@ -5,7 +5,7 @@
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.MedicalDeptSubDao">
     <select id="searchMedicalDeptSubList" parameterType="int" resultType="HashMap">
         SELECT id, name
-        FROM MEDICAL_DEPT_SUB
+        FROM medical_dept_sub
         WHERE dept_id = ${deptId}
     </select>
 

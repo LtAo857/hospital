@@ -6,7 +6,7 @@
 
 
     <select id="searchIllnessInfo" parameterType="Map"  resultType="HashMap">
-select * from ILLNESS   LIMIT ${length} OFFSET ${start}
+select * from illness   LIMIT ${length} OFFSET ${start}
     </select>
 
 

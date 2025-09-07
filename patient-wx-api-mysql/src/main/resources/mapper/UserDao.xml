@@ -3,7 +3,7 @@
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.UserDao">
 
     <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.UserEntity">
-        INSERT INTO PATIENT_USER(
+        INSERT INTO patient_user(
         open_id, nickname, photo, sex, status, create_time
     )
     VALUES(
@@ -13,22 +13,22 @@
 
     <select id="searchAlreadyRegistered" parameterType="String" resultType="Integer">
         SELECT id
-        FROM PATIENT_USER
+        FROM patient_user
         WHERE open_id = #{openId}
             LIMIT 1
     </select>
 
     <select id="searchUserInfo" parameterType="int" resultType="HashMap">
         SELECT nickname, sex, photo
-        FROM PATIENT_USER
+        FROM patient_user
         WHERE id = ${userId}
     </select>
 
     <select id="searchOpenId" parameterType="int" resultType="HashMap">
         SELECT u.open_id AS openId,
                c.id AS patientCardId
-        FROM PATIENT_USER u
-                 JOIN PATIENT_USER_INFO_CARD c ON c.user_id=u.id
+        FROM patient_user u
+                 JOIN patient_user_INFO_CARD c ON c.user_id=u.id
         WHERE u.id = #{userId}
     </select>
 
