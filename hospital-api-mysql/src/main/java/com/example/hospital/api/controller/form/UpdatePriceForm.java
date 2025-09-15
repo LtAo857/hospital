@@ -18,10 +18,11 @@ public class UpdatePriceForm {
 
 //    @JsonFormat(shape = JsonFormat.Shape.STRING)
     @NotNull(message = "price_1不能为空")
-    private Integer priceMenZhen;
+    private BigDecimal price_1;
 
 
 //    @JsonFormat(shape = JsonFormat.Shape.STRING)
     @NotNull(message = "price_2不能为空")
-    private Integer priceShiPing;
+    private BigDecimal price_2;
+
 }

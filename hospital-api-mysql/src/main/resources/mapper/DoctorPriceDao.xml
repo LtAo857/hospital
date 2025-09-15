@@ -34,7 +34,7 @@
         WHERE doctor_id = #{doctorId}
     </select>
     <update id="update" parameterType="Map">
-        UPDATE doctor_price SET price_1 = #{priceMenZhen}, price_2 = #{priceShiPing}
+        UPDATE doctor_price SET price_1 = #{price_1}, price_2 = #{price_2}
         WHERE doctor_id = #{doctorId}
     </update>
 
