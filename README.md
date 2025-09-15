@@ -1,5 +1,6 @@
 # 项目描述
-        EHO互联网医疗系统是为大连市XXX 医院开发并实施的线上医疗系统，移动端小程序为患者提供了挂号缴费、问诊等服务，并且为管理者提供了 MIS 管理平台，可以管理医疗系统各个模块的业务数据。由于采用了先 进的人脸识别和静态活体检测技术，可以识别挂号者是不是患者本人，杜绝黄牛倒卖专家号。本项目还采用了 TRTC 音视频服务，可以实现患者端和医生端的实时视频问诊功能，做到视频信号稳定清晰。
+        医疗系统，挂号系统。
+        移动端小程序为患者提供了挂号缴费、问诊等服务，并且为管理者提供了 MIS 管理平台，可以管理医疗系统各个模块的业务数据。由于采用了先 进的人脸识别和静态活体检测技术，可以识别挂号者是不是患者本人，杜绝黄牛倒卖专家号。本项目还采用了 TRTC 音视频服务，可以实现患者端和医生端的实时视频问诊功能，做到视频信号稳定清晰。
 
 # 开发环境
         * 版本一：JDK15.02 +IDEA + HBase + Redis + RabbitMQ + Minio + HBuilderX
@@ -29,6 +30,12 @@
 ![输入图片说明](swiper/swiper-5.jpg)
 
 # 部署流程（具体见gitee代码里的docs文档，mysql版本）
+## Web工具
+* 下载地址 
+  * 通过网盘分享的文件：Web开发工具
+  链接: https://pan.baidu.com/s/1k0F6OpL350b-qjsCfwFOHg?pwd=aa2w 提取码: aa2w
+* 文档
+    * https://blog.csdn.net/weixin_53175511/article/details/150985343?fromshare=blogdetail&sharetype=blogdetail&sharerId=150985343&sharerefer=PC&sharesource=weixin_53175511&sharefrom=from_link
 ## 后端部署
 * 软件
   * idea 2024
