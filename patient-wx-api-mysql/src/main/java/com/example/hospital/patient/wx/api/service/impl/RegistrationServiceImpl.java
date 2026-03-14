@@ -14,6 +14,7 @@ import com.example.hospital.patient.wx.api.db.pojo.MedicalRegistrationEntity;
 //import com.example.hospital.patient.wx.api.service.PaymentService;
 import com.example.hospital.patient.wx.api.service.FaceAuthService;
 //import com.example.hospital.patient.wx.api.service.PaymentService;
+import com.example.hospital.patient.wx.api.service.MessageService;
 import com.example.hospital.patient.wx.api.service.RegistrationService;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.dao.DataAccessException;
@@ -51,6 +52,9 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Resource
     private RedisTemplate redisTemplate;
+
+    @Resource
+    private MessageService messageService;
 
 //    @Resource
 //    private PaymentService paymentService;
@@ -248,6 +252,9 @@ public class RegistrationServiceImpl implements RegistrationService {
                 put("signType","1");
                 put("paySign", 1);
             }};
+
+            // 发送挂号成功消息通知
+            messageService.sendMessage(userId, (byte) 1, "挂号成功", "您已成功挂号，就诊日期：" + date, entity.getId());
 //                        HashMap result = new HashMap() {{
 //                put("outTradeNo", outTradeNo);
 //                put("prepayId", prepayId);

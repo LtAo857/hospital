@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.patient.wx.api.db.dao.EvaluationDao">
+
+    <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.EvaluationEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO doctor_evaluation(doctor_id, patient_card_id, registration_id, video_diagnose_id, score, comment, create_time)
+        VALUES(#{doctorId}, #{patientCardId}, #{registrationId}, #{videoDiagnoseId}, #{score}, #{comment}, NOW())
+    </insert>
+
+    <select id="hasEvaluated" parameterType="Map" resultType="Integer">
+        SELECT id FROM doctor_evaluation
+        WHERE patient_card_id = #{patientCardId}
+        <if test="registrationId != null">
+            AND registration_id = #{registrationId}
+        </if>
+        <if test="videoDiagnoseId != null">
+            AND video_diagnose_id = #{videoDiagnoseId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="searchEvaluationCount" parameterType="Map" resultType="long">
+        SELECT COUNT(*)
+        FROM doctor_evaluation e
+            JOIN patient_user_info_card c ON e.patient_card_id = c.id
+        WHERE c.user_id = #{userId}
+    </select>
+
+    <select id="searchEvaluationByPage" parameterType="Map" resultType="HashMap">
+        SELECT e.id,
+               e.score,
+               e.comment,
+               d.name AS doctorName,
+               d.job AS job,
+               DATE_FORMAT(e.create_time, '%Y-%m-%d %H:%i') AS createTime
+        FROM doctor_evaluation e
+            JOIN patient_user_info_card c ON e.patient_card_id = c.id
+            JOIN doctor d ON d.id = e.doctor_id
+        WHERE c.user_id = #{userId}
+        ORDER BY e.create_time DESC
+        LIMIT #{length} OFFSET #{start}
+    </select>
+
+    <select id="searchDoctorEvaluationCount" parameterType="int" resultType="long">
+        SELECT COUNT(*)
+        FROM doctor_evaluation
+        WHERE doctor_id = #{doctorId}
+    </select>
+
+    <select id="searchDoctorEvaluationByPage" parameterType="Map" resultType="HashMap">
+        SELECT e.id,
+               e.score,
+               e.comment,
+               c.name AS patientName,
+               DATE_FORMAT(e.create_time, '%Y-%m-%d %H:%i') AS createTime
+        FROM doctor_evaluation e
+            JOIN patient_user_info_card c ON e.patient_card_id = c.id
+        WHERE e.doctor_id = #{doctorId}
+        ORDER BY e.create_time DESC
+        LIMIT #{length} OFFSET #{start}
+    </select>
+
+    <select id="searchDoctorAvgScore" parameterType="int" resultType="HashMap">
+        SELECT ROUND(AVG(score), 1) AS avgScore,
+               COUNT(*) AS totalCount
+        FROM doctor_evaluation
+        WHERE doctor_id = #{doctorId}
+    </select>
+</mapper>

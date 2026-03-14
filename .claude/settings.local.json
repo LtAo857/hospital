@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(java -version)",
+      "Bash(cd patient-wx-api-mysql:*)",
+      "Bash(cd hospital-api-mysql:*)",
+      "Bash(ls -la /d/Code/code/Java/hospital/hospital/patient-wx/pages/*/)",
+      "Bash(find /d/Code/code/Java/hospital/hospital -type d -name \"hospital-api\" -o -type d -name \"hospital-api-mysql\" | xargs -I {} find {} -name \"*.java\" -type f | wc -l)",
+      "Bash(find /d/Code/code/Java/hospital/hospital -type d -name \"patient-wx-api\" -o -type d -name \"patient-wx-api-mysql\" | xargs -I {} find {} -name \"*.java\" -type f | wc -l)",
+      "Bash(find /d/Code/code/Java/hospital/hospital -type d -name \"hospital-vue\" | xargs -I {} find {} -name \"*.js\" -o -name \"*.vue\" -o -name \"*.ts\" -type f | wc -l)",
+      "Bash(find /d/Code/code/Java/hospital/hospital -type d -name \"patient-wx\" | xargs -I {} find {} -name \"*.js\" -o -name \"*.vue\" -o -name \"*.ts\" -type f | wc -l)",
+      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\" && sed -i 's/\"navigationBarTitleText\": \"\",$/\"navigationBarTitleText\": \"消息中心\",/' patient-wx/pages.json)",
+      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\" && sed -i '18s/\"navigationBarTitleText\": \"消息中心\"/\"navigationBarTitleText\": \"\"/' patient-wx/pages.json && sed -i '71s/\"navigationBarTitleText\": \"消息中心\"/\"navigationBarTitleText\": \"\"/' patient-wx/pages.json)",
+      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\\\\patient-wx-api-mysql\" && mvn clean compile -q 2>&1 | tail -30)",
+      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\\\\patient-wx-api-mysql\" && mvn clean compile -q 2>&1 | tail -20)",
+      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\\\\patient-wx-api-mysql\" && mvn clean compile -q 2>&1 | tail -5)",
+      "Bash(mysql -u root -p123456 hospital_mysql -e \"SELECT id, payment_status FROM medical_registration ORDER BY id DESC LIMIT 10;\" 2>&1)"
+    ]
+  }
+}

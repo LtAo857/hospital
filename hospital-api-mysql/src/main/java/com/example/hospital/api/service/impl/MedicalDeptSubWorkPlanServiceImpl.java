@@ -52,8 +52,8 @@ public class MedicalDeptSubWorkPlanServiceImpl implements MedicalDeptSubWorkPlan
                      * 该诊室出诊计划
                      * 为了保证添加的顺序不被打乱，必须用LinkedHashMap，不可以是HashMap
                      */
-                    put("plan", new LinkedHashMap<>() {{
-                        put(date, new ArrayList<>() {{
+                    put("plan", new LinkedHashMap<String, Object>() {{
+                        put(date, new ArrayList<String>() {{
                             add(doctorName);
                         }});
                     }});
@@ -79,7 +79,7 @@ public class MedicalDeptSubWorkPlanServiceImpl implements MedicalDeptSubWorkPlan
                 //从诊室中取出出诊计划
                 LinkedHashMap plan = (LinkedHashMap) map.get("plan");
                 //创建新的出诊日期列表，添加该医生的名字
-                plan.put(date, new ArrayList<>() {{
+                plan.put(date, new ArrayList<String>() {{
                     add(doctorName);
                 }});
             }
@@ -93,9 +93,9 @@ public class MedicalDeptSubWorkPlanServiceImpl implements MedicalDeptSubWorkPlan
                     put("deptSubId", deptSubId);
                     put("deptSubName", deptSubName);
                     //出诊计划
-                    put("plan", new LinkedHashMap<>() {{
+                    put("plan", new LinkedHashMap<String, Object>() {{
                         //添加出诊列表
-                        put(date, new ArrayList<>() {{
+                        put(date, new ArrayList<String>() {{
                             add(doctorName);
                         }});
                     }});
@@ -148,7 +148,7 @@ public class MedicalDeptSubWorkPlanServiceImpl implements MedicalDeptSubWorkPlan
             ArrayList temp = new ArrayList();
             //把出诊计划保存到列表中
             tempSet.forEach(entry -> {
-                temp.add(new HashMap<>() {{
+                temp.add(new HashMap<String, Object>() {{
                     put("date", entry.getKey());
                     put("doctors", entry.getValue());
                 }});

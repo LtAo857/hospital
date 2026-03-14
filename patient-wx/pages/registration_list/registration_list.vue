@@ -155,9 +155,12 @@ export default {
     },
 
     moreHandle: function(id) {
-        uni.navigateTo({
-            url: '/registration/registration_info/registration_info?id=' + id
-        });
+        let one = this.list.find(item => item.id == id);
+        let url = '/registration/registration_info/registration_info?id=' + id;
+        if (one) {
+            url += '&paymentStatus=' + one.paymentStatus + '&doctorId=' + one.doctorId;
+        }
+        uni.navigateTo({ url: url });
     }
 
 

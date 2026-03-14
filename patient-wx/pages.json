@@ -22,7 +22,7 @@
 		}, {
 			"path": "pages/message_list/message_list",
 			"style": {
-				"navigationBarTitleText": "",
+				"navigationBarTitleText": "消息中心",
 				"enablePullDownRefresh": false
 			}
 
@@ -122,6 +122,13 @@
 						"navigationBarBackgroundColor": "#4aaccf",
 						"navigationBarTextStyle": "white"
 					}
+				},
+				{
+					"path": "evaluation/evaluation",
+					"style": {
+						"navigationBarTitleText": "就诊评价",
+						"enablePullDownRefresh": false
+					}
 				}
 			]
 		},
@@ -181,13 +188,16 @@
 					"enablePullDownRefresh": false
 				}
 		
+			}, {
+				"path": "doctor_evaluation/doctor_evaluation",
+				"style": {
+					"navigationBarTitleText": "医生评价",
+					"enablePullDownRefresh": false
+				}
 			}
-	
+
 			]
 		}
-		
-
-		
 	],
 	"tabBar": {
 		"color": "#444",
@@ -204,12 +214,12 @@
 				"iconPath": "static/tab_bar/icon-3.png",
 				"selectedIconPath": "static/tab_bar/icon-4.png"
 			},
-			// {
-			// 	"text": "消息中心",
-			// 	"pagePath": "pages/message_list/message_list",
-			// 	"iconPath": "static/tab_bar/icon-5.png",
-			// 	"selectedIconPath": "static/tab_bar/icon-6.png"
-			// },
+			{
+				"text": "消息中心",
+				"pagePath": "pages/message_list/message_list",
+				"iconPath": "static/tab_bar/icon-5.png",
+				"selectedIconPath": "static/tab_bar/icon-6.png"
+			},
 			// {
 			// 	"text": "体检中心",
 			// 	"pagePath": "pages/checkup/checkup",

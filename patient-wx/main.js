@@ -88,6 +88,17 @@ Vue.prototype.api = {
 	updatePetInfo:baseUrl + "/pet/update",
 		deletePetInfo:baseUrl + "/pet/deleteByIds",
 	searchById:baseUrl + "/pet/searchById",
+
+	// 消息相关
+	searchMessageByPage: baseUrl + "/message/searchMessageByPage",
+	searchUnreadCount: baseUrl + "/message/searchUnreadCount",
+	readMessage: baseUrl + "/message/readMessage",
+	readAllMessage: baseUrl + "/message/readAllMessage",
+	// 评价相关
+	insertEvaluation: baseUrl + "/evaluation/insert",
+	searchEvaluationByPage: baseUrl + "/evaluation/searchByPage",
+	searchDoctorEvaluation: baseUrl + "/evaluation/searchDoctorEvaluation",
+	hasEvaluated: baseUrl + "/evaluation/hasEvaluated",
 }
 
 

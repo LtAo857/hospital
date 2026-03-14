@@ -25,6 +25,8 @@ public interface MedicalRegistrationDao {
     public int updateRepayInfo(Map param);
 
     public HashMap searchRegistrationInfo(Map param);
+
+    public ArrayList<HashMap> searchTodayRegistrationUsers();
 }
 
 

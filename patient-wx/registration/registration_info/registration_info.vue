@@ -41,6 +41,12 @@
 <!--           <u-cell v-if="prescriptionId != null" title="电子处方" :border="false" isLink :url="`/registration/prescription/prescription?registrationId=${id}`"></u-cell> -->
 				</u-cell-group>
 			</view>
+			<view class="evaluation-btn" v-if="!hasEvaluated">
+				<u-button type="primary" @click="goEvaluation">评价医生</u-button>
+			</view>
+			<view class="evaluation-btn" v-if="hasEvaluated">
+				<u-button type="info" disabled>已评价</u-button>
+			</view>
 		</view>
 	</view>
 </template>
@@ -87,51 +93,73 @@ export default {
 				'15': '16:00'
 			},
 			flag: false,
-      prescriptionId: null
+      prescriptionId: null,
+			hasEvaluated: false,
+			doctorId: null
 		};
 	},
-	methods: {},
+	methods: {
+		goEvaluation: function() {
+			uni.navigateTo({
+				url: `/registration/evaluation/evaluation?registrationId=${this.id}&doctorId=${this.doctorId}`
+			});
+		},
+		checkEvaluated: function() {
+			let that = this;
+			if (that.id) {
+				that.ajax(that.api.hasEvaluated, 'POST', { registrationId: that.id }, function(resp) {
+					that.hasEvaluated = resp.data.result;
+				}, false);
+			}
+		}
+	},
 	onLoad: function(options) {
-	    // let that = this;
-	    // let id = options.id;
-	    // that.id = id;
-	    // let data = {
-	    //     id: id
-	    // };
-	    // that.ajax(
-	    //     that.api.searchRegistrationInfo,
-	    //     'POST',
-	    //     data,
-	    //     function(resp) {
-	    //         let data = resp.data;
-	    //         that.outTradeNo = data.outTradeNo;
-	    //         that.patientName = data.patientName;
-	    //         that.subDeptName = data.subDeptName;
-	    //         that.doctorName = data.doctorName;
-	    //         that.location = data.location;
-	    //         that.job = data.job;
-	    //         if (['主任医师', '副主任医师'].includes(that.job)) {
-	    //             that.type = '专家号';
-	    //         } else {
-	    //             that.type = '普通号';
-	    //         }
-	    //         that.date = data.date;
-	    //         that.slot = data.slot;
-	    //         that.datetime = data.date + ' ' + that.json[data.slot];
-	    //         that.amount = data.amount + ' 元';
-	    //         that.paymentStatus = data.paymentStatus;
-	    //         let today = dayjs().format('YYYY-MM-DD');
-	    //         if (today == that.date && that.paymentStatus == 2) {
-	    //             that.flag = true;
-	    //         } else {
-	    //             that.flag = false;
-	    //         }
-     //          if (data.hasOwnProperty('prescriptionId')) {
-     //                          that.prescriptionId = data.prescriptionId;
-     //                      }
-	    //     },
-	    //     false
-	    // );
+	    let that = this;
+	    let id = options.id;
+	    that.id = id;
+	    let data = {
+	        id: id
+	    };
+	    that.ajax(
+	        that.api.searchRegistrationInfo,
+	        'POST',
+	        data,
+	        function(resp) {
+	            let data = resp.data;
+	            that.outTradeNo = data.outTradeNo;
+	            that.patientName = data.patientName;
+	            that.subDeptName = data.subDeptName;
+	            that.doctorName = data.doctorName;
+	            that.doctorId = data.doctorId;
+	            that.location = data.location;
+	            that.job = data.job;
+	            if (['主任医师', '副主任医师'].includes(that.job)) {
+	                that.type = '专家号';
+	            } else {
+	                that.type = '普通号';
+	            }
+	            that.date = data.date;
+	            that.slot = data.slot;
+	            that.datetime = data.date + ' ' + that.json[data.slot];
+	            that.amount = data.amount + ' 元';
+	            that.paymentStatus = data.paymentStatus;
+	            let today = dayjs().format('YYYY-MM-DD');
+	            if (today == that.date && that.paymentStatus == 2) {
+	                that.flag = true;
+	            } else {
+	                that.flag = false;
+	            }
+	            if (data.hasOwnProperty('prescriptionId')) {
+	                that.prescriptionId = data.prescriptionId;
+	            }
+	            that.checkEvaluated();
+	        },
+	        false
+	    );
+	},
+
+	onShow: function() {
+	    this.checkEvaluated();
 	},
 
 	onUnload: function() {

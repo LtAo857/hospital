@@ -49,7 +49,11 @@
 				<u-grid-item name="视频问诊">
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">视频问诊</text>
-				</u-grid-item> 
+				</u-grid-item>
+				<u-grid-item name="我的评价">
+					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
+					<text class="title">我的评价</text>
+				</u-grid-item>
 <!-- 				<u-grid-item name="导诊问询">
 					<button open-type="contact" session-from="sessionFrom" plain="true" class="btn">
 									<view class="navigator-icon"><view class="navigator-icon-1" /></view>
@@ -303,7 +307,10 @@ export default {
        else if (name == '视频问诊') {
            //这里是新添加的代码
            url = '/video_diagnose/order_list/order_list';
-       } 
+       }
+       else if (name == '我的评价') {
+           url = '/registration/evaluation/evaluation?mode=list';
+       }
        else if (name == '挂号就诊') {
 
         url= '/registration/medical_dept_list/medical_dept_list';

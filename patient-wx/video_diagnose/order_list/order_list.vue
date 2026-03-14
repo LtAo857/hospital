@@ -73,6 +73,14 @@
 				<view class="btn orange" v-if="one.paymentStatus == 2">已付款</view>
 				<view class="btn gray" v-if="one.paymentStatus == 3">已关闭</view>
 			</view>
+			<view class="row" v-if="one.status == '已结束' && !one.hasEvaluated">
+				<view style="flex:1"></view>
+				<view class="btn blue" @tap="goEvaluation(one)">评价医生</view>
+			</view>
+			<view class="row" v-if="one.hasEvaluated">
+				<view style="flex:1"></view>
+				<view class="btn gray">已评价</view>
+			</view>
 		</view>
 		<view v-if="list.length == 0">
 			<u-empty mode="order" text="没有问诊挂号记录" icon="http://cdn.uviewui.com/uview/empty/order.png"></u-empty>
@@ -124,8 +132,10 @@ export default {
                     one.expectStartShort = dayjs(one.expectStart).format('HH:mm');
                     one.expectEndShort = dayjs(one.expectEnd).format('HH:mm');
                     one.outTradeNoShort = one.outTradeNo.substr(0, 15) + '…';
+                    one.hasEvaluated = false;
                     ref.list.push(one);
                 }
+                ref.checkEvaluated(ref);
             }
         });
     },
@@ -145,6 +155,20 @@ export default {
         uni.navigateTo({
             url: `../prepare_diagnose/prepare_diagnose?videoDiagnoseId=${id}&expectStart=${expectStart}&expectEnd=${expectEnd}&doctorId=${doctorId}`
         });
+    },
+    goEvaluation: function(one) {
+        uni.navigateTo({
+            url: `/registration/evaluation/evaluation?videoDiagnoseId=${one.id}&doctorId=${one.doctorId}`
+        });
+    },
+    checkEvaluated: function(ref) {
+        for (let one of ref.list) {
+            if (one.status == '已结束') {
+                ref.ajax(ref.api.hasEvaluated, 'POST', { videoDiagnoseId: one.id }, function(resp) {
+                    one.hasEvaluated = resp.data.result;
+                }, false);
+            }
+        }
     },
 	},
 	onShow: function() {

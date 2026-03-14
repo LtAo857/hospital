@@ -75,6 +75,7 @@
                s.name AS name,
                s.location AS location,
                d.job AS job,
+               d.id AS doctorId,
                r.out_trade_no AS outTradeNo,
                r.prepay_id AS prepayId,
                r.transaction_id AS transactionId,
@@ -115,18 +116,31 @@
                c.name AS patientName,
                s.name AS subDeptName,
                d.name AS doctorName,
+               d.id AS doctorId,
                s.location AS location,
                d.job AS job,
                r.out_trade_no AS outTradeNo,
                FORMAT(r.amount, 2) AS amount,
-               r.payment_status AS paymentStatus,
-               dp.id AS prescriptionId
+               r.payment_status AS paymentStatus
         FROM medical_registration r
             JOIN patient_user_info_card c ON r.patient_card_id = c.id
             JOIN medical_dept_sub s ON r.dept_sub_id = s.id
             JOIN doctor d ON d.id = r.doctor_id
-            LEFT JOIN doctor_prescription dp ON dp.registration_id = r.id
         WHERE r.id = #{id}
           AND c.user_id = #{userId}
+    </select>
+
+    <!-- 查询当天有挂号的患者列表（用于就诊提醒） -->
+    <select id="searchTodayRegistrationUsers" resultType="HashMap">
+        SELECT DISTINCT c.user_id AS userId,
+               d.name AS doctorName,
+               s.name AS subDeptName,
+               r.id AS registrationId
+        FROM medical_registration r
+            JOIN patient_user_info_card c ON r.patient_card_id = c.id
+            JOIN doctor d ON d.id = r.doctor_id
+            JOIN medical_dept_sub s ON r.dept_sub_id = s.id
+        WHERE r.date = CURDATE()
+          AND r.payment_status = 2
     </select>
 </mapper>

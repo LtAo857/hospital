@@ -75,7 +75,7 @@ public class VideoDiagnoseServiceImpl implements VideoDiagnoseService {
         }
 
         //检查是否有正在执行的问诊和等待的问诊
-        List<String> list = redisTemplate.opsForHash().multiGet(key, new ArrayList<>() {{
+        List<String> list = redisTemplate.opsForHash().multiGet(key, new ArrayList<String>() {{
             add("currentOrder");
             add("nextOrder");
         }});
@@ -202,7 +202,7 @@ public class VideoDiagnoseServiceImpl implements VideoDiagnoseService {
                 }
             }
             if (flag == false) {
-                tempList.add(new HashMap<>() {{
+                tempList.add(new HashMap<String, Object>() {{
                     put("month", temp);
                     put("count", 0);
                 }});
