@@ -45,7 +45,7 @@ hospital
 
 # 项目技术栈
 ## 移动端：
-        UniApp、Vue2.0、uView、人脸识别服务、OCR 插���、TRTC 服务
+        UniApp、Vue2.0、uView、人脸识别服务、OCR服务、TRTC 服务
 
 ## 后端项目：
         SpringBoot、SpringMVC、MyBatis、SaToken、Quartz、WebSocket
