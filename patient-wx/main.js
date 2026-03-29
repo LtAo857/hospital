@@ -28,10 +28,17 @@ app.$mount()
 // #endif
 
 
-let minioUrl = "http://62.234.37.187:9000/hospital"
-Vue.prototype.minioUrl = minioUrl
+let fileBaseUrl = "http://127.0.0.1:8092/patient-wx-api/file"
+Vue.prototype.fileBaseUrl = fileBaseUrl
+Vue.prototype.fileUrl = function(path) {
+	if (!path) {
+		return ''
+	}
+	let normalizedPath = `${path}`.replace(/^\/+/, '')
+	return `${fileBaseUrl}/${normalizedPath}`
+}
 
-let patientUrl = minioUrl + "/patient-wx"
+let patientUrl = fileBaseUrl + "/patient-wx"
 
 
 Vue.prototype.patientUrl = patientUrl

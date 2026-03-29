@@ -165,7 +165,7 @@ export default {
         that.ajax(that.api.searchOnlineDoctorList, 'POST', data, function(resp) {
             let result = resp.data.result;
             for (let one of result) {
-                one.photo = `${that.minioUrl}/${one.photo}`;
+                one.photo = that.fileUrl(one.photo);
                 one.price = one.price + '元';
             }
             that.doctor = result;

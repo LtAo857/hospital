@@ -301,8 +301,8 @@ export default {
 	        for (let one of result) {
 	            that.fileList.push({
 	                filename: one.filename,
-	                thumb: `${that.minioUrl}/${one.path}`,
-	                url: `${that.minioUrl}/${one.path}`,
+	                thumb: that.fileUrl(one.path),
+	                url: that.fileUrl(one.path),
 	                type: 'image'
 	            });
 	        }

@@ -36,19 +36,21 @@
                 <div class="cell-header operate">操作</div>
             </div>
             <div class="row" v-for="doctor in doctors">
-                <div class="cell room">{{ doctor.doctorName }}</div>
+                <div class="cell room">
+                    <div>{{ doctor.doctorName }}</div>
+                    <div style="font-size: 12px; color: #666;">总剩余 {{ doctor.totalRemaining }}/{{ doctor.totalMaximum }}</div>
+                </div>
 
-                <div class="cell" v-for="(one, index) in doctor.slot">
+                <div class="cell" v-for="slot in doctor.slots">
                     <el-tooltip
                         effect="dark"
-                        :content="`患者上限${doctor.maximum}人`"
+                        :content="`上限${slot.maximum}人 / 已挂${slot.num}人 / 剩余${slot.remaining}人`"
                         placement="top-start"
-                        v-if="index == 0 && one"
+                        v-if="slot.enabled"
                     >
-                        <span class="blue">✔</span>
+                        <span :class="slot.remaining > 0 ? 'blue' : 'red'">{{ slot.remaining > 0 ? `剩余${slot.remaining}` : '已满' }}</span>
                     </el-tooltip>
-                    <span v-if="index > 0 && one" class="blue">✔</span>
-                    <span v-if="!one" class="red">空</span>
+                    <span v-if="!slot.enabled" class="red">空</span>
                 </div>
                 <div class="cell">
                     <el-button
@@ -106,6 +108,7 @@ export default {
             ],
 
             doctors: [],
+            refreshTimer: null,
 
             roomList: [],
             dept: [],
@@ -146,7 +149,7 @@ export default {
       },
       loadDataList: function() {
           let that = this;
-      
+
           let data = {
               date: that.dataForm.date,
               deptSubId: that.dataForm.deptSubId
@@ -154,6 +157,13 @@ export default {
           that.$http('/doctor/work_plan/schedule/searchDeptSubSchedule', 'POST', data, true, function(resp) {
               let result = resp.result;
               that.doctors = result;
+              if (that.refreshTimer == null) {
+                  that.refreshTimer = setInterval(function() {
+                      if (that.dataForm.deptSubId != null && that.dataForm.date != null) {
+                          that.loadDataList();
+                      }
+                  }, 15000);
+              }
           });
       },
       deptSubChangeHandle: function(val) {
@@ -214,7 +224,13 @@ export default {
 
     },
     mounted: function() {
-     
+
+    },
+    beforeUnmount: function() {
+        if (this.refreshTimer != null) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+        }
     },
     created: function() {
         let that = this;

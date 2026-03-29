@@ -14,9 +14,6 @@ import com.example.hospital.patient.wx.api.exception.HospitalException;
 //import com.example.hospital.patient.wx.api.service.PaymentService;
 import com.example.hospital.patient.wx.api.service.VideoDiagnoseService;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
-import io.minio.RemoveObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
@@ -27,9 +24,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,22 +57,8 @@ public class VideoDiagnoseServiceImpl implements VideoDiagnoseService {
     @Resource
     private VideoDiagnoseFileDao videoDiagnoseFileDao;
 
-    @Value("${minio.endpoint}")
-    private String endpoint;
-
-    @Value("${minio.access-key}")
-    private String accessKey;
-
-    @Value("${minio.secret-key}")
-    private String secretKey;
-
-    private MinioClient client;
-
-    @PostConstruct
-    public void init() {
-        this.client = new MinioClient.Builder().endpoint(endpoint)
-                .credentials(accessKey, secretKey).build();
-    }
+    @Value("${storage.local.root-path:D:/hospital-storage}")
+    private String storageRootPath;
 
     @Override
     public ArrayList<HashMap> searchOnlineDoctorList(String subName, String job) {
@@ -301,20 +288,18 @@ public class VideoDiagnoseServiceImpl implements VideoDiagnoseService {
     @Transactional
     public String uploadImage(MultipartFile file, Integer videoDiagnoseId) {
         try {
-            //随机生成文件名称
             String filename = IdUtil.simpleUUID() + ".jpg";
-            //照片存放在Minio存储桶中的相对路径
             String path = "patient-wx/video_diagnose/" + filename;
-            //在Minio中保存照片（文件不能超过5M）
-            this.client.putObject(PutObjectArgs.builder().bucket("hospital")
-                    .object(path).stream(file.getInputStream(), -1, 5 * 1024 * 1024)
-                    .contentType("image/jpeg").build());
+            Path target = Paths.get(storageRootPath, "patient-wx", "video_diagnose", filename);
+            Files.createDirectories(target.getParent());
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             VideoDiagnoseFileEntity entity = new VideoDiagnoseFileEntity();
             entity.setVideoDiagnoseId(videoDiagnoseId);
             entity.setFilename(filename);
             entity.setPath(path);
-            //文件属性信息保存到数据表
             videoDiagnoseFileDao.insert(entity);
             return filename;
         } catch (Exception e) {
@@ -373,10 +358,8 @@ public class VideoDiagnoseServiceImpl implements VideoDiagnoseService {
 
     private void removeImageFile(String filename) {
         try {
-            String path = "patient-wx/video_diagnose/" + filename;
-            //删除文件
-            this.client.removeObject(RemoveObjectArgs.builder().bucket("hospital")
-                    .object(path).build());
+            Path path = Paths.get(storageRootPath, "patient-wx", "video_diagnose", filename);
+            Files.deleteIfExists(path);
         } catch (Exception e) {
             log.error("删除视频问诊图片失败", e);
             throw new HospitalException("删除视频问诊图片失败");

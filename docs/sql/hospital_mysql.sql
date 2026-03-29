@@ -399,6 +399,7 @@ INSERT INTO `mis_permission` VALUES (52, 'DOCTOR_PRICE:UPDATE', 15, 3);
 INSERT INTO `mis_permission` VALUES (53, 'DOCTOR_PRICE:SELECT', 16, 4);
 INSERT INTO `mis_permission` VALUES (54, 'SYSTEM:UPDATE', 16, 3);
 INSERT INTO `mis_permission` VALUES (55, 'SYSTEM:SELECT', 16, 4);
+INSERT INTO `mis_permission` VALUES (56, 'EVALUATION:SELECT', 15, 4);
 
 -- ----------------------------
 -- Table structure for mis_role
@@ -441,6 +442,8 @@ INSERT INTO `mis_role_permission` VALUES (5, 1, 28);
 INSERT INTO `mis_role_permission` VALUES (6, 1, 32);
 INSERT INTO `mis_role_permission` VALUES (7, 2, 36);
 INSERT INTO `mis_role_permission` VALUES (8, 2, 37);
+INSERT INTO `mis_role_permission` VALUES (9, 0, 56);
+INSERT INTO `mis_role_permission` VALUES (10, 1, 56);
 
 -- ----------------------------
 -- Table structure for mis_user
@@ -554,5 +557,51 @@ CREATE TABLE `patient_user_info_card`  (
 -- ----------------------------
 INSERT INTO `patient_user_info_card` VALUES (1, 1, '550e8400e29b41d4a716446655440000', '张三', '男', '110101199003077832', '13800138000', '1990-03-07', '无重大疾病史', '城镇医保', 1);
 INSERT INTO `patient_user_info_card` VALUES (2, 2, 'da42e00492a5444a8322d6c4933cdf33', '测试', '男', '140227200106190518', '15110790629', '1900-01-01', '[\"无\"]', '无', NULL);
+
+-- ----------------------------
+-- Table structure for video_diagnose
+-- ----------------------------
+DROP TABLE IF EXISTS `video_diagnose`;
+CREATE TABLE `video_diagnose`  (
+  `id` int(0) NOT NULL AUTO_INCREMENT,
+  `patient_card_id` int(0) NULL DEFAULT NULL,
+  `doctor_id` int(0) NULL DEFAULT NULL,
+  `out_trade_no` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `amount` decimal(10, 2) NULL DEFAULT NULL,
+  `payment_status` tinyint(0) NULL DEFAULT NULL,
+  `prepay_id` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `transaction_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `expect_start` datetime(0) NULL DEFAULT NULL,
+  `expect_end` datetime(0) NULL DEFAULT NULL,
+  `real_start` datetime(0) NULL DEFAULT NULL,
+  `real_end` datetime(0) NULL DEFAULT NULL,
+  `status` tinyint(0) NULL DEFAULT NULL,
+  `create_time` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `video_diagnose_idx_1`(`patient_card_id`) USING BTREE,
+  INDEX `video_diagnose_idx_2`(`doctor_id`) USING BTREE,
+  INDEX `video_diagnose_idx_3`(`out_trade_no`) USING BTREE,
+  INDEX `video_diagnose_idx_4`(`payment_status`) USING BTREE,
+  INDEX `video_diagnose_idx_5`(`prepay_id`) USING BTREE,
+  INDEX `video_diagnose_idx_6`(`transaction_id`) USING BTREE,
+  INDEX `video_diagnose_idx_7`(`expect_start`) USING BTREE,
+  INDEX `video_diagnose_idx_8`(`expect_end`) USING BTREE,
+  INDEX `video_diagnose_idx_9`(`status`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for video_diagnose_file
+-- ----------------------------
+DROP TABLE IF EXISTS `video_diagnose_file`;
+CREATE TABLE `video_diagnose_file`  (
+  `id` int(0) NOT NULL AUTO_INCREMENT,
+  `video_diagnose_id` int(0) NULL DEFAULT NULL,
+  `filename` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `path` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `create_time` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `video_diagnose_file_idx_1`(`video_diagnose_id`) USING BTREE,
+  INDEX `video_diagnose_file_idx_2`(`create_time`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 SET FOREIGN_KEY_CHECKS = 1;

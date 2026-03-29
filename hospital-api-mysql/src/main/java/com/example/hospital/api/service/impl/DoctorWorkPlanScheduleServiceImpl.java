@@ -64,34 +64,42 @@ public class DoctorWorkPlanScheduleServiceImpl implements DoctorWorkPlanSchedule
         ArrayList<HashMap> result = new ArrayList();
 
         int tempDoctorId = 0;
-        HashMap doctor = new HashMap();
+        HashMap doctor = null;
 
         for (HashMap map : list) {
             int doctorId = MapUtil.getInt(map, "doctorId");
             int slot = MapUtil.getInt(map, "slot");
-            //如果当前记录跟上一条记录的医生不是同一个人
+            int maximum = MapUtil.getInt(map, "maximum");
+            int num = MapUtil.getInt(map, "num");
+            int remaining = Math.max(maximum - num, 0);
             if (tempDoctorId != doctorId) {
                 tempDoctorId = doctorId;
-                doctor = map;
-                doctor.replace("slot", new ArrayList<Integer>() {{
-                    add(slot);
-                }});
+                doctor = new HashMap();
+                doctor.put("workPlanId", MapUtil.getInt(map, "workPlanId"));
+                doctor.put("doctorId", doctorId);
+                doctor.put("doctorName", MapUtil.getStr(map, "doctorName"));
+                doctor.put("totalMaximum", MapUtil.getInt(map, "totalMaximum"));
+                doctor.put("totalNum", MapUtil.getInt(map, "totalNum"));
+                doctor.put("totalRemaining", Math.max(MapUtil.getInt(map, "totalMaximum") - MapUtil.getInt(map, "totalNum"), 0));
+                ArrayList<HashMap> slots = new ArrayList();
+                for (int i = 1; i <= 15; i++) {
+                    HashMap<String, Object> slotInfo = new HashMap<>();
+                    slotInfo.put("slot", i);
+                    slotInfo.put("enabled", false);
+                    slotInfo.put("maximum", 0);
+                    slotInfo.put("num", 0);
+                    slotInfo.put("remaining", 0);
+                    slots.add(slotInfo);
+                }
+                doctor.put("slots", slots);
                 result.add(doctor);
             }
-            //如果当前记录与上一条记录是同一个医生
-            else if (tempDoctorId == doctorId) {
-                ArrayList<Integer> slotList = (ArrayList) doctor.get("slot");
-                slotList.add(slot);
-            }
-        }
-        //筛选哪些时段出诊，哪些时段不出诊
-        for (HashMap map : result) {
-            ArrayList<Integer> slot = (ArrayList) map.get("slot");
-            ArrayList tempSlot = new ArrayList();
-            for (int i = 1; i <= 15; i++) {
-                tempSlot.add(slot.contains(i));
-            }
-            map.replace("slot", tempSlot);
+            ArrayList<HashMap> slotList = (ArrayList<HashMap>) doctor.get("slots");
+            HashMap slotInfo = slotList.get(slot - 1);
+            slotInfo.put("enabled", true);
+            slotInfo.put("maximum", maximum);
+            slotInfo.put("num", num);
+            slotInfo.put("remaining", remaining);
         }
         return result;
     }

@@ -27,8 +27,10 @@ public class MisUserController {
             StpUtil.login(userId);
             String token = StpUtil.getTokenValue();
             List<String> permissions = StpUtil.getPermissionList();
+            Map userInfo = misUserService.searchUserInfoById(userId);
             return R.ok().put("result", true).put("token", token)
-                    .put("permissions", permissions);
+                    .put("permissions", permissions)
+                    .put("userInfo", userInfo);
 
         }
         return R.ok().put("result", false);

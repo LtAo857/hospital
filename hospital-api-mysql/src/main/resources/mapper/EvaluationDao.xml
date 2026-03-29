@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.api.db.dao.EvaluationDao">
+
+    <sql id="whereSql">
+        <where>
+            <if test="doctorId != null">
+                AND e.doctor_id = #{doctorId}
+            </if>
+            <if test="doctorName != null and doctorName != ''">
+                AND d.name LIKE CONCAT('%', #{doctorName}, '%')
+            </if>
+            <if test="patientName != null and patientName != ''">
+                AND c.name LIKE CONCAT('%', #{patientName}, '%')
+            </if>
+            <if test="score != null">
+                AND e.score = #{score}
+            </if>
+            <if test="source != null and source != ''">
+                <choose>
+                    <when test="source == '门诊'">
+                        AND e.registration_id IS NOT NULL
+                    </when>
+                    <otherwise>
+                        AND e.video_diagnose_id IS NOT NULL
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND e.create_time <![CDATA[>=]]> STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND e.create_time <![CDATA[<]]> DATE_ADD(STR_TO_DATE(#{endDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+            </if>
+        </where>
+    </sql>
+
+    <select id="searchCount" parameterType="Map" resultType="long">
+        SELECT COUNT(*)
+        FROM doctor_evaluation e
+                 JOIN doctor d ON d.id = e.doctor_id
+                 JOIN patient_user_info_card c ON c.id = e.patient_card_id
+        <include refid="whereSql"/>
+    </select>
+
+    <select id="searchByPage" parameterType="Map" resultType="HashMap">
+        SELECT e.id,
+               d.name AS doctorName,
+               c.name AS patientName,
+               e.score,
+               e.comment,
+               CASE
+                   WHEN e.registration_id IS NOT NULL THEN '门诊'
+                   ELSE '视频问诊'
+                   END AS source,
+               DATE_FORMAT(e.create_time, '%Y-%m-%d %H:%i') AS createTime
+        FROM doctor_evaluation e
+                 JOIN doctor d ON d.id = e.doctor_id
+                 JOIN patient_user_info_card c ON c.id = e.patient_card_id
+        <include refid="whereSql"/>
+        ORDER BY e.create_time DESC
+        LIMIT #{length} OFFSET #{start}
+    </select>
+</mapper>

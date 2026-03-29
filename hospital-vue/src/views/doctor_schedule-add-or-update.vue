@@ -22,7 +22,12 @@
                             v-for="(one, index) in slotList"
                             :label="one"
                             :disabled="analyseCheckBoxDisable(index + 1)"
-                        />
+                        >
+                            <span>{{ one }}</span>
+                            <span v-if="slotStatusMap[index + 1]" style="margin-left: 8px; color: #909399;">
+                                已挂{{ slotStatusMap[index + 1].num }} / 剩余{{ slotStatusMap[index + 1].remaining }}
+                            </span>
+                        </el-checkbox>
                     </el-checkbox-group>
                 </div>
             </el-form-item>
@@ -68,11 +73,12 @@ export default {
                 '14:00~14:30',
                 '14:30~15:00',
                 '15:00~15:30',
-                '16:00~16:30',
-                '16:30~17:00'
+                '15:30~16:00',
+                '16:00~16:30'
             ],
             checkedSlot: [],
             oldSlots: [],
+            slotStatusMap: {},
             dataForm: {
                 workPlanId: null,
                 deptSubId: null,
@@ -105,6 +111,7 @@ export default {
           this.checkAll = false;
           this.checkedSlot = [];
           this.oldSlots = [];
+          this.slotStatusMap = {};
           let dataForm = {
               deptSubId: null,
               doctorId: null,
@@ -132,9 +139,14 @@ export default {
                            that.dataForm.doctorId = result.doctorId;
                            that.dataForm.slotMaximum = result.maximum;
                            that.oldSlots = result.slots;
+                           that.slotStatusMap = {};
                            for (let one of result.slots) {
                                   let slot = that.slotList[one.slot - 1];
                                   that.checkedSlot.push(slot);
+                                  that.slotStatusMap[one.slot] = {
+                                      num: one.num,
+                                      remaining: Math.max(one.maximum - one.num, 0)
+                                  };
                            }
                  });
               }

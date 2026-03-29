@@ -16,6 +16,10 @@ public interface DoctorAccountService {
 
     public void insert(Map param);
 
+    public HashMap searchAccountByRefId(int refId);
+
+    public void updateAccount(Map param);
+
     public HashMap searchById(int id);
     public void update(Map param);
 

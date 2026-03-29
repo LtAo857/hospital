@@ -122,6 +122,53 @@
                )
     </insert>
 
+    <select id="searchAccountByRefId" parameterType="int" resultType="HashMap">
+        SELECT id,
+               username,
+               name,
+               ref_id AS refId,
+               job,
+               status
+        FROM mis_user
+        WHERE ref_id = #{refId}
+        LIMIT 1
+    </select>
+
+    <select id="searchAccountById" parameterType="int" resultType="HashMap">
+        SELECT id,
+               username,
+               name,
+               ref_id AS refId,
+               job,
+               status
+        FROM mis_user
+        WHERE id = #{id}
+    </select>
+
+    <select id="searchAccountIdByUsername" parameterType="Map" resultType="Integer">
+        SELECT id
+        FROM mis_user
+        WHERE username = #{username}
+        <if test="id != null">
+            AND id != #{id}
+        </if>
+        LIMIT 1
+    </select>
+
+    <insert id="insertUserRole" parameterType="Map">
+        INSERT INTO mis_user_role(user_id, role_id)
+        VALUES(#{userId}, #{roleId})
+    </insert>
+
+    <update id="updateAccount" parameterType="Map">
+        UPDATE mis_user
+        SET username = #{username}
+        <if test="password != null and password != ''">
+            , password = #{password}
+        </if>
+        WHERE id = #{id}
+    </update>
+
     <!-- 根据UUID查询医生ID -->
     <select id="searchIdByUuid" parameterType="String" resultType="Integer">
         SELECT id
@@ -149,6 +196,7 @@
                d.tag AS tag,
                d.recommended AS recommended,
                d.status AS status,
+               md.id AS deptId,
                md.name AS deptName,
                sd.dept_sub_id AS deptSubId
         FROM doctor d

@@ -25,7 +25,7 @@ spring:
 
   redis:
     database: 0
-    host: 1
+    host: 62.234.37.187
     port: 6379
     password: abc123456
     jedis:
@@ -76,18 +76,17 @@ sa-token:
 #
 tencent:
   cloud:
-    appId: 1
-    secretId: 1
-    secretKey: 1
+    appId: 1308222269
+    secretId: AKID3zf7b4Skv7AzZyGVar8KRixNC9eJzhRK
+    secretKey: zut273qVxDGIOTOLGA527KPPFqGWZSDn
     face:
       groupName: hospital
       region: ap-beijing
   trtc:
-    appId: 1
-    secretKey: 1
+    appId: 1600018532
+    secretKey: 196c9dc9e34ea1ef27c4c25c917569cff3aa5f65b5d6006134a578ee59f78321
     expire: 86400
-minio:
-  endpoint: http://1:9000
-  access-key: root
-  secret-key: 1
+storage:
+  local:
+    root-path: D:/hospital-storage
 

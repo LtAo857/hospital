@@ -290,7 +290,7 @@ export default {
                 };
                 that.$http('/doctor/searchContent', 'POST', data, false, function(resp) {
                     that.content.id = row.id;
-                    that.content.photo = `${that.$minioUrl}${resp.photo}?random=${Math.random()}`;
+                    that.content.photo = `${that.$fileUrl(resp.photo)}?random=${Math.random()}`;
                     // console.log(that.content.photo);
                     that.content.pid = resp.pid;
                     that.content.birthday = resp.birthday;
@@ -309,7 +309,7 @@ export default {
         },
         //上传重新加载医生的照片
         updatePhotoSuccess: function() {
-            this.content.photo = `${this.$minioUrl}/doctor/doctor-${this.content.id}.jpg?random=${Math.random()}`;
+            this.content.photo = `${this.$fileUrl(`doctor/doctor-${this.content.id}.jpg`)}?random=${Math.random()}`;
             // console.log(this.content.photo);
         },
         updatePhotoError: function() {

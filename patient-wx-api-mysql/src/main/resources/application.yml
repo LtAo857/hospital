@@ -24,7 +24,7 @@ spring:
 
   redis:
     database: 0
-    host: 1
+    host: 62.234.37.187
     port: 6379
     password: abc123456
     jedis:
@@ -63,8 +63,8 @@ sa-token:
 
 
 wechat:
-  app-id: 1
-  app-secret: 41
+  app-id: wx3e302392b738718d
+  app-secret: 4abaeb547f7d580865be4324e2a8dbf0
 #  pay:
 #    v3:
 #      patient-wx-api:
@@ -76,19 +76,18 @@ wechat:
 
 tencent:
   cloud:
-    appId: 1
-    secretId: 1
-    secretKey: 1
+    appId: 1308222269
+    secretId: AKID3zf7b4Skv7AzZyGVar8KRixNC9eJzhRK
+    secretKey: zut273qVxDGIOTOLGA527KPPFqGWZSDn
     face:
-      groupName: 1
+      groupName: hospital
       region: ap-beijing
   trtc:
-    appId: 1
-    secretKey: 1
+    appId: 1600018532
+    secretKey: 196c9dc9e34ea1ef27c4c25c917569cff3aa5f65b5d6006134a578ee59f78321
     expire: 86400
 
-minio:
-  endpoint: http://1:9000
-  access-key: root
-  secret-key: 1
+storage:
+  local:
+    root-path: D:/hospital-storage
 

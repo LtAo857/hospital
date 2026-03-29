@@ -20,6 +20,7 @@ import DoctorSchedule from "../views/doctor_schedule.vue"
 import VideoDiagnose from "../views/video_diagnose.vue"
 import Illness from "../views/illness.vue"
 import Patient from "../views/patient.vue"
+import Evaluation from "../views/evaluation.vue"
 import NotFound from "../views/404.vue"
 
 
@@ -156,6 +157,15 @@ const routes = [{
 				component:Patient,
 				meta: {
 					title: '患者信息',
+					isTab: true
+				}
+			},
+			{
+				path: '/evaluation',
+				name: 'Evaluation',
+				component: Evaluation,
+				meta: {
+					title: '评价管理',
 					isTab: true
 				}
 			},

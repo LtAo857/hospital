@@ -95,12 +95,16 @@ app.config.globalProperties.$echarts = echarts //设置全局变量$echarts
 let baseUrl = "http://localhost:8094/hospital-api"
 app.config.globalProperties.$baseUrl = baseUrl //设置全局变量$baseUrl
 
-//Minio服务器地址
-let minioUrl = "http://62.234.37.187:9000/hospital"
-app.config.globalProperties.$minioUrl = minioUrl
-
-
-
+//本地文件访问地址
+let fileBaseUrl = `${baseUrl}/file`
+app.config.globalProperties.$fileBaseUrl = fileBaseUrl
+app.config.globalProperties.$fileUrl = function(path) {
+    if (!path) {
+        return ''
+    }
+    let normalizedPath = `${path}`.replace(/^\/+/, '')
+    return `${fileBaseUrl}/${normalizedPath}`
+}
 //封装全局Ajax公共函数
 app.config.globalProperties.$http = function(url, method, data, async, fun) {
     $.ajax({
@@ -152,8 +156,21 @@ app.config.globalProperties.$http = function(url, method, data, async, fun) {
 }
 
 //封装用于判断用户是否具有某些权限的公共函数
-app.config.globalProperties.isAuth = function(permission) {
+function parsePermissions() {
     let permissions = localStorage.getItem("permissions");
+    if (!permissions) {
+        return [];
+    }
+    try {
+        let parsed = JSON.parse(permissions);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return permissions.split(",").filter(item => item);
+    }
+}
+
+app.config.globalProperties.isAuth = function(permission) {
+    let permissions = parsePermissions();
     let flag = false
     for (let one of permission) {
         if (permissions.includes(one)) {

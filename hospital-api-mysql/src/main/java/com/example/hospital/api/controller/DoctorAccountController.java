@@ -70,6 +70,23 @@ public class DoctorAccountController {
         return R.ok();
     }
 
+    @PostMapping("/searchAccountByRefId")
+    @SaCheckLogin
+    @SaCheckPermission(value = {"ROOT", "DOCTOR:SELECT"}, mode = SaMode.OR)
+    public R searchAccountByRefId(@RequestBody @Valid SearchDoctorByIdForm form) {
+        HashMap map = doctorAccountService.searchAccountByRefId(form.getId());
+        return R.ok().put("result", map);
+    }
+
+    @PostMapping("/updateAccount")
+    @SaCheckLogin
+    @SaCheckPermission(value = {"ROOT", "DOCTOR:UPDATE"}, mode = SaMode.OR)
+    public R updateAccount(@RequestBody @Valid UpdateDoctorAccountForm form) {
+        Map param = BeanUtil.beanToMap(form);
+        doctorAccountService.updateAccount(param);
+        return R.ok();
+    }
+
     @PostMapping("/searchById")
     @SaCheckLogin
     @SaCheckPermission(value = {"ROOT", "DOCTOR:SELECT"}, mode = SaMode.OR)

@@ -31,4 +31,14 @@
         WHERE ref_id = ${refId}
           AND job = #{job}
     </select>
+
+    <select id="searchUserInfoById" parameterType="int" resultType="HashMap">
+        SELECT id,
+               username,
+               name,
+               job,
+               ref_id AS refId
+        FROM mis_user
+        WHERE id = #{id}
+    </select>
 </mapper>

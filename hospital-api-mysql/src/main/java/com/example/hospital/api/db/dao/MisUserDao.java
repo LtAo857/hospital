@@ -14,6 +14,8 @@ public interface MisUserDao {
     public HashMap searchRefId(int id);
 
     public Integer searchUserId(Map param);
+
+    public HashMap searchUserInfoById(int id);
 }
 
 

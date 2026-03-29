@@ -30,10 +30,13 @@
 
     <select id="searchDeptSubSchedule" parameterType="Map" resultType="HashMap">
         SELECT p.id AS workPlanId,
+               p.maximum AS totalMaximum,
+               p.num AS totalNum,
                d.id AS doctorId,
                d.name AS doctorName,
                s.slot AS slot,
-               s.maximum AS maximum
+               s.maximum AS maximum,
+               s.num AS num
         FROM doctor_work_plan p
                  JOIN doctor_work_plan_schedule s ON s.work_plan_id = p.id
                  JOIN doctor d ON p.doctor_id = d.id

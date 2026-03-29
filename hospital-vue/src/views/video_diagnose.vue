@@ -658,7 +658,7 @@ export default {
             let result = resp.result;
             for (let one of result) {
                 //为了避免图片被浏览器缓存，这里添加随机参数
-                that.imgList.push(`${that.$minioUrl}/${one}?random=${Math.random()}`);
+                that.imgList.push(`${that.$fileUrl(one)}?random=${Math.random()}`);
             }
         });
     },

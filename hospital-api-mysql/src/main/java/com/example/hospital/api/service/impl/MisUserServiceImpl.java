@@ -9,6 +9,7 @@ import com.example.hospital.api.service.MisUserService;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
@@ -33,6 +34,12 @@ public class MisUserServiceImpl implements MisUserService {
         param.replace("password", password);
         Integer userId = misUserDao.login(param);
         return userId;
+    }
+
+    @Override
+    public Map searchUserInfoById(int id) {
+        HashMap map = misUserDao.searchUserInfoById(id);
+        return map;
     }
 }
 

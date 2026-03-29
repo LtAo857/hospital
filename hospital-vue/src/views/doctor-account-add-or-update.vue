@@ -1,192 +1,177 @@
 <template>
-<!--    :title="!dataForm.id ? '新增' : '修改'"  -->
   <el-dialog
-      title="添加医生账号"
-      v-if="isAuth(['ROOT', 'DOCTOR:INSERT', 'DOCTOR:UPDATE'])"
-      :close-on-click-modal="false"
-      v-model="visible"
-      width="480px"
+    :title="mode === 'edit' ? '编辑医生账号' : '添加医生账号'"
+    v-if="isAuth(['ROOT', 'DOCTOR:INSERT', 'DOCTOR:UPDATE'])"
+    :close-on-click-modal="false"
+    v-model="visible"
+    width="480px"
   >
-    <el-scrollbar height="500px">
-      <el-form :model="dataForm" ref="dataForm" :rules="dataRule" label-width="80px">
-        <el-form-item label="姓名" prop="name"><el-input  disabled v-model="dataForm.name" clearable /></el-form-item>
-        <el-form-item label="账号名称" disabled prop="username"><el-input v-model="dataForm.username" clearable /></el-form-item>
-        <el-form-item label="密码" disabled prop="password"><el-input v-model="dataForm.password" clearable /></el-form-item>
-
-
-      </el-form>
-    </el-scrollbar>
+    <el-form :model="dataForm" ref="dataForm" :rules="dataRule" label-width="90px">
+      <el-form-item label="姓名" prop="name">
+        <el-input v-model="dataForm.name" disabled />
+      </el-form-item>
+      <el-form-item label="账号名称" prop="username">
+        <el-input v-model="dataForm.username" maxlength="50" />
+      </el-form-item>
+      <el-form-item label="密码" prop="password">
+        <el-input
+          v-model="dataForm.password"
+          maxlength="20"
+          :placeholder="mode === 'edit' ? '不修改可留空' : '请输入初始密码'"
+          show-password
+        />
+      </el-form-item>
+    </el-form>
     <template #footer>
-            <span class="dialog-footer">
-                <el-button @click="visible = false">取消</el-button>
-                <el-button type="primary" @click="dataFormSubmit">确定</el-button>
-            </span>
+      <span class="dialog-footer">
+        <el-button @click="visible = false">取消</el-button>
+        <el-button type="primary" @click="dataFormSubmit">确定</el-button>
+      </span>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import dayjs from 'dayjs';
+import { ElMessage } from 'element-plus';
+
 export default {
-  data: function() {
+  data() {
+    const validateUsername = (rule, value, callback) => {
+      if (!/^[a-zA-Z0-9]{5,50}$/.test(value || '')) {
+        callback(new Error('账号名称应为5-50位字母或数字'));
+        return;
+      }
+      callback();
+    };
+    const validatePassword = (rule, value, callback) => {
+      if (this.mode === 'add' && !value) {
+        callback(new Error('密码不能为空'));
+        return;
+      }
+      if (value && !/^[a-zA-Z0-9]{6,20}$/.test(value)) {
+        callback(new Error('密码应为6-20位字母或数字'));
+        return;
+      }
+      callback();
+    };
     return {
       visible: false,
-      newTag: null,
-      dept: [],
-
+      mode: 'add',
       dataForm: {
+        accountId: null,
         id: null,
-        name: null,
-        pid: null,
-        sex: '男',
-        photo: null,
-        birthday: null,
-        school: null,
-        degree: '博士',
-        tel: null,
-        address: null,
-        email: null,
-        job: null,
-        deptSub: null,
-        deptSubId: null,
-        remark: null,
-        description: null,
-        hiredate: null,
-        tag: [],
-        recommended: '普通',
-        status: '在职'
+        name: '',
+        username: '',
+        password: '',
+        sex: '',
+        tel: '',
+        email: '',
+        deptId: null
       },
       dataRule: {
-        username: [
-          { required: true, message: '账号名称不能为空' },
-
-        ],
-
-
-        password: [
-          {
-            required: true,
-            message: '密码不能为空'
-          }
-        ]
+        username: [{ required: true, validator: validateUsername, trigger: 'blur' }],
+        password: [{ validator: validatePassword, trigger: 'blur' }]
       }
     };
   },
   methods: {
-    loadDeptAndSub: function() {
-      let that = this;
-      that.$http('/medical/dept/searchDeptAndSub', 'GET', {}, false, function(resp) {
-        let result = resp.result;
-        let dept = [];
-        for (let one in result) {
-          let array = [];
-          for (let sub of result[one]) {
-            array.push({
-              value: sub.subId,
-              label: sub.subName
+    reset() {
+      this.mode = 'add';
+      this.dataForm = {
+        accountId: null,
+        id: null,
+        name: '',
+        username: '',
+        password: '',
+        sex: '',
+        tel: '',
+        email: '',
+        deptId: null
+      };
+    },
+    init(row) {
+      const that = this;
+      that.reset();
+      const doctorId = row.id;
+      that.$http('/doctor/account/searchAccountByRefId', 'POST', { id: doctorId }, true, function(resp) {
+        const account = resp.result;
+        that.$http('/doctor/account/searchById', 'POST', { id: doctorId }, true, function(detailResp) {
+          const detail = detailResp;
+          that.mode = account ? 'edit' : 'add';
+          that.dataForm = {
+            accountId: account ? account.id : null,
+            id: detail.id,
+            name: detail.name,
+            username: account ? account.username : `doctor${detail.id}`,
+            password: account ? '' : 'abc123456',
+            sex: detail.sex,
+            tel: detail.tel,
+            email: detail.email || `doctor${detail.id}@hospital.local`,
+            deptId: detail.deptId
+          };
+          if (account) {
+            ElMessage({
+              message: `该医生已设置账号，已切换为编辑模式：${account.username}`,
+              type: 'warning',
+              duration: 1500
             });
           }
-          dept.push({
-            value: one,
-            label: one,
-            children: array
-          });
-        }
-        that.dept = dept;
+          that.visible = true;
+        });
       });
     },
-    reset: function() {
-      let dataForm = {
-        id: null,
-        name: null,
-        pid: null,
-        sex: '男',
-        photo: null,
-        birthday: null,
-        school: null,
-        degree: '博士',
-        tel: null,
-        address: null,
-        email: null,
-        job: null,
-        deptSub: null,
-        deptSubId: null,
-        remark: null,
-        description: null,
-        hiredate: null,
-        tag: [],
-        recommended: '普通',
-        status: '在职'
-      };
-      this.dataForm = dataForm;
-      this.newTag = null;
-    },
-    init: function(row) {
-      console.log(row)
-      let that = this;
-      //重置表单控件
-      that.reset();
-      // //如果id是undefined，就对模型层id变量赋值为0
-      // that.dataForm.id = row.id || 0;
-      //显示对话框
-      that.visible = true;
+    dataFormSubmit() {
+      const that = this;
+      that.$refs['dataForm'].validate(function(valid) {
+        if (!valid) {
+          return;
+        }
+        if (that.mode === 'edit') {
+          that.$http(
+            '/doctor/account/updateAccount',
+            'POST',
+            {
+              id: that.dataForm.accountId,
+              username: that.dataForm.username,
+              password: that.dataForm.password
+            },
+            true,
+            function() {
+              ElMessage({
+                message: '账号已更新',
+                type: 'success',
+                duration: 1200
+              });
+              that.visible = false;
+              that.$emit('refreshDataList');
+            }
+          );
+          return;
+        }
 
-      //数据回显
-      that.dataForm=row;
-
-
-    },
-    inputTagHandle: function () {
-      if (this.newTag != null && this.newTag != '') {
-        if (this.dataForm.tag.includes(this.newTag)) {
+        const data = {
+          name: that.dataForm.name,
+          username: that.dataForm.username,
+          password: that.dataForm.password,
+          sex: that.dataForm.sex,
+          tel: that.dataForm.tel,
+          email: that.dataForm.email,
+          job: '医生',
+          dept_id: that.dataForm.deptId,
+          ref_id: that.dataForm.id,
+          status: 1
+        };
+        that.$http('/doctor/account/insert', 'POST', data, true, function() {
           ElMessage({
-            message: '不能添加重复标签',
-            type: 'warning',
+            message: '账号已创建',
+            type: 'success',
             duration: 1200
           });
-        } else {
-          this.dataForm.tag.push(this.newTag);
-          this.newTag = null;
-        }
-      }
-    },
-    closeTagHandle: function (tag) {
-      let i = this.dataForm.tag.indexOf(tag);
-      this.dataForm.tag.splice(i, 1);
-    },
-    dataFormSubmit: function () {
-      let that = this;
-      that.$refs['dataForm'].validate(function (valid) {
-        if (valid) {
-          let json = { 在职: 1, 离职: 2, 退休: 3 };
-          let data = {
-            username: that.dataForm.username,
-            password: that.dataForm.password,
-            name: that.dataForm.name,
-            sex: that.dataForm.sex,
-            tel: that.dataForm.tel,
-            dept_id:that.dataForm.deptId,
-            address: that.dataForm.address,
-            email: "110@qq.com",
-            // job: that.dataForm.job,
-            status: json[that.dataForm.status],
-          };
-          // that.$http(`/doctor/account/${!that.dataForm.id ? 'insert' : 'update'}`, 'POST', data, true, function (
-          that.$http(`/doctor/account/insert`, 'POST', data, true, function (
-              resp
-          ) {
-            ElMessage({
-              message: '操作成功',
-              type: 'success'
-            });
-            that.visible = false;
-            that.$emit('refreshDataList');
-          });
-        }
+          that.visible = false;
+          that.$emit('refreshDataList');
+        });
       });
     }
-
-
   }
 };
 </script>

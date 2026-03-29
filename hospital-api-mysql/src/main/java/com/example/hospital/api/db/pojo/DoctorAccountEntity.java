@@ -8,8 +8,8 @@ public class DoctorAccountEntity {
     private String name;
     private String username;
     private String password;
-    private int deptId;
-    private int refId;
+    private Integer deptId;
+    private Integer refId;
 
     private String sex;
 

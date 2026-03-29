@@ -15,7 +15,13 @@
       "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\\\\patient-wx-api-mysql\" && mvn clean compile -q 2>&1 | tail -20)",
       "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\\\\patient-wx-api-mysql\" && mvn clean compile -q 2>&1 | tail -5)",
       "Bash(mysql -u root -p123456 hospital_mysql -e \"SELECT id, payment_status FROM medical_registration ORDER BY id DESC LIMIT 10;\" 2>&1)",
-      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\" && ls -d */)"
+      "Bash(cd \"D:\\\\Code\\\\code\\\\Java\\\\hospital\\\\hospital\" && ls -d */)",
+      "Bash(where.exe node:*)",
+      "Bash(where.exe npm:*)",
+      "Bash(D:/Code/env/nvm/nvm.exe list:*)",
+      "Bash(where.exe nvm:*)",
+      "Read(//mnt/d/Code/env/**)",
+      "Bash('D:\\\\Code\\\\env\\\\nvm\\\\nvm\\\\nvm.exe' list:*)"
     ]
   }
 }

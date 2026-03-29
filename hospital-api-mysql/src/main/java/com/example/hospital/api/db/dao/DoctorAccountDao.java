@@ -17,6 +17,11 @@ public interface DoctorAccountDao {
 
     @Transactional
     public void insert(DoctorAccountEntity entity);
+    public HashMap searchAccountByRefId(int refId);
+    public HashMap searchAccountById(int id);
+    public Integer searchAccountIdByUsername(Map param);
+    public void insertUserRole(Map param);
+    public void updateAccount(Map param);
     public Integer searchIdByUuid(String uuid);
     public HashMap searchById(int id);
     public void update(Map param);

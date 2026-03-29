@@ -287,7 +287,7 @@
 					function(resp) {
 						let result = resp.data.result;
 						for (let one of result.list) {
-							one.photo = that.minioUrl + `${one.photo}`;
+							one.photo = that.fileUrl(one.photo);
 						}
 						that.doctor = result.list.slice(0, 3)
 					},
