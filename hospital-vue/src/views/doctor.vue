@@ -143,6 +143,23 @@
                                 <td colspan="4">{{ content.description }}</td>
                             </tr>
                         </table>
+                        <div class="evaluation-panel" v-loading="evaluationLoading">
+                            <div class="evaluation-header">
+                                <span class="evaluation-title">患者评价</span>
+                                <span class="evaluation-total">共 {{ evaluationTotal }} 条</span>
+                            </div>
+                            <div v-if="evaluationList.length > 0" class="evaluation-list">
+                                <div v-for="one in evaluationList" :key="one.id" class="evaluation-item">
+                                    <div class="evaluation-meta">
+                                        <span>{{ one.patientName }}</span>
+                                        <span>{{ one.score }}分</span>
+                                        <span>{{ one.createTime }}</span>
+                                    </div>
+                                    <div class="evaluation-comment">{{ one.comment || '未填写评价内容' }}</div>
+                                </div>
+                            </div>
+                            <el-empty v-else description="暂无评价" :image-size="80" />
+                        </div>
                     </div>
                 </template>
             </el-table-column>
@@ -292,7 +309,10 @@ export default {
                 tag: '',
                 address: '',
                 description: ''
-            }
+            },
+            evaluationList: [],
+            evaluationTotal: 0,
+            evaluationLoading: false
         };
     },
     methods: {
@@ -382,6 +402,8 @@ export default {
             if (expandedRows.length > 0) {
                 that.expands = [];
                 that.expands.push(row.id);
+                that.evaluationList = [];
+                that.evaluationTotal = 0;
                 let data = {
                     id: row.id
                 };
@@ -399,12 +421,34 @@ export default {
                     that.content.address = resp.address;
                     that.content.description = resp.description;
                 });
-                
+                that.loadDoctorEvaluations(row.id);
+
             } else {
                 that.expands = [];
+                that.evaluationList = [];
+                that.evaluationTotal = 0;
             }
         },
-        //上传重新加载医生的照片
+        loadDoctorEvaluations: function(doctorId) {
+            let that = this;
+            that.evaluationLoading = true;
+            that.$http('/evaluation/searchByPage', 'POST', {
+                doctorId: doctorId,
+                doctorName: null,
+                patientName: null,
+                score: null,
+                source: null,
+                startDate: null,
+                endDate: null,
+                page: 1,
+                length: 10
+            }, false, function(resp) {
+                let result = resp.result;
+                that.evaluationList = result.list || [];
+                that.evaluationTotal = result.totalCount || 0;
+                that.evaluationLoading = false;
+            });
+        },
         updatePhotoSuccess: function() {
             this.content.photo = `${this.$fileUrl(`doctor/doctor-${this.content.id}.jpg`)}?random=${Math.random()}`;
             // console.log(this.content.photo);
@@ -498,4 +542,47 @@ export default {
 
 <style lang="less" scoped="scoped">
 @import url(doctor.less);
+
+.evaluation-panel {
+    margin-top: 16px;
+}
+
+.evaluation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.evaluation-total {
+    color: #909399;
+    font-size: 13px;
+}
+
+.evaluation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.evaluation-item {
+    padding: 12px;
+    border: 1px solid #ebeef5;
+    border-radius: 4px;
+    background-color: #fafafa;
+}
+
+.evaluation-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+    color: #606266;
+    font-size: 13px;
+}
+
+.evaluation-comment {
+    color: #303133;
+    line-height: 1.6;
+}
 </style>

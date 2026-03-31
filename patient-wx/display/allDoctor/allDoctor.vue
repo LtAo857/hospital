@@ -52,7 +52,7 @@
 				    function(resp) {
 				        let result = resp.data.result;
 						for (let one of result.list) {
-						    one.photo = that.fileUrl(one.photo);
+						    one.photo = that.doctorPhotoUrl(one.photo);
 						}
 						that.doctor=result.list
 				    },

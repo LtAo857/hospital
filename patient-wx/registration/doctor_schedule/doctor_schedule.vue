@@ -127,7 +127,7 @@ export default {
             data,
             function(resp) {
                 that.name = resp.data.name;
-                that.photo = that.fileUrl(resp.data.photo);
+                that.photo = that.doctorPhotoUrl(resp.data.photo);
                 that.job = resp.data.job;
                 that.remark = resp.data.remark;
                 that.description = resp.data.description;

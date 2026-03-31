@@ -89,7 +89,6 @@
 </template>
 
 <script>
-const dayjs = require('dayjs');
 export default {
 	data() {
 		return {
@@ -97,96 +96,53 @@ export default {
 			page: 1,
 			length: 50,
 			list: [],
-			isLastPage: false
+			isLastPage: true
 		};
 	},
 	methods: {
-    registerHandle: function() {
-        uni.navigateTo({
-            url: '../doctor_list/doctor_list'
-        });
-    },
-    loadDataList: function(ref) {
-        let data = {
-            page: ref.page,
-            length: ref.length
-        };
-        ref.ajax(ref.api.searchVideoDiagnoseByPage, 'POST', data, function(resp) {
-            let result = resp.data.result;
-            if (result.list == null || result.list.length == 0) {
-                ref.isLastPage = true;
-                ref.page = ref.page - 1;
-                uni.showToast({
-                    icon: 'none',
-                    title: '已经到底了'
-                });
-            } else {
-                let json = {
-                    '1': '进入问诊室',
-                    '2': '进入问诊室',
-                    '3': '已结束'
-                };
-                for (let one of result.list) {
-                    // console.log(one)
-                    one.status = json[one.status + ''];
-                    one.expectStartShort = dayjs(one.expectStart).format('HH:mm');
-                    one.expectEndShort = dayjs(one.expectEnd).format('HH:mm');
-                    one.outTradeNoShort = one.outTradeNo.substr(0, 15) + '…';
-                    one.hasEvaluated = false;
-                    ref.list.push(one);
-                }
-                ref.checkEvaluated(ref);
-            }
-        });
-    },
-    copyOutTradeNoHandle: function(outTradeNo) {
-        uni.setClipboardData({
-            data: outTradeNo,
-            showToast: false,
-            success: function() {
-                uni.showToast({
-                    icon: 'success',
-                    title: '已复制订单号'
-                });
-            }
-        });
-    },
-    enterHandle: function(id, expectStart, expectEnd, doctorId) {
-        uni.navigateTo({
-            url: `../prepare_diagnose/prepare_diagnose?videoDiagnoseId=${id}&expectStart=${expectStart}&expectEnd=${expectEnd}&doctorId=${doctorId}`
-        });
-    },
-    goEvaluation: function(one) {
-        uni.navigateTo({
-            url: `/registration/evaluation/evaluation?videoDiagnoseId=${one.id}&doctorId=${one.doctorId}`
-        });
-    },
-    checkEvaluated: function(ref) {
-        for (let one of ref.list) {
-            if (one.status == '已结束') {
-                ref.ajax(ref.api.hasEvaluated, 'POST', { videoDiagnoseId: one.id }, function(resp) {
-                    one.hasEvaluated = resp.data.result;
-                }, false);
-            }
-        }
-    },
+	    registerHandle: function() {
+	        uni.navigateTo({
+	            url: '../doctor_list/doctor_list'
+	        });
+	    },
+	    loadDataList: function(ref) {
+	        ref.list = [];
+	        ref.isLastPage = true;
+	    },
+	    copyOutTradeNoHandle: function(outTradeNo) {
+	        uni.setClipboardData({
+	            data: outTradeNo,
+	            showToast: false,
+	            success: function() {
+	                uni.showToast({
+	                    icon: 'success',
+	                    title: '已复制订单号'
+	                });
+	            }
+	        });
+	    },
+	    enterHandle: function(id, expectStart, expectEnd, doctorId) {
+	        uni.navigateTo({
+	            url: `../prepare_diagnose/prepare_diagnose?videoDiagnoseId=${id}&expectStart=${expectStart}&expectEnd=${expectEnd}&doctorId=${doctorId}`
+	        });
+	    },
+	    goEvaluation: function(one) {
+	        uni.navigateTo({
+	            url: `/registration/evaluation/evaluation?videoDiagnoseId=${one.id}&doctorId=${one.doctorId}`
+	        });
+	    },
+	    checkEvaluated: function() {}
 	},
 	onShow: function() {
 	    let that = this;
 	    that.page = 1;
 	    that.list = [];
-	    that.isLastPage = false;
+	    that.isLastPage = true;
 	    that.loadDataList(that);
 	},
 
 	onReachBottom: function() {
-	    let that = this;
-	    console.log(that.isLastPage);
-	    if (that.isLastPage) {
-	        return;
-	    }
-	    that.page = that.page + 1;
-	    that.loadDataList(that);
+	    return;
 	}
 
 };

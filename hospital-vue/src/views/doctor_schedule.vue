@@ -238,19 +238,21 @@ export default {
         that.loadDeptAndSub();
     
         let deptName = that.$route.params.deptName;
-        let deptSubId = Number(that.$route.params.deptSubId);
+        let deptSubIdParam = that.$route.params.deptSubId;
+        let deptSubId = Number(deptSubIdParam);
         let date = that.$route.params.date;
-    
-        //设置二级列表控件选中的科室和诊室
-        that.dataForm.deptSub = [deptName, deptSubId];
-    
+
         //如果是从页面左侧导航进入的schedule页面，传入的三个参数都为NAN，把变量设置成null
-        if (deptName == 'NAN' || deptSubId == 'NAN' || date == 'NAN') {
+        if (deptName == 'NAN' || deptSubIdParam == 'NAN' || date == 'NAN' || Number.isNaN(deptSubId)) {
             that.dataForm.deptName = null;
             that.dataForm.deptSubId = null;
             that.dataForm.date = null;
+            that.dataForm.deptSub = [];
             return;
         }
+
+        //设置二级列表控件选中的科室和诊室
+        that.dataForm.deptSub = [deptName, deptSubId];
         that.dataForm.deptName = deptName;
         that.dataForm.deptSubId = deptSubId;
         that.dataForm.date = date;

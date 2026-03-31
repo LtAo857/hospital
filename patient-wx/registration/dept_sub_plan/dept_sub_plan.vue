@@ -87,7 +87,7 @@ export default {
                 let result = resp.data.result;
                 //把头像相对路径合成绝对路径
                 for (let one of result) {
-                    one.photo = ref.fileUrl(one.photo);
+                    one.photo = ref.doctorPhotoUrl(one.photo);
                 }
                 ref.doctorList = result;
                 if (result.length == 0) {

@@ -9,6 +9,9 @@ import javax.validation.constraints.Pattern;
 
 @Data
 public class SearchEvaluationByPageForm {
+    @Min(value = 1, message = "doctorId内容不正确")
+    private Integer doctorId;
+
     @Pattern(regexp = "^[\\u4e00-\\u9fa5a-zA-Z0-9]{1,20}$", message = "doctorName内容不正确")
     private String doctorName;
 

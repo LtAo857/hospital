@@ -21,7 +21,10 @@
       "Bash(D:/Code/env/nvm/nvm.exe list:*)",
       "Bash(where.exe nvm:*)",
       "Read(//mnt/d/Code/env/**)",
-      "Bash('D:\\\\Code\\\\env\\\\nvm\\\\nvm\\\\nvm.exe' list:*)"
+      "Bash('D:\\\\Code\\\\env\\\\nvm\\\\nvm\\\\nvm.exe' list:*)",
+      "Bash(mvn:*)",
+      "Bash(npm:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

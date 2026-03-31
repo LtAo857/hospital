@@ -61,19 +61,6 @@ sa-token:
   token-style: uuid
   isReadCookie: false
 
-#
-#wechat:
-#  app-id: 你的微信小程序APPID
-#  app-secret: 你的微信小程序密钥
-#  pay:
-#    v3:
-#      patient-wx-api:
-#        app-id: 你的微信小程序APPID
-#        app-v3-secret: 微信商户平台密钥
-#        mch-id: 微信商户平台ID
-#        domain: http://内网穿透的外网IP地址和端口/hospital-wx-api
-#        cert-path: apiclient_cert.p12
-#
 tencent:
   cloud:
     appId: 1308222269

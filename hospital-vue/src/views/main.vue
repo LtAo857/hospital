@@ -145,16 +145,16 @@
             </el-menu-item>
           </el-sub-menu>
 
-          <el-sub-menu v-if="!isDoctorUser()" index="患者管理" :popper-class="'site-sidebar--' + sidebarLayoutSkin + '-popper'">
-            <template #title>
-              <SvgIcon name="night_fill" class="icon-svg" />
-              <span>患者管理</span>
-            </template>
-            <el-menu-item index="患者信息" @click="$router.push({ name: 'Patient' })">
-              <SvgIcon name="camera_fill" class="icon-svg" />
-              <span>患者信息</span>
-            </el-menu-item>
-          </el-sub-menu>
+<!--          <el-sub-menu v-if="!isDoctorUser()" index="患者管理" :popper-class="'site-sidebar&#45;&#45;' + sidebarLayoutSkin + '-popper'">-->
+<!--            <template #title>-->
+<!--              <SvgIcon name="night_fill" class="icon-svg" />-->
+<!--              <span>患者管理</span>-->
+<!--            </template>-->
+<!--            <el-menu-item index="患者信息" @click="$router.push({ name: 'Patient' })">-->
+<!--              <SvgIcon name="camera_fill" class="icon-svg" />-->
+<!--              <span>患者信息</span>-->
+<!--            </el-menu-item>-->
+<!--          </el-sub-menu>-->
         </el-menu>
       </div>
     </aside>

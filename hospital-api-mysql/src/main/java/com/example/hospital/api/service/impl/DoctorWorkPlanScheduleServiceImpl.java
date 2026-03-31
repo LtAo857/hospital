@@ -122,11 +122,12 @@ public class DoctorWorkPlanScheduleServiceImpl implements DoctorWorkPlanSchedule
                 result.put("doctorId", doctorId);
                 result.put("maximum", maximum);
             }
-            temp.add(new HashMap<String, Object>() {{
-                put("scheduleId", scheduleId);
-                put("slot", slot);
-                put("num", num);
-            }});
+            HashMap<String, Object> slotInfo = new HashMap<>();
+            slotInfo.put("scheduleId", scheduleId);
+            slotInfo.put("slot", slot);
+            slotInfo.put("maximum", maximum);
+            slotInfo.put("num", num);
+            temp.add(slotInfo);
         }
         result.put("slots", temp);
         return result;

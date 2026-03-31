@@ -37,6 +37,14 @@ Vue.prototype.fileUrl = function(path) {
 	let normalizedPath = `${path}`.replace(/^\/+/, '')
 	return `${fileBaseUrl}/${normalizedPath}`
 }
+Vue.prototype.doctorPhotoUrl = function(path) {
+	let url = this.fileUrl(path)
+	if (!url) {
+		return ''
+	}
+	let version = Math.floor(Date.now() / 1000)
+	return `${url}${url.indexOf('?') > -1 ? '&' : '?'}v=${version}`
+}
 
 let patientUrl = fileBaseUrl + "/patient-wx"
 
@@ -76,17 +84,13 @@ Vue.prototype.api = {
     searchRegistrationByPage: baseUrl + "/registration/searchRegistrationByPage",
     repayRegistration: baseUrl + "/registration/repayRegistration",
     searchRegistrationInfo: baseUrl + "/registration/searchRegistrationInfo",
-    searchDeptAndSub: baseUrl + "/medical/dept/searchDeptAndSub",
 
     searchOnlineDoctorList: baseUrl + "/video_diagnose/searchOnlineDoctorList",
-    createVideoDiagnose: baseUrl + "/video_diagnose/createVideoDiagnose",
-    searchVideoDiagnosePaymentResult: baseUrl + "/video_diagnose/searchPaymentResult",
     uploadVideoDiagnoseImage: baseUrl + "/video_diagnose/uploadImage",
     searchImageByVideoDiagnoseId: baseUrl + "/video_diagnose/searchImageByVideoDiagnoseId",
     deleteVideoDiagnoseImage: baseUrl + "/video_diagnose/deleteImage",
     searchRoomId: baseUrl + "/video_diagnose/searchRoomId",
     searchUserSig: baseUrl + "/video_diagnose/searchUserSig",
-    searchVideoDiagnoseByPage: baseUrl + "/video_diagnose/searchByPage",
     searchPrescriptionByRegistrationId: baseUrl + "/prescription/searchPrescriptionByRegistrationId",
 	
 	

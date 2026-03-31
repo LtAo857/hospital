@@ -65,14 +65,7 @@ sa-token:
 wechat:
   app-id: wx3e302392b738718d
   app-secret: 4abaeb547f7d580865be4324e2a8dbf0
-#  pay:
-#    v3:
-#      patient-wx-api:
-#        app-id: 你的微信小程序APPID
-#        app-v3-secret: 微信商户平台密钥
-#        mch-id: 微信商户平台ID
-#        domain: http://内网穿透的外网IP地址和端口/hospital-wx-api
-#        cert-path: apiclient_cert.p12
+
 
 tencent:
   cloud:
