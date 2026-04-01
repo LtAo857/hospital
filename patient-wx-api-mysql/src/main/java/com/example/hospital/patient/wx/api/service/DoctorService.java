@@ -6,8 +6,14 @@ import com.example.hospital.patient.wx.api.common.PageUtils;
 
 public interface DoctorService {
 
-    public HashMap searchDoctorInfoById(int id);
+    HashMap searchDoctorInfoById(int id, Integer userId);
 
-    public PageUtils searchDoctorInfo(Map param);
+    PageUtils searchDoctorInfo(Map param);
+
+    boolean favoriteDoctor(int userId, int doctorId);
+
+    boolean unfavoriteDoctor(int userId, int doctorId);
+
+    PageUtils searchFavoriteDoctorByPage(int userId, Map param);
 }
 

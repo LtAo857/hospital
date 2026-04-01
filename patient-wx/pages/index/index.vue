@@ -103,7 +103,7 @@
 			</view>
 			<u-tabs :list="tab.list" @click="clickTabHandle"></u-tabs>
 			<view class="panel">
-				<view class="doctor" v-for="one in doctor">
+				<view class="doctor" v-for="one in doctor" :key="one.id" @tap="goDoctorDetail(one.id)">
 					<u-avatar :src="one.photo" size="45"></u-avatar>
 					<view class="info">
 						<view class="row">
@@ -342,11 +342,17 @@
 					false
 				);
 			},
+			clickTabHandle: function() {},
 
 			click: function() {
 				let that = this;
 				uni.navigateTo({
 					url: '/registration/notice/notice'
+				});
+			},
+			goDoctorDetail: function(doctorId) {
+				uni.navigateTo({
+					url: `/display/doctor_detail/doctor_detail?doctorId=${doctorId}`
 				});
 			}
 

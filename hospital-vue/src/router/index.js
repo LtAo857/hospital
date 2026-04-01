@@ -21,6 +21,7 @@ import VideoDiagnose from "../views/video_diagnose.vue"
 import Illness from "../views/illness.vue"
 import Patient from "../views/patient.vue"
 import Evaluation from "../views/evaluation.vue"
+import Favorite from "../views/favorite.vue"
 import NotFound from "../views/404.vue"
 
 
@@ -166,6 +167,15 @@ const routes = [{
 				component: Evaluation,
 				meta: {
 					title: '评价管理',
+					isTab: true
+				}
+			},
+			{
+				path: '/favorite',
+				name: 'Favorite',
+				component: Favorite,
+				meta: {
+					title: '收藏管理',
 					isTab: true
 				}
 			},

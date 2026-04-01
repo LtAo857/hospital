@@ -1,35 +1,35 @@
 <template>
 	<view>
 		<view class="date-container">
-			<view class="item" v-for="one in dateList">
+			<view class="item" v-for="one in dateList" :key="one.date">
 				<text class="day">{{ one.day }}</text>
 				<view :class="one.date == date ? 'selector active' : 'selector'" @tap="clickDateHandle(one.date)">
 					<text class="date">{{ one.dateOfMonth }}</text>
-					<text :class="one.status == '无号' ? 'status gray' : 'status'">{{ one.status }}</text>
+					<text :class="one.status == noSlotStatus ? 'status gray' : 'status'">{{ one.status }}</text>
 				</view>
 			</view>
 		</view>
-		<view class="doctor" v-for="one in doctorList">
+		<view class="doctor" v-for="one in doctorList" :key="one.id" @tap="goDoctorDetail(one.id)">
 			<u-avatar :src="one.photo" size="45"></u-avatar>
 			<view class="info">
 				<view class="row">
 					<text class="name">{{ one.name }}</text>
-					<text class="job">（{{ one.job }}）</text>
-					<button class="btn" @tap="clickBtnHandle(one.id, date)">挂号</button>
+					<text class="job">{{ one.job }}</text>
+					<button class="btn" @tap.stop="clickBtnHandle(one.id, date)">Book</button>
 				</view>
 				<view class="row">
-					<text class="num">总量:{{ one.maximum }}</text>
-					<text class="price">￥{{ one.price }}</text>
+					<text class="num">Total: {{ one.maximum }}</text>
+					<text class="price">RMB {{ one.price }}</text>
 				</view>
 				<view class="row">
-					<rich-text class="desc">{{ one.description }}</rich-text>
+					<rich-text class="desc" :nodes="one.description"></rich-text>
 				</view>
 			</view>
 		</view>
 		<u-empty
 			v-if="showEmpty"
 			mode="list"
-			text="无医生出诊记录"
+			text="No doctors"
 			width="150"
 			icon="http://cdn.uviewui.com/uview/empty/order.png"
 		></u-empty>
@@ -38,6 +38,12 @@
 
 <script>
 let dayjs = require('dayjs');
+
+const LIMIT_REACHED = '\u5df2\u7ecf\u8fbe\u5230\u5f53\u5929\u6302\u53f7\u4e0a\u9650';
+const DUPLICATED = '\u5df2\u7ecf\u6302\u8fc7\u8be5\u8bca\u5ba4\u7684\u53f7';
+const NO_FACE_MODEL = '\u4e0d\u5b58\u5728\u9762\u90e8\u6a21\u578b';
+const NO_FACE_AUTH = '\u5f53\u65e5\u6ca1\u6709\u4eba\u8138\u9a8c\u8bc1\u8bb0\u5f55';
+
 export default {
 	data() {
 		return {
@@ -45,148 +51,115 @@ export default {
 			showEmpty: false,
 			date: dayjs().format('YYYY-MM-DD'),
 			dateList: [],
-			doctorList: []
+			doctorList: [],
+			noSlotStatus: '\u65e0\u53f7'
 		};
 	},
 	methods: {
-    //查询某个诊室7天出诊情况
-    searchCanRegisterInDateRange: function(ref, deptSubId) {
-        let startDate = dayjs().format('YYYY-MM-DD');
-        let endDate = dayjs().add(6, 'day').format('YYYY-MM-DD');
-        let data = {
-            deptSubId: deptSubId,
-            startDate: startDate,
-            endDate: endDate
-        };
-        ref.ajax(ref.api.searchCanRegisterInDateRange, 'POST', data,
-            function(resp) {
-                let result = resp.data.result;
-                //定义工具数组
-                let array = ['日', '一', '二', '三', '四', '五', '六'];
-                for (let one of result) {
-                    //把星期几的阿拉伯数字转换成汉字数字
-                    let day = array[dayjs(one.date).day()];
-                    one.day = day;
-                    one.dateOfMonth = dayjs(one.date).date();
-                }
-                ref.dateList = result;
-            },
-            false
-        );
-    },
-    
-    //查找某天科室医生出诊列表
-    searchDeptSubDoctorPlanInDay: function(ref) {
-        let data = {
-            deptSubId: ref.deptSubId,
-            date: ref.date
-        };
-    
-        ref.ajax(ref.api.searchDeptSubDoctorPlanInDay, 'POST', data,
-            function(resp) {
-                let result = resp.data.result;
-                //把头像相对路径合成绝对路径
-                for (let one of result) {
-                    one.photo = ref.doctorPhotoUrl(one.photo);
-                }
-                ref.doctorList = result;
-                if (result.length == 0) {
-                    ref.showEmpty = true;
-                } else {
-                    ref.showEmpty = false;
-                }
-            },
-            false
-        );
-    },
-    clickDateHandle: function(date) {
-        let that = this;
-        that.date = date;
-        that.searchDeptSubDoctorPlanInDay(that);
-    },
-    clickBtnHandle: function(id, date) {
-        //检查用户在当天有没有挂过该科室的号
-        let that = this;
-        let data = {
-            deptSubId: that.deptSubId,
-            date: that.date
-        };
-    
-        that.ajax(
-            that.api.checkRegisterCondition,
-            'POST',
-            data,
-            function(resp) {
-                let result = resp.data.result;
-                if (result == '已经达到当天挂号上限') {
-                    uni.showToast({
-                        icon: 'none',
-                        title: '每天只能挂号3次，您已达到当日上限'
-                    });
-                } else if (result == '已经挂过该诊室的号') {
-                    uni.showToast({
-                        icon: 'none',
-                        title: '您已经挂过该诊室号了，不可重复挂号'
-                    });
-                } else if (result == '不存在面部模型') {
-                    uni.showModal({
-                        title: '提示消息',
-                        content: '挂号需要人脸识别验证身份，你还没有录入面部信息，是否立即采集面部信息？',
-                        confirmText: '录入',
-                        success: function(resp) {
-                            if (resp.confirm) {
-                                //跳转到面部采集页面，录入面部信息
-                                uni.navigateTo({
-                                    url: '/user/face_camera/face_camera?mode=create'
-                                });
-                            }
-                        }
-                    });
-                } else if (result == '当日没有人脸验证记录') {
-                    uni.showModal({
-                        title: '提示消息',
-                        content: '每天第一次挂号之前，需要核验面部信息，以便确保是您本人挂号',
-                        confirmText: '验证',
-                        success: function(resp) {
-                            if (resp.confirm) {
-                                //跳转到面部采集页面，验证面部信息
-                                uni.navigateTo({
-                                    url: '/user/face_camera/face_camera?mode=verificate'
-                                });
-                            }
-                        }
-                    });
-                } else {
-                    //TODO 跳转到doctor_schedule页面
-                uni.navigateTo({
-                  url: `/registration/doctor_schedule/doctor_schedule?deptSubId=${that.deptSubId}&doctorId=${id}&date=${date}`
-                                });
-                            }
-                        },
-            false
-        );
-    },
-
-
-
-		
+		searchCanRegisterInDateRange: function(ref, deptSubId) {
+			let data = {
+				deptSubId: deptSubId,
+				startDate: dayjs().format('YYYY-MM-DD'),
+				endDate: dayjs().add(6, 'day').format('YYYY-MM-DD')
+			};
+			ref.ajax(ref.api.searchCanRegisterInDateRange, 'POST', data, function(resp) {
+				let result = resp.data.result || [];
+				let weekNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+				for (let one of result) {
+					one.day = weekNames[dayjs(one.date).day()];
+					one.dateOfMonth = dayjs(one.date).date();
+				}
+				ref.dateList = result;
+			}, false);
+		},
+		searchDeptSubDoctorPlanInDay: function(ref) {
+			let data = {
+				deptSubId: ref.deptSubId,
+				date: ref.date
+			};
+			ref.ajax(ref.api.searchDeptSubDoctorPlanInDay, 'POST', data, function(resp) {
+				let result = resp.data.result || [];
+				for (let one of result) {
+					one.photo = ref.doctorPhotoUrl(one.photo);
+				}
+				ref.doctorList = result;
+				ref.showEmpty = result.length === 0;
+			}, false);
+		},
+		clickDateHandle: function(date) {
+			this.date = date;
+			this.searchDeptSubDoctorPlanInDay(this);
+		},
+		clickBtnHandle: function(id, date) {
+			let that = this;
+			that.ajax(
+				that.api.checkRegisterCondition,
+				'POST',
+				{
+					deptSubId: that.deptSubId,
+					date: that.date
+				},
+				function(resp) {
+					let result = resp.data.result || '';
+					if (result === LIMIT_REACHED) {
+						uni.showToast({
+							icon: 'none',
+							title: 'Daily limit reached'
+						});
+					} else if (result === DUPLICATED) {
+						uni.showToast({
+							icon: 'none',
+							title: 'Already booked today'
+						});
+					} else if (result === NO_FACE_MODEL) {
+						uni.showModal({
+							title: 'Notice',
+							content: 'Face data is required before booking.',
+							confirmText: 'Create',
+							success: function(modalResp) {
+								if (modalResp.confirm) {
+									uni.navigateTo({
+										url: '/user/face_camera/face_camera?mode=create'
+									});
+								}
+							}
+						});
+					} else if (result === NO_FACE_AUTH) {
+						uni.showModal({
+							title: 'Notice',
+							content: 'Face verification is required today.',
+							confirmText: 'Verify',
+							success: function(modalResp) {
+								if (modalResp.confirm) {
+									uni.navigateTo({
+										url: '/user/face_camera/face_camera?mode=verificate'
+									});
+								}
+							}
+						});
+					} else {
+						uni.navigateTo({
+							url: `/registration/doctor_schedule/doctor_schedule?deptSubId=${that.deptSubId}&doctorId=${id}&date=${date}`
+						});
+					}
+				},
+				false
+			);
+		},
+		goDoctorDetail: function(doctorId) {
+			uni.navigateTo({
+				url: `/display/doctor_detail/doctor_detail?doctorId=${doctorId}&deptSubId=${this.deptSubId}&date=${this.date}`
+			});
+		}
 	},
 	onLoad: function(options) {
-	    let that = this;
-	    //取出URL参数
-	    let deptSubId = options.deptSubId;
-	    let deptSubName = options.deptSubName;
-	
-	    that.deptSubId = deptSubId;
-	    //设置当前页面标题栏文字
-	    uni.setNavigationBarTitle({
-	        title: deptSubName
-	    });
-	  
-	    that.searchCanRegisterInDateRange(that,deptSubId)
-	    that.searchDeptSubDoctorPlanInDay(that);
+		this.deptSubId = options.deptSubId;
+		uni.setNavigationBarTitle({
+			title: options.deptSubName
+		});
+		this.searchCanRegisterInDateRange(this, this.deptSubId);
+		this.searchDeptSubDoctorPlanInDay(this);
 	}
-
 };
 </script>
 

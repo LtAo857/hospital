@@ -180,6 +180,7 @@
             <el-table-column prop="sex" header-align="center" align="center" min-width="70" label="性别" />
             <el-table-column prop="tel" header-align="center" align="center" min-width="120" label="电话" />
             <el-table-column prop="job" header-align="center" align="center" min-width="100" label="职务" />
+            <el-table-column prop="favoriteCount" header-align="center" align="center" min-width="90" label="收藏数" />
             <el-table-column
                 prop="deptName"
                 header-align="center"
@@ -306,6 +307,7 @@ export default {
                 hiredate: '',
                 email: '',
                 remark: '',
+                favoriteCount: 0,
                 tag: '',
                 address: '',
                 description: ''
@@ -417,6 +419,7 @@ export default {
                     that.content.hiredate = resp.hiredate;
                     that.content.email = resp.email;
                     that.content.remark = resp.remark;
+                    that.content.favoriteCount = resp.favoriteCount || 0;
                     that.content.tag = resp.tag;
                     that.content.address = resp.address;
                     that.content.description = resp.description;

@@ -91,7 +91,12 @@
           </el-sub-menu>
 
           <el-sub-menu
-            v-if="isAuth(['ROOT', 'SCHEDULE:SELECT']) || isAuth(['ROOT', 'VIDEO_DIAGNOSE:DIAGNOSE']) || canViewEvaluation()"
+            v-if="
+              isAuth(['ROOT', 'SCHEDULE:SELECT']) ||
+              isAuth(['ROOT', 'VIDEO_DIAGNOSE:DIAGNOSE']) ||
+              canViewEvaluation() ||
+              canViewFavorite()
+            "
             index="出诊管理"
             :popper-class="'site-sidebar--' + sidebarLayoutSkin + '-popper'"
           >
@@ -132,6 +137,10 @@
               <SvgIcon name="camera_fill" class="icon-svg" />
               <span>评价管理</span>
             </el-menu-item>
+            <el-menu-item v-if="canViewFavorite()" index="收藏管理" @click="$router.push({ name: 'Favorite' })">
+              <SvgIcon name="camera_fill" class="icon-svg" />
+              <span>收藏管理</span>
+            </el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu v-if="!isDoctorUser()" index="疾病管理" :popper-class="'site-sidebar--' + sidebarLayoutSkin + '-popper'">
@@ -145,16 +154,16 @@
             </el-menu-item>
           </el-sub-menu>
 
-<!--          <el-sub-menu v-if="!isDoctorUser()" index="患者管理" :popper-class="'site-sidebar&#45;&#45;' + sidebarLayoutSkin + '-popper'">-->
-<!--            <template #title>-->
-<!--              <SvgIcon name="night_fill" class="icon-svg" />-->
-<!--              <span>患者管理</span>-->
-<!--            </template>-->
-<!--            <el-menu-item index="患者信息" @click="$router.push({ name: 'Patient' })">-->
-<!--              <SvgIcon name="camera_fill" class="icon-svg" />-->
-<!--              <span>患者信息</span>-->
-<!--            </el-menu-item>-->
-<!--          </el-sub-menu>-->
+          <el-sub-menu v-if="!isDoctorUser()" index="患者管理" :popper-class="'site-sidebar--' + sidebarLayoutSkin + '-popper'">
+            <template #title>
+              <SvgIcon name="night_fill" class="icon-svg" />
+              <span>患者管理</span>
+            </template>
+            <el-menu-item index="患者信息" @click="$router.push({ name: 'Patient' })">
+              <SvgIcon name="camera_fill" class="icon-svg" />
+              <span>患者信息</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </div>
     </aside>
@@ -259,6 +268,9 @@ export default {
     },
     canViewEvaluation() {
       return this.isDoctorUser() || this.isAuth(['ROOT', 'EVALUATION:SELECT']);
+    },
+    canViewFavorite() {
+      return this.isDoctorUser() || this.isAuth(['ROOT', 'FAVORITE:SELECT']);
     },
     handleSwitch() {
       this.navbarLayoutType = this.sidebarFold ? '' : 'fold';

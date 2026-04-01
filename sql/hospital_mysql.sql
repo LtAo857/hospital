@@ -11,7 +11,7 @@
  Target Server Version : 80026
  File Encoding         : 65001
 
- Date: 31/03/2026 11:36:52
+ Date: 01/04/2026 11:02:05
 */
 
 SET NAMES utf8mb4;
@@ -44,14 +44,14 @@ CREATE TABLE `doctor`  (
   `create_time` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_doctor_uuid`(`uuid`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor
 -- ----------------------------
-INSERT INTO `doctor` VALUES (1, '程淳美', '360201198609151112', '2F0EB81AF9094277A958A41B59139DE1', '女', 'doctor/doctor-1.jpg', '1986-09-15', '重庆医科大学', '博士', '13593812535', '北京市西城区', 'cheng@hospital.com', '主任医师', '专家', '心脏外科专家', '2025-05-24', '[\"专家\", \"主任医师\"]', 1, 1, '2025-04-12 21:47:55');
-INSERT INTO `doctor` VALUES (4, '王五', '110120198505050055', '4F59E9D8459B48B2B31DBC4B632978ED', '女', 'doctor/doctor-4.jpg', '2025-04-10', '国防科技大学', '研究生', '15111111111', '阿斯顿', '15111111111@qq.com', '主任医师', '无', '无', '2025-04-02', '[]', 1, 1, '2025-04-13 18:25:05');
-INSERT INTO `doctor` VALUES (6, '赵六', '110120199909090099', 'E3DA595C39FE4841A9BC11FB38088906', '男', 'doctor/doctor-6.jpg', '2026-03-31', '医科大', '博士', '15111111111', '1', '1231@qq.com', '副主任医师', '3', '3', '2026-03-31', '[]', 1, 1, '2026-03-31 11:07:52');
+INSERT INTO `doctor` VALUES (1, '程淳美', '360201198609151112', '2F0EB81AF9094277A958A41B59139DE1', '女', 'doctor/doctor-1.jpg', '1986-09-15', '重庆医科大学', '博士', '13593812535', '北京市西城区', 'cheng@hospital.com', '主任医师', '专家', '女，1977年1月出生，毕业于山东大学临床医学专业，副主任医师。2005年至省人民医院普外科学习一年，2007年取得普外科职称。诊治范围：普外科大多数疾病，如甲状腺、乳腺、疝气、胃肠道疾病及胆道疾病。业务专长：腹腔镜胆囊切除术，腹股沟疝无张力修补术，甲状腺次全切除术。学术方面先后在省市级杂志上发表论文。', '2025-05-24', '[\"专家\", \"主任医师\"]', 1, 1, '2025-04-12 21:47:55');
+INSERT INTO `doctor` VALUES (4, '王五', '110120198505050055', '4F59E9D8459B48B2B31DBC4B632978ED', '女', 'doctor/doctor-4.jpg', '2025-04-10', '国防科技大学', '研究生', '15111111111', '阿斯顿', '15111111111@qq.com', '主任医师', '专家', '男，1982年10月出生，毕业于石河子大学医学院临床医学专业，副主任医师。从事普外科临床工作10年，积累了丰富的临床工作经验，熟练常握了普外科常见病、多发病的诊治。擅长普外科疾病如胆囊结石、胆道结石症、胃十二指肠溃疡穿孔、胃肠道间质瘤、腹外疝、肠梗阻、阑尾炎、甲状腺、乳腺等常见病的诊治。', '2025-04-02', '[]', 1, 1, '2025-04-13 18:25:05');
+INSERT INTO `doctor` VALUES (6, '赵六', '110120199909090099', 'E3DA595C39FE4841A9BC11FB38088906', '男', 'doctor/doctor-6.jpg', '2026-03-31', '医科大', '博士', '15111111111', '1', '1231@qq.com', '副主任医师', '专家', '男，2009年毕业于东南大学临床医学院，主治医师。从事普外科工作十年，积累丰富临床经验。擅长普外科常见病诊断治疗：乳腺、甲状腺、腹股沟疝、胆囊结石及其他普外科常见疾病诊治。', '2026-03-31', '[]', 1, 1, '2026-03-31 11:07:52');
 
 -- ----------------------------
 -- Table structure for doctor_consult
@@ -113,7 +113,7 @@ CREATE TABLE `doctor_price`  (
   `price_1` decimal(10, 2) NULL DEFAULT NULL,
   `price_2` decimal(10, 2) NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_price
@@ -134,7 +134,7 @@ CREATE TABLE `doctor_work_plan`  (
   `maximum` smallint NULL DEFAULT NULL,
   `num` smallint NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 8 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_work_plan
@@ -158,7 +158,7 @@ CREATE TABLE `doctor_work_plan_schedule`  (
   `maximum` smallint NULL DEFAULT NULL,
   `num` smallint NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 77 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 92 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_work_plan_schedule
@@ -315,7 +315,7 @@ CREATE TABLE `medical_dept_sub_and_doctor`  (
   `dept_sub_id` int NULL DEFAULT NULL,
   `doctor_id` int NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of medical_dept_sub_and_doctor
@@ -409,6 +409,7 @@ INSERT INTO `mis_module` VALUES (12, 'NURSING_ASSISTANT', '护工管理');
 INSERT INTO `mis_module` VALUES (13, 'DOCTOR_PRICE', '诊费管理');
 INSERT INTO `mis_module` VALUES (14, 'SYSTEM', '系统管理');
 INSERT INTO `mis_module` VALUES (15, 'EVALUATION', '评价管理');
+INSERT INTO `mis_module` VALUES (17, 'FAVORITE', '收藏管理');
 
 -- ----------------------------
 -- Table structure for mis_permission
@@ -482,6 +483,7 @@ INSERT INTO `mis_permission` VALUES (53, 'DOCTOR_PRICE:SELECT', 16, 4);
 INSERT INTO `mis_permission` VALUES (54, 'SYSTEM:UPDATE', 16, 3);
 INSERT INTO `mis_permission` VALUES (55, 'SYSTEM:SELECT', 16, 4);
 INSERT INTO `mis_permission` VALUES (56, 'EVALUATION:SELECT', 15, 4);
+INSERT INTO `mis_permission` VALUES (57, 'FAVORITE:SELECT', 17, 4);
 
 -- ----------------------------
 -- Table structure for mis_role
@@ -525,6 +527,7 @@ INSERT INTO `mis_role_permission` VALUES (6, 1, 32);
 INSERT INTO `mis_role_permission` VALUES (7, 2, 36);
 INSERT INTO `mis_role_permission` VALUES (8, 2, 37);
 INSERT INTO `mis_role_permission` VALUES (9, 0, 56);
+INSERT INTO `mis_role_permission` VALUES (10, 0, 57);
 
 -- ----------------------------
 -- Table structure for mis_user
@@ -548,7 +551,7 @@ CREATE TABLE `mis_user`  (
   INDEX `mis_user_idx_2`(`dept_id`) USING BTREE,
   INDEX `mis_user_idx_3`(`job`) USING BTREE,
   INDEX `mis_user_idx_5`(`status`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 8 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of mis_user
@@ -569,7 +572,7 @@ CREATE TABLE `mis_user_role`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `mis_user_role_idx_1`(`user_id`) USING BTREE,
   INDEX `mis_user_role_idx_2`(`role_id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of mis_user_role
@@ -583,6 +586,27 @@ INSERT INTO `mis_user_role` VALUES (6, 8, 1);
 INSERT INTO `mis_user_role` VALUES (7, 8, 2);
 INSERT INTO `mis_user_role` VALUES (8, 9, 1);
 INSERT INTO `mis_user_role` VALUES (9, 9, 2);
+
+-- ----------------------------
+-- Table structure for patient_doctor_favorite
+-- ----------------------------
+DROP TABLE IF EXISTS `patient_doctor_favorite`;
+CREATE TABLE `patient_doctor_favorite`  (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `patient_card_id` int NOT NULL,
+  `doctor_id` int NOT NULL,
+  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_patient_doctor_favorite`(`patient_card_id`, `doctor_id`) USING BTREE,
+  INDEX `idx_patient_doctor_favorite_doctor_id`(`doctor_id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of patient_doctor_favorite
+-- ----------------------------
+INSERT INTO `patient_doctor_favorite` VALUES (1, 2, 1, '2026-04-01 10:24:46');
+INSERT INTO `patient_doctor_favorite` VALUES (2, 2, 6, '2026-04-01 10:25:01');
+INSERT INTO `patient_doctor_favorite` VALUES (3, 2, 4, '2026-04-01 10:25:03');
 
 -- ----------------------------
 -- Table structure for patient_face_auth
@@ -669,7 +693,7 @@ CREATE TABLE `patient_user_info_card`  (
 -- Records of patient_user_info_card
 -- ----------------------------
 INSERT INTO `patient_user_info_card` VALUES (1, 1, '550e8400e29b41d4a716446655440000', '张三', '男', '110101199003077832', '13800138001', '1990-03-07', '[\"无\"]', '城镇医保', 1);
-INSERT INTO `patient_user_info_card` VALUES (2, 2, 'da42e00492a5444a8322d6c4933cdf33', '测试', '男', '110101199003077832', '15110790629', '1900-01-01', '[\"无\"]', '无', 1);
+INSERT INTO `patient_user_info_card` VALUES (2, 2, 'da42e00492a5444a8322d6c4933cdf33', '测试', '男', '110101199003077832', '15110790629', '1900-01-01', '[\"脑中风\",\"白血病\",\"癫痫\",\"脑梗\",\"心脏病\"]', '其他', 1);
 
 -- ----------------------------
 -- Table structure for video_diagnose
@@ -719,7 +743,7 @@ CREATE TABLE `video_diagnose_file`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `video_diagnose_file_idx_1`(`video_diagnose_id`) USING BTREE,
   INDEX `video_diagnose_file_idx_2`(`create_time`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of video_diagnose_file

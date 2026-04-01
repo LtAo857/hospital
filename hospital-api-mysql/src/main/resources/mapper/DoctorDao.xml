@@ -12,6 +12,7 @@
         d.school AS school,
         d.degree AS degree,
         d.job AS job,
+        (SELECT COUNT(*) FROM patient_doctor_favorite f WHERE f.doctor_id = d.id) AS favoriteCount,
         md.name AS deptName,
         md.id AS deptId,
         ds.name AS subName,
@@ -79,6 +80,7 @@
                DATE_FORMAT(hiredate, '%Y-%m-%d') AS hiredate,
                email,
                remark,
+               (SELECT COUNT(*) FROM patient_doctor_favorite f WHERE f.doctor_id = doctor.id) AS favoriteCount,
                tag,
                address,
                description

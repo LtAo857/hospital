@@ -1,57 +1,60 @@
 <template>
-	<view>
-		<view class="doctor">
-			<u-avatar :src="photo" size="45"></u-avatar>
-			<view class="info">
-				<view class="row">
-					<text class="name">{{ name }}</text>
-					<text class="job">（{{ job }}）</text>
+	<view class="page">
+		<view class="doctor-card">
+			<view class="doctor-main">
+				<u-avatar :src="photo" size="56"></u-avatar>
+				<view class="info">
+					<view class="row">
+						<text class="name">{{ name }}</text>
+						<text class="job">{{ job }}</text>
+					</view>
+					<text class="remark">{{ remark || 'No specialty summary' }}</text>
+					<view class="meta-row">
+						<text class="meta-item">Rating {{ formatScore(avgScore) }}</text>
+						<text class="meta-item">Reviews {{ totalCount }}</text>
+						<text class="meta-item">Fee RMB {{ price || '--' }}</text>
+					</view>
+					<text class="meta-text" v-if="tel">Call: {{ tel }}</text>
 				</view>
-				<view class="row">
-					<text class="remark">{{ remark }}</text>
-				</view>
-				<view class="row">
-					<rich-text class="desc">{{ description }}</rich-text>
-				</view>
+			</view>
+			<view class="action-row">
+				<uni-fav
+					:checked="isFavorite"
+					bg-color="#eef2f7"
+					bg-color-checked="#34ba97"
+					fg-color="#5f6b7a"
+					fg-color-checked="#ffffff"
+					:content-text="{ contentDefault: 'Favorite', contentFav: 'Saved' }"
+					@click="toggleFavorite"
+				/>
+				<view class="link-btn" @tap="goEvaluation">View Reviews</view>
 			</view>
 		</view>
+
 		<view class="schedule-container">
-			<view>
-				<text class="title">选择挂号时间</text>
-				
-				<u-grid :border="false" col="4">
-					<u-grid-item v-for="one in schedule" :key="one.slot">
-						<text
-							:class="one.style"
-							@click="clickScheduleHandler(one.workPlanId, one.scheduleId, one.slot)"
-						>
-							{{ one.range }}
-						</text>
-					</u-grid-item>
-				</u-grid>
-<!-- 								<picker @change="bindPickerChange" mode='selector' range-key="name" :value="index" :range="petList">
-									<view class="title">
-										请选择要挂号的宠物：{{petList[index].name?petList[index].name:''}}
-									</view>
-								</picker> -->
-			
-			</view>
+			<text class="title">Select Time</text>
+			<u-grid :border="false" col="4">
+				<u-grid-item v-for="one in schedule" :key="one.slot">
+					<text :class="one.style" @click="clickScheduleHandler(one)">{{ one.range }}</text>
+				</u-grid-item>
+			</u-grid>
 			<u-parse :content="notice"></u-parse>
-			<u-button type="primary" size="large" @click="submitHandler">挂号费{{ price }}元，去支付</u-button>
+			<u-button type="primary" size="large" @click="submitHandler">Book RMB {{ price || '--' }}</u-button>
 		</view>
 	</view>
 </template>
 
 <script>
+import uniFav from '@/uni_modules/uni-ui/components/uni-fav/uni-fav.vue';
+
 const dayjs = require('dayjs');
-const isBetween = require('dayjs/plugin/isBetween');
-dayjs.extend(isBetween);
+
 export default {
+	components: {
+		uniFav
+	},
 	data() {
 		return {
-			index:-1,
-			page: 1,
-			length: 50,
 			workPlanId: null,
 			scheduleId: null,
 			date: '',
@@ -62,9 +65,13 @@ export default {
 			job: '',
 			remark: '',
 			description: '',
+			tel: '',
 			price: '',
+			avgScore: 0,
+			totalCount: 0,
+			isFavorite: false,
 			slot: null,
-			json: {
+			timeMap: {
 				'1': '08:00',
 				'2': '08:30',
 				'3': '09:00',
@@ -82,234 +89,211 @@ export default {
 				'15': '16:00'
 			},
 			schedule: [],
-			petList:[],
 			notice: `
 				<ol class='notice-list'>
-					<li class='notice-item'>挂号平台提供次日起七天的预约服务，用户可预约中医院的大部分科室次日起至七天的就诊号源。</li>
-					<li class='notice-item'>因为医生工作繁忙，可能更改或者取消预约时间，届时会第一时间通知您，请留意短信通知。</li>
-					<li class='notice-item'>如果您在就诊当天不能前往医院取号就诊，请提前通过挂号平台取消预约，否则会因造成号源的浪费，请您谅解。</li>
+					<li class='notice-item'>Booking is available for the next seven days.</li>
+					<li class='notice-item'>Schedule changes will be notified by message.</li>
+					<li class='notice-item'>Cancel early if you cannot attend.</li>
 				</ol>
 			`
 		};
 	},
 	methods: {
-		  bindPickerChange: function(e) {
-		    console.log('picker发送选择改变，携带值为', e.detail.value)
-	
-		      this.index=e.detail.value
-
-		  },
-		getPetById:function(){
+		searchDoctorInfoById: function() {
 			let that = this;
-			let data = {
-			    page: that.page,
-			    length: that.length
-			};
 			that.ajax(
-			    that.api.searchByPageAndId,
-			    'POST',
-			    data,
-			    function(resp) {
-		     let result = resp.data.result;
-			 that.petList=result.list;
-			
-			    }, 
-			    false
+				that.api.searchDoctorInfoById,
+				'POST',
+				{ id: that.doctorId },
+				function(resp) {
+					let result = resp.data;
+					that.name = result.name;
+					that.photo = that.doctorPhotoUrl(result.photo);
+					that.job = result.job;
+					that.remark = result.remark;
+					that.description = result.description;
+					that.tel = result.tel;
+					that.price = result.price;
+					that.avgScore = result.avgScore || 0;
+					that.totalCount = result.totalCount || 0;
+					that.isFavorite = !!result.isFavorite;
+				},
+				false
 			);
 		},
-    searchDoctorInfoById: function(that) {
-        let data = {
-            id: that.doctorId
-        };
-        that.ajax(
-            that.api.searchDoctorInfoById,
-            'POST',
-            data,
-            function(resp) {
-                that.name = resp.data.name;
-                that.photo = that.doctorPhotoUrl(resp.data.photo);
-                that.job = resp.data.job;
-                that.remark = resp.data.remark;
-                that.description = resp.data.description;
-                that.price = resp.data.price;
-            },
-            false
-        );
-    },
-    
-    searchDoctorWorkPlanSchedule: function(that) {
-        let data = {
-            date: that.date,
-            doctorId: that.doctorId
-        };
-        that.ajax(
-            that.api.searchDoctorWorkPlanSchedule,
-            'POST',
-            data,
-            function(resp) {
-                let result = resp.data.result;
-                let schedule = [];
-                let now = dayjs();
-                let date = now.format('YYYY-MM-DD');
-                for (let one in that.json) {
-                    let rangeStart = dayjs(`${date} ${that.json[one]}`);
-    
-                    let item = result.find(function(element) {
-                        return element.slot + '' == one;
-                    });
-                    let style = null;
-                    //如果挂今天的时段，如果该出诊时段已经过期了，就使用禁用效果的CSS样式
-                    if (that.date == date && now.isAfter(rangeStart)) {
-                        style = 'item disable';
-                    } 
-                    //如果该时段医生不出诊，使用禁用效果的CSS样式
-                    else if (item == undefined) {
-                        style = 'item disable';
-                    } 
-                    //如果该时段挂号人数已达最大值，使用禁用效果的CSS样式
-                    else if (item.num == item.maximum) {
-                        style = 'item disable';
-                    } 
-                    //如果可以挂号，该时段使用正常CSS样式
-                    else {
-                        style = 'item';
-                    }
-                  
-                    schedule.push({
-                        workPlanId: item != undefined ? item.workPlanId : null,
-                        scheduleId: item != undefined ? item.scheduleId : null,
-                        slot: one,
-                        range: that.json[one],
-                        style: style
-                    });
-                }
-                that.schedule = schedule;
-            },
-            false
-        );
-    },
-    clickScheduleHandler: function(workPlanId, scheduleId, slot) {
-        let that = this;
-        that.workPlanId = workPlanId;
-        that.scheduleId = scheduleId;
-        for (let one of that.schedule) {
-            if (one.style == 'item disable') {
-                // that.slot = null;
-                continue;
-            }
-            one.style = 'item';
-            if (one.slot == slot) {
-                one.style = 'item active';
-                that.slot = slot;
-            }
-        }
-    },
-    submitHandler: function() {
-        let that = this;
-        if (that.slot == null) {
-            uni.showToast({
-                icon: 'error',
-                title: '选择预约时间'
-            });
-            return;
-        }
-		// if (that.index===-1) {
-		// 	uni.showToast({
-		// 		title: '请选择要挂号的宠物',
-		// 		icon: 'none',
-		// 		duration: 2000
-		// 	});
-		// 	return;
-		// }
-        uni.showModal({
-            title: '提示信息',
-            content: '确定付款挂号？',
-            success: function(resp) {
-                if (resp.confirm) {
-                    let data = {
-                        workPlanId: that.workPlanId,
-                        scheduleId: that.scheduleId,
-                        date: that.date,
-                        doctorId: that.doctorId,
-                        deptSubId: that.deptSubId,
-                        amount: that.price,
-                        slot: that.slot
-                    };
-
-                    that.ajax(that.api.registerMedicalAppointment, 'POST', data, function(resp) {
-                        let data = resp.data;
-                        if (!data.hasOwnProperty('outTradeNo')) {
-                            uni.showToast({
-                                icon: 'none',
-                                title: '该时段已经不可挂号'
-                            });
-
-							
-                        }
-						
-						
+		searchDoctorWorkPlanSchedule: function() {
+			let that = this;
+			that.ajax(
+				that.api.searchDoctorWorkPlanSchedule,
+				'POST',
+				{
+					date: that.date,
+					doctorId: that.doctorId
+				},
+				function(resp) {
+					let result = resp.data.result || [];
+					let now = dayjs();
+					let today = now.format('YYYY-MM-DD');
+					that.schedule = Object.keys(that.timeMap).map(function(slot) {
+						let rangeStart = dayjs(`${that.date} ${that.timeMap[slot]}`);
+						let item = result.find(function(element) {
+							return `${element.slot}` === slot;
+						});
+						let isDisabled = !item || item.num === item.maximum || (that.date === today && now.isAfter(rangeStart));
+						return {
+							workPlanId: item ? item.workPlanId : null,
+							scheduleId: item ? item.scheduleId : null,
+							slot: slot,
+							range: that.timeMap[slot],
+							style: isDisabled ? 'item disable' : that.slot === slot ? 'item active' : 'item'
+						};
+					});
+					let current = that.schedule.find(function(item) {
+						return item.slot === that.slot && item.style === 'item active';
+					});
+					if (!current) {
+						that.slot = null;
+						that.workPlanId = null;
+						that.scheduleId = null;
+					}
+				},
+				false
+			);
+		},
+		formatScore: function(score) {
+			let value = Number(score || 0);
+			if (!value) {
+				return '--';
+			}
+			return value.toFixed(1);
+		},
+		ensureLogin: function() {
+			let token = uni.getStorageSync('token');
+			if (token) {
+				return true;
+			}
+			uni.showToast({
+				icon: 'none',
+				title: 'Login required'
+			});
+			setTimeout(function() {
+				uni.switchTab({
+					url: '/pages/mine/mine'
+				});
+			}, 1200);
+			return false;
+		},
+		toggleFavorite: function() {
+			let that = this;
+			if (!that.ensureLogin()) {
+				return;
+			}
+			let url = that.isFavorite ? that.api.unfavoriteDoctor : that.api.favoriteDoctor;
+			that.ajax(
+				url,
+				'POST',
+				{ doctorId: that.doctorId },
+				function(resp) {
+					if (resp.data.result) {
+						that.isFavorite = !that.isFavorite;
 						uni.showToast({
-							                    icon: 'none',
-							                    title: '支付成功'
-							                });
-						    setTimeout(function() {
-								                uni.switchTab({
-								                    url: '/pages/registration_list/registration_list'
-								                });
-						        that.searchDoctorInfoById(that);
-						        that.searchDoctorWorkPlanSchedule(that);
-						    }, 1500);
-
-                        let outTradeNo = data.outTradeNo;
-                        // uni.requestPayment({
-                        //     provider: 'wxpay',
-                        //     timeStamp: data.timeStamp, //当前的时间
-                        //     nonceStr: data.nonceStr, //随机字符串
-                        //     package: data.package, //统一下单接口返回的 prepay_id 参数值
-                        //     signType: data.signType, //签名算法，暂支持 MD5。
-                        //     paySign: data.paySign,
-                        //     success(resp) {
-                        //         //这里是新添加的代码
-                        //         data = {
-                        //             outTradeNo: outTradeNo
-                        //         };
-                        //         that.ajax(that.api.searchRegisterPaymentResult, 'POST', data, function(resp) {
-                        //             if (resp.data.result) {
-                        //                 uni.showToast({
-                        //                     icon: 'success',
-                        //                     title: '付款成功'
-                        //                 });
-                        //             } else {
-                        //                 uni.showToast({
-                        //                     icon: 'none',
-                        //                     title: '付款异常，请联系客服'
-                        //                 });
-                        //             }
-                        //             setTimeout(function() {
-                        //                 uni.switchTab({
-                        //                     url: '/pages/registration_list/registration_list'
-                        //                 });
-                        //             }, 1500);
-                        //         });
-                        //     }
-                        // });
-                    });
-                }
-            }
-        });
-    },
-	
+							icon: 'none',
+							title: that.isFavorite ? 'Saved' : 'Removed'
+						});
+					} else {
+						uni.showToast({
+							icon: 'none',
+							title: 'Create patient card first'
+						});
+					}
+				},
+				false
+			);
+		},
+		goEvaluation: function() {
+			uni.navigateTo({
+				url: `/display/doctor_evaluation/doctor_evaluation?doctorId=${this.doctorId}`
+			});
+		},
+		clickScheduleHandler: function(item) {
+			if (item.style.indexOf('disable') > -1) {
+				return;
+			}
+			this.workPlanId = item.workPlanId;
+			this.scheduleId = item.scheduleId;
+			this.slot = item.slot;
+			this.schedule = this.schedule.map(function(one) {
+				if (one.style.indexOf('disable') > -1) {
+					return one;
+				}
+				return {
+					...one,
+					style: one.slot === item.slot ? 'item active' : 'item'
+				};
+			});
+		},
+		submitHandler: function() {
+			let that = this;
+			if (!that.slot || !that.workPlanId || !that.scheduleId) {
+				uni.showToast({
+					icon: 'none',
+					title: 'Pick a time slot'
+				});
+				return;
+			}
+			uni.showModal({
+				title: 'Confirm',
+				content: 'Submit this booking?',
+				success: function(resp) {
+					if (!resp.confirm) {
+						return;
+					}
+					that.ajax(
+						that.api.registerMedicalAppointment,
+						'POST',
+						{
+							workPlanId: that.workPlanId,
+							scheduleId: that.scheduleId,
+							date: that.date,
+							doctorId: that.doctorId,
+							deptSubId: that.deptSubId,
+							amount: that.price,
+							slot: that.slot
+						},
+						function(registerResp) {
+							let result = registerResp.data;
+							if (!result.hasOwnProperty('outTradeNo')) {
+								uni.showToast({
+									icon: 'none',
+									title: 'Slot unavailable'
+								});
+								that.searchDoctorWorkPlanSchedule();
+								return;
+							}
+							uni.showToast({
+								icon: 'none',
+								title: 'Booked'
+							});
+							setTimeout(function() {
+								uni.switchTab({
+									url: '/pages/registration_list/registration_list'
+								});
+							}, 1500);
+						}
+					);
+				}
+			});
+		}
 	},
 	onLoad: function(options) {
-	    let that = this;
-	    that.date = options.date;
-	    that.doctorId = options.doctorId;
-	    that.deptSubId = options.deptSubId;
-		// this.getPetById()
-	    that.searchDoctorInfoById(that);
-	    that.searchDoctorWorkPlanSchedule(that);
+		this.date = options.date || '';
+		this.doctorId = Number(options.doctorId || 0);
+		this.deptSubId = options.deptSubId || null;
+		if (this.doctorId > 0) {
+			this.searchDoctorInfoById();
+			this.searchDoctorWorkPlanSchedule();
+		}
 	}
-
 };
 </script>
 

@@ -107,6 +107,79 @@ page {
 		display: block;
 	}
 }
+.favorite-container {
+	background-color: #fff;
+	margin: 30rpx 35rpx 30rpx 35rpx;
+	padding: 30rpx;
+	border-radius: 15rpx;
+	.title-row {
+		display: flex;
+		justify-content: space-between;
+		margin-bottom: 24rpx;
+		.title {
+			color: @fc-1;
+			font-weight: bold;
+			font-size: 36rpx;
+			display: flex;
+		}
+	}
+	.favorite-card {
+		display: flex;
+		align-items: flex-start;
+		padding: 22rpx 0;
+		border-bottom: 1rpx solid @bc-16;
+		&:last-of-type {
+			border-bottom: none;
+			padding-bottom: 0;
+		}
+	}
+	.favorite-info {
+		flex: 1;
+		margin-left: 20rpx;
+	}
+	.favorite-head {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+	.favorite-name {
+		font-size: 30rpx;
+		font-weight: bold;
+		color: @fc-1;
+		margin-right: 12rpx;
+	}
+	.favorite-job {
+		font-size: 24rpx;
+		color: @fc-8;
+	}
+	.favorite-remark {
+		display: block;
+		font-size: 25rpx;
+		color: @fc-3;
+		margin-top: 8rpx;
+		line-height: 1.6;
+	}
+	.favorite-meta {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-top: 12rpx;
+	}
+	.favorite-price {
+		font-size: 24rpx;
+		color: @fc-22;
+	}
+	.favorite-time {
+		font-size: 22rpx;
+		color: @fc-8;
+	}
+	.favorite-empty {
+		font-size: 26rpx;
+		color: @fc-8;
+		text-align: center;
+		padding: 20rpx 0 10rpx;
+	}
+}
 .mine-container,
 .service-container,
 .settings-container {

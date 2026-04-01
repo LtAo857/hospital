@@ -1,7 +1,7 @@
 <template>
 	<view>
 		<view class="top-container">
-			<u-avatar :src="user.photo" shape="square" size="52"></u-avatar>
+			<u-avatar :src="user.photo" shape="square" size="52" @tap.stop="openUserInfoCard"></u-avatar>
 			<view class="info">
 				<view v-if="flag == 'logout'" open-type="getUserInfo" @tap="loginOrRegister">
 					<text class="operate">注册 / 登陆</text>
@@ -54,6 +54,10 @@
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">我的评价</text>
 				</u-grid-item>
+				<u-grid-item :name="text.favoriteNavName">
+					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
+					<text class="title">{{ text.favoriteNavTitle }}</text>
+				</u-grid-item>
 <!-- 				<u-grid-item name="导诊问询">
 					<button open-type="contact" session-from="sessionFrom" plain="true" class="btn">
 									<view class="navigator-icon"><view class="navigator-icon-1" /></view>
@@ -63,6 +67,28 @@
 
 			</u-grid>
 		</view>
+<!-- 		<view class="favorite-container" v-if="flag == 'login'">
+			<view class="title-row">
+				<text class="title">{{ text.favoriteTitle }}</text>
+			</view>
+			<view v-if="favoriteDoctors.length > 0">
+				<view class="favorite-card" v-for="one in favoriteDoctors" :key="one.id" @tap="goDoctorDetail(one.id)">
+					<u-avatar :src="one.photo" size="46"></u-avatar>
+					<view class="favorite-info">
+						<view class="favorite-head">
+							<text class="favorite-name">{{ one.name }}</text>
+							<text class="favorite-job">{{ one.job }}</text>
+						</view>
+						<text class="favorite-remark">{{ one.remark || text.noRemark }}</text>
+						<view class="favorite-meta">
+							<text class="favorite-price">{{ text.pricePrefix }}{{ one.price || '--' }}</text>
+							<text class="favorite-time">{{ one.favoriteTime }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+			<view v-else class="favorite-empty">{{ text.noFavorite }}</view>
+		</view> -->
 		<view class="publicity-container"><image :src="publicityBannerUrl" mode="widthFix" class="banner" /></view>
 		 <view class="mine-container">
 			<view class="title-row">
@@ -202,6 +228,17 @@ export default {
 			},
 			flag: 'logout',
 			code: null,
+			favoriteDoctors: [],
+			favoritePage: 1,
+			favoriteLength: 10,
+			text: {
+				favoriteTitle: '\u6211\u7684\u6536\u85cf\u533b\u751f',
+				favoriteNavName: '\u6211\u7684\u6536\u85cf',
+				favoriteNavTitle: '\u6211\u7684\u6536\u85cf',
+				noFavorite: '\u6682\u65e0\u6536\u85cf\u533b\u751f',
+				noRemark: '\u6682\u65e0\u64c5\u957f\u65b9\u5411\u4ecb\u7ecd',
+				pricePrefix: '\u6302\u53f7\u8d39 \u00a5'
+			},
 			user: {
 				username: '',
 				photo: null,
@@ -214,7 +251,20 @@ export default {
 		};
 	},
 	methods: {
-		loginOrRegister: function() {
+		openUserInfoCard: function() {
+				let token = uni.getStorageSync('token');
+				if (token == null || token.length == 0) {
+					uni.showToast({
+						icon: 'error',
+						title: '请先登录小程序'
+					});
+					return;
+				}
+				uni.navigateTo({
+					url: '/user/user_info_card_detail'
+				});
+			},
+			loginOrRegister: function() {
 		    let that = this;
 		    //获取微信用户的临时授权
 		    uni.login({
@@ -262,6 +312,7 @@ export default {
 		                        if (resp.data.hasOwnProperty('tel')) {
 		                            that.user.tel = resp.data.tel;
 		                        }
+		                        that.loadFavoriteDoctors();
 		                    }
 		                });
 		            });
@@ -275,12 +326,38 @@ export default {
 			uni.setStorageSync('token', null);
 			//更新页面标志位变量
 			this.flag = 'logout';
+			this.favoriteDoctors = [];
 			uni.showToast({
 			    icon: 'success',
 			    title: '退出成功'
 			});
 
 		},
+	loadFavoriteDoctors: function() {
+		let that = this;
+		that.ajax(
+			that.api.searchFavoriteDoctorByPage,
+			'POST',
+			{
+				page: that.favoritePage,
+				length: that.favoriteLength
+			},
+			function(resp) {
+				let result = resp.data.result;
+				let list = result && result.list ? result.list : [];
+				for (let one of list) {
+					one.photo = that.doctorPhotoUrl(one.photo);
+				}
+				that.favoriteDoctors = list.slice(0, 3);
+			},
+			false
+		);
+	},
+	goDoctorDetail: function(doctorId) {
+		uni.navigateTo({
+			url: `/display/doctor_detail/doctor_detail?doctorId=${doctorId}`
+		});
+	},
    navigatorHandle: function(name) {
        let token = uni.getStorageSync('token');
        if (token == null || token.length == 0) {
@@ -311,6 +388,9 @@ export default {
        else if (name == '我的评价') {
            url = '/registration/evaluation/evaluation?mode=list';
        }
+       else if (name == this.text.favoriteNavName) {
+           url = '/display/favorite_doctor/favorite_doctor';
+       }
        else if (name == '挂号就诊') {
 
         url= '/registration/medical_dept_list/medical_dept_list';
@@ -339,10 +419,13 @@ export default {
 	                    that.user.username = result.nickname;
 	                    that.user.photo = result.photo;
 	                    that.user.tel = result.tel;
+	                    that.loadFavoriteDoctors();
 	                }
 	            },
 	            false
 	        );
+	    } else {
+	        that.favoriteDoctors = [];
 	    }
 	}
 

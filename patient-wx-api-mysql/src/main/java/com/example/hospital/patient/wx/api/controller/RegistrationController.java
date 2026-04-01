@@ -58,7 +58,6 @@ public class RegistrationController {
     }
 
     @PostMapping("/searchDoctorWorkPlanSchedule")
-    @SaCheckLogin
     public R searchDoctorWorkPlanSchedule(@RequestBody @Valid SearchDoctorWorkPlanScheduleForm form) {
         Map param = BeanUtil.beanToMap(form);
         ArrayList<HashMap> list = registrationService.searchDoctorWorkPlanSchedule(param);

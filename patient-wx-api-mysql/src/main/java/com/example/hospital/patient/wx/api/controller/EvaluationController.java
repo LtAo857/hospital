@@ -51,7 +51,6 @@ public class EvaluationController {
     }
 
     @PostMapping("/searchDoctorEvaluation")
-    @SaCheckLogin
     public R searchDoctorEvaluation(@RequestBody @Valid SearchDoctorEvaluationForm form) {
         Map param = BeanUtil.beanToMap(form);
         HashMap result = evaluationService.searchDoctorEvaluation(param);
