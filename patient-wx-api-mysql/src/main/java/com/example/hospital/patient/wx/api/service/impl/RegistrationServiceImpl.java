@@ -8,11 +8,13 @@ import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.NumberUtil;
 import com.example.hospital.patient.wx.api.common.PageUtils;
-import com.example.hospital.patient.wx.api.db.dao.*;
+import com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanDao;
+import com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanScheduleDao;
+import com.example.hospital.patient.wx.api.db.dao.MedicalRegistrationDao;
+import com.example.hospital.patient.wx.api.db.dao.UserDao;
 import com.example.hospital.patient.wx.api.db.pojo.MedicalRegistrationEntity;
 //import com.example.hospital.patient.wx.api.service.FaceAuthService;
 //import com.example.hospital.patient.wx.api.service.PaymentService;
-import com.example.hospital.patient.wx.api.service.FaceAuthService;
 //import com.example.hospital.patient.wx.api.service.PaymentService;
 import com.example.hospital.patient.wx.api.service.MessageService;
 import com.example.hospital.patient.wx.api.service.RegistrationService;
@@ -37,12 +39,6 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Resource
     private MedicalRegistrationDao medicalRegistrationDao;
-
-    @Resource
-    private UserInfoCardDao userInfoCardDao;
-
-    @Resource
-    private FaceAuthService faceAuthService;
 
     @Resource
     private DoctorWorkPlanScheduleDao doctorWorkPlanScheduleDao;
@@ -109,18 +105,6 @@ public class RegistrationServiceImpl implements RegistrationService {
             return "已经挂过该诊室的号";
         }
 
-        //检查是否存在人脸面部数据
-        int userId = MapUtil.getInt(param, "userId");
-        Boolean bool = userInfoCardDao.searchExistFaceModel(userId);
-        if (bool == null || !bool) {
-            return "不存在面部模型";
-        }
-
-        //检查今日是否存在挂号用户的面部识别记录
-        bool = faceAuthService.hasFaceAuthInDay(param);
-        if (!bool) {
-            return "当日没有人脸验证记录";
-        }
         return "满足挂号条件";
     }
 

@@ -8,13 +8,13 @@
 						<text class="name">{{ name }}</text>
 						<text class="job">{{ job }}</text>
 					</view>
-					<text class="remark">{{ remark || 'No specialty summary' }}</text>
+					<text class="remark">{{ remark || '暂无擅长方向介绍' }}</text>
 					<view class="meta-row">
-						<text class="meta-item">Rating {{ formatScore(avgScore) }}</text>
-						<text class="meta-item">Reviews {{ totalCount }}</text>
-						<text class="meta-item">Fee RMB {{ price || '--' }}</text>
+						<text class="meta-item">评分 {{ formatScore(avgScore) }}</text>
+						<text class="meta-item">评价 {{ totalCount }}</text>
+						<text class="meta-item">挂号费 {{ price || '--' }}</text>
 					</view>
-					<text class="meta-text" v-if="tel">Call: {{ tel }}</text>
+					<text class="meta-text" v-if="tel">电话：{{ tel }}</text>
 				</view>
 			</view>
 			<view class="action-row">
@@ -24,22 +24,22 @@
 					bg-color-checked="#34ba97"
 					fg-color="#5f6b7a"
 					fg-color-checked="#ffffff"
-					:content-text="{ contentDefault: 'Favorite', contentFav: 'Saved' }"
+					:content-text="{ contentDefault: '收藏', contentFav: '已收藏' }"
 					@click="toggleFavorite"
 				/>
-				<view class="link-btn" @tap="goEvaluation">View Reviews</view>
+				<view class="link-btn" @tap="goEvaluation">查看评价</view>
 			</view>
 		</view>
 
 		<view class="schedule-container">
-			<text class="title">Select Time</text>
+			<text class="title">选择号源时段</text>
 			<u-grid :border="false" col="4">
 				<u-grid-item v-for="one in schedule" :key="one.slot">
 					<text :class="one.style" @click="clickScheduleHandler(one)">{{ one.range }}</text>
 				</u-grid-item>
 			</u-grid>
 			<u-parse :content="notice"></u-parse>
-			<u-button type="primary" size="large" @click="submitHandler">Book RMB {{ price || '--' }}</u-button>
+			<u-button type="primary" size="large" @click="submitHandler">确认挂号 ￥{{ price || '--' }}</u-button>
 		</view>
 	</view>
 </template>
@@ -91,9 +91,9 @@ export default {
 			schedule: [],
 			notice: `
 				<ol class='notice-list'>
-					<li class='notice-item'>Booking is available for the next seven days.</li>
-					<li class='notice-item'>Schedule changes will be notified by message.</li>
-					<li class='notice-item'>Cancel early if you cannot attend.</li>
+					<li class='notice-item'>可预约未来七天内的门诊号源。</li>
+					<li class='notice-item'>若排班有变动，将通过消息通知您。</li>
+					<li class='notice-item'>如无法按时就诊，请尽早取消预约。</li>
 				</ol>
 			`
 		};
@@ -174,7 +174,7 @@ export default {
 			}
 			uni.showToast({
 				icon: 'none',
-				title: 'Login required'
+				title: '请先登录'
 			});
 			setTimeout(function() {
 				uni.switchTab({
@@ -198,12 +198,12 @@ export default {
 						that.isFavorite = !that.isFavorite;
 						uni.showToast({
 							icon: 'none',
-							title: that.isFavorite ? 'Saved' : 'Removed'
+							title: that.isFavorite ? '收藏成功' : '已取消收藏'
 						});
 					} else {
 						uni.showToast({
 							icon: 'none',
-							title: 'Create patient card first'
+							title: '请先创建就诊卡'
 						});
 					}
 				},
@@ -237,13 +237,13 @@ export default {
 			if (!that.slot || !that.workPlanId || !that.scheduleId) {
 				uni.showToast({
 					icon: 'none',
-					title: 'Pick a time slot'
+					title: '请选择号源时段'
 				});
 				return;
 			}
 			uni.showModal({
-				title: 'Confirm',
-				content: 'Submit this booking?',
+				title: '确认挂号',
+				content: '是否确认提交本次挂号？',
 				success: function(resp) {
 					if (!resp.confirm) {
 						return;
@@ -265,14 +265,14 @@ export default {
 							if (!result.hasOwnProperty('outTradeNo')) {
 								uni.showToast({
 									icon: 'none',
-									title: 'Slot unavailable'
+									title: '该时段号源已满'
 								});
 								that.searchDoctorWorkPlanSchedule();
 								return;
 							}
 							uni.showToast({
 								icon: 'none',
-								title: 'Booked'
+								title: '挂号成功'
 							});
 							setTimeout(function() {
 								uni.switchTab({

@@ -74,8 +74,6 @@ Vue.prototype.api = {
     searchCanRegisterInDateRange: baseUrl + "/registration/searchCanRegisterInDateRange",
     searchDeptSubDoctorPlanInDay: baseUrl + "/registration/searchDeptSubDoctorPlanInDay",
     checkRegisterCondition: baseUrl + "/registration/checkRegisterCondition",  
-    createFaceModel: baseUrl + "/face/auth/createFaceModel",
-    verifyFaceModel: baseUrl + "/face/auth/verifyFaceModel",
 	searchDoctorInfo: baseUrl + "/doctor/searchDoctorInfo",
     searchDoctorWorkPlanSchedule: baseUrl + "/registration/searchDoctorWorkPlanSchedule",
     searchDoctorInfoById: baseUrl + "/doctor/searchDoctorInfoById",

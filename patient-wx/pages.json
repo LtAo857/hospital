@@ -50,14 +50,6 @@
 
 				},
 				{
-					"path": "face_camera/face_camera",
-					"style": {
-						"navigationBarTitleText": "录入面部信息",
-						"enablePullDownRefresh": false
-					}
-
-				},
-				{
 					"path": "pet_info/pet_info",
 					"style": {
 						"navigationBarTitleText": "我的宠物",

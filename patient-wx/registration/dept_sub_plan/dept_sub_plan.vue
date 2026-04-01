@@ -15,11 +15,11 @@
 				<view class="row">
 					<text class="name">{{ one.name }}</text>
 					<text class="job">{{ one.job }}</text>
-					<button class="btn" @tap.stop="clickBtnHandle(one.id, date)">Book</button>
+					<button class="btn" @tap.stop="clickBtnHandle(one.id, date)">挂号</button>
 				</view>
 				<view class="row">
-					<text class="num">Total: {{ one.maximum }}</text>
-					<text class="price">RMB {{ one.price }}</text>
+					<text class="num">总号源：{{ one.maximum }}</text>
+					<text class="price">挂号费：{{ one.price }}</text>
 				</view>
 				<view class="row">
 					<rich-text class="desc" :nodes="one.description"></rich-text>
@@ -29,7 +29,7 @@
 		<u-empty
 			v-if="showEmpty"
 			mode="list"
-			text="No doctors"
+			text="暂无医生出诊"
 			width="150"
 			icon="http://cdn.uviewui.com/uview/empty/order.png"
 		></u-empty>
@@ -41,8 +41,6 @@ let dayjs = require('dayjs');
 
 const LIMIT_REACHED = '\u5df2\u7ecf\u8fbe\u5230\u5f53\u5929\u6302\u53f7\u4e0a\u9650';
 const DUPLICATED = '\u5df2\u7ecf\u6302\u8fc7\u8be5\u8bca\u5ba4\u7684\u53f7';
-const NO_FACE_MODEL = '\u4e0d\u5b58\u5728\u9762\u90e8\u6a21\u578b';
-const NO_FACE_AUTH = '\u5f53\u65e5\u6ca1\u6709\u4eba\u8138\u9a8c\u8bc1\u8bb0\u5f55';
 
 export default {
 	data() {
@@ -64,7 +62,7 @@ export default {
 			};
 			ref.ajax(ref.api.searchCanRegisterInDateRange, 'POST', data, function(resp) {
 				let result = resp.data.result || [];
-				let weekNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+				let weekNames = ['日', '一', '二', '三', '四', '五', '六'];
 				for (let one of result) {
 					one.day = weekNames[dayjs(one.date).day()];
 					one.dateOfMonth = dayjs(one.date).date();
@@ -104,38 +102,12 @@ export default {
 					if (result === LIMIT_REACHED) {
 						uni.showToast({
 							icon: 'none',
-							title: 'Daily limit reached'
+							title: '今日挂号次数已达上限'
 						});
 					} else if (result === DUPLICATED) {
 						uni.showToast({
 							icon: 'none',
-							title: 'Already booked today'
-						});
-					} else if (result === NO_FACE_MODEL) {
-						uni.showModal({
-							title: 'Notice',
-							content: 'Face data is required before booking.',
-							confirmText: 'Create',
-							success: function(modalResp) {
-								if (modalResp.confirm) {
-									uni.navigateTo({
-										url: '/user/face_camera/face_camera?mode=create'
-									});
-								}
-							}
-						});
-					} else if (result === NO_FACE_AUTH) {
-						uni.showModal({
-							title: 'Notice',
-							content: 'Face verification is required today.',
-							confirmText: 'Verify',
-							success: function(modalResp) {
-								if (modalResp.confirm) {
-									uni.navigateTo({
-										url: '/user/face_camera/face_camera?mode=verificate'
-									});
-								}
-							}
+							title: '今天已挂过该诊室'
 						});
 					} else {
 						uni.navigateTo({
