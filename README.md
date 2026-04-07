@@ -13,6 +13,8 @@ qq交流群： **1081725203**
 - 后台新增“收藏管理”页面，可查看医生/患者收藏记录
 - 后台医生管理页补充医生被收藏次数展示
 - 当前版本已移除挂号前的人脸识别前置校验，挂号不再依赖人脸录入与人脸验证
+- 新增患者侧 AI 挂号助手页，首页与个人中心都可进入助手流程
+- Agent 一期已打通“查询 → 条件校验 → 确认 → 挂号”链路，并保留 Redis 会话记忆与风险确认
 
 # 项目结构
 ```
@@ -28,6 +30,18 @@ hospital
 ├── Minio                    # 静态资源（图片等）
 └── video                    # 视频相关资源
 ```
+
+# 开发者快速导航
+> 日常开发建议优先关注 MySQL 版本链路：`hospital-api-mysql`、`patient-wx-api-mysql`、`hospital-vue`、`patient-wx`。HBase 目录更适合作为历史实现对照。
+
+| 子项目 | 面向角色 | 主要职责 | 技术栈 | 建议先看 |
+| --- | --- | --- | --- | --- |
+| `hospital-api-mysql` | 管理员、医生、MIS | 管理科室、诊室、医生、排班、评价、收藏、视频问诊等后台能力 | Spring Boot 2.7、MyBatis、Sa-Token、Redis、Quartz、WebSocket | `src/main/java/com/example/hospital/api/HospitalApiApplication.java`、`src/main/resources/application.yml` |
+| `patient-wx-api-mysql` | 患者小程序 | 登录注册、就诊卡、挂号、消息、评价、视频问诊等患者侧接口 | Spring Boot 2.7、MyBatis、Sa-Token、Redis、Quartz | `src/main/java/com/example/hospital/patient/wx/api/PatientWxApiApplication.java`、`src/main/resources/application.yml` |
+| `hospital-vue` | 管理员、医生 | MIS 管理端页面、权限菜单、后台数据维护与统计 | Vue3、Vite、Element Plus、vue-router、jQuery Ajax、WebSocket | `src/main.js`、`src/router/index.js`、`src/views/` |
+| `patient-wx` | 患者 | 小程序挂号、消息、评价、收藏、视频问诊、就诊卡 | uni-app、Vue2、uView、微信插件、TRTC | `main.js`、`pages.json`、`manifest.json` |
+
+面向 Claude/协作者的项目级说明见根目录 `CLAUDE.md`。
 
 # 功能模块
 ## 患者端小程序
@@ -62,6 +76,60 @@ hospital
 
 ## 前端项目：
         Vue3.0、ElementPlus、TRTC 服务
+
+# 代码入口与联调关系
+## 后端
+- `hospital-api-mysql`
+  - 启动入口：`hospital-api-mysql/src/main/java/com/example/hospital/api/HospitalApiApplication.java`
+  - 关键配置：`hospital-api-mysql/src/main/resources/application.yml`
+  - 默认端口：`8094`
+  - 上下文路径：`/hospital-api`
+  - 额外关注：WebSocket 推送位于 `hospital-api-mysql/src/main/java/com/example/hospital/api/socket/WebSocketService.java`
+- `patient-wx-api-mysql`
+  - 启动入口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/PatientWxApiApplication.java`
+  - 关键配置：`patient-wx-api-mysql/src/main/resources/application.yml`
+  - 默认端口：`8092`
+  - 上下文路径：`/patient-wx-api`
+  - 额外关注：每日就诊提醒 Quartz 配置位于 `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/config/QuartzConfig.java`
+
+## 管理端前端 `hospital-vue`
+- 接口根地址定义在 `hospital-vue/src/main.js`，默认请求 `http://localhost:8094/hospital-api`
+- 路由集中在 `hospital-vue/src/router/index.js`
+- 页面主要位于 `hospital-vue/src/views/`
+- 当前采用“全局 `$http` + 页面直接调接口”的组织方式，排查联调问题时优先查看 `src/main.js`
+
+## 患者端小程序 `patient-wx`
+- 接口根地址定义在 `patient-wx/main.js`，默认请求 `http://127.0.0.1:8092/patient-wx-api`
+- 页面与分包定义在 `patient-wx/pages.json`
+- 小程序与插件配置位于 `patient-wx/manifest.json`
+- 当前统一通过 `main.js` 里的 `ajax()` 封装请求与 token 处理
+
+## 联调关系
+- `hospital-vue` 对接 `hospital-api-mysql`
+- `patient-wx` 对接 `patient-wx-api-mysql`
+- 两套前端都依赖后端 `application.yml` 中的数据库、Redis、文件存储等配置正确可用
+- 视频问诊能力涉及前后端共同配置 TRTC 参数
+
+# 启动建议
+1. 先导入 `sql/` 下的 MySQL 建表脚本。
+2. 分别检查 `hospital-api-mysql` 与 `patient-wx-api-mysql` 的 `application.yml`，替换为本地数据库、Redis、文件存储与第三方服务配置。
+3. 先启动两个后端，再根据需要启动 `hospital-vue` 或使用 HBuilderX / 微信开发者工具打开 `patient-wx`。
+4. 如果只是熟悉代码，建议按“后端入口类/配置 → 前端入口文件/路由或页面配置 → 目标业务页面/控制器”的顺序阅读。
+
+# Agent 一期改造说明
+- 当前仓库已在 `patient-wx-api-mysql` 新增患者侧 Agent 编排层，入口接口为 `POST /agent/chat`。
+- 当前仓库已在 `patient-wx` 新增独立页面 `agent/chat/chat`，作为“AI挂号助手”首期入口。
+- 首页 `patient-wx/pages/index/index.vue` 与个人中心 `patient-wx/pages/mine/mine.vue` 已接入 AI 助手入口。
+- 一期采用“无模型 Agent 编排骨架”：基于规则引擎、Tool 封装、Redis 会话记忆与确认机制驱动，不依赖真实模型 API。
+- 一期已覆盖：科室查询、诊室查询、医生查询、号源日期/时段查询、就诊卡状态查询、消息查询、确认后挂号。
+- 一期挂号写操作保持强确认，用户需先完成条件校验，再在助手中确认后才会真正执行挂号。
+- 一期暂不开放：取消挂号、评价提交、收藏写操作、视频问诊写操作、人脸认证流程。
+- 详细设计见 `docs/agent/system-prompt.md`、`docs/agent/tool-spec.md`、`docs/agent/architecture.md`。
+
+# 敏感配置提醒
+- 两个后端的 `application.yml` 中包含数据库、Redis、微信、腾讯云/TRTC 等示例配置位置。
+- 这些值只适合作为配置项定位参考，不能直接视为可用凭证；本地运行前请全部替换为自己的环境参数。
+- 更新文档或截图时，不要扩散任何真实密钥、密码、AppSecret、SecretKey。
 
 # 主要工作
 + 设计了后端项目全局异常处理、异步线程任务、WebSocket 消息推送。

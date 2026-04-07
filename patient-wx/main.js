@@ -106,6 +106,7 @@ Vue.prototype.api = {
 	searchUnreadCount: baseUrl + "/message/searchUnreadCount",
 	readMessage: baseUrl + "/message/readMessage",
 	readAllMessage: baseUrl + "/message/readAllMessage",
+	agentChat: baseUrl + "/agent/chat",
 	// 评价相关
 	insertEvaluation: baseUrl + "/evaluation/insert",
 	searchEvaluationByPage: baseUrl + "/evaluation/searchByPage",

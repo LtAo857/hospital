@@ -7,23 +7,22 @@
 					<text class="operate">注册 / 登陆</text>
 					<text class="remark">请登陆医疗挂号挂号小程序</text>
 				</view>
-				<view  v-if="flag == 'login'">
+				<view v-if="flag == 'login'">
 					<view class="left">
 						<text class="username">{{ user.username }}</text>
 						<text class="tel">{{ user.tel != null ? user.tel : '未绑定手机（需实名登记）' }}</text>
 					</view>
-					
 					<view class="right">
-						<text style="			display: block;
-			font-size: 38rpx;
-			font-weight: bold;
-			color: #fff;
-			margin-bottom: 5rpx;margin-left: 250rpx;" class="logout" @tap="logout">退出登录</text>
+						<text
+							class="logout"
+							style="display: block; font-size: 38rpx; font-weight: bold; color: #fff; margin-bottom: 5rpx; margin-left: 250rpx;"
+							@tap="logout"
+						>退出登录</text>
 					</view>
-
 				</view>
 			</view>
 		</view>
+
 		<view class="navigator-container">
 			<u-grid :border="false" col="4" @click="navigatorHandle">
 				<u-grid-item name="实名登记">
@@ -34,14 +33,14 @@
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">挂号</text>
 				</u-grid-item>
+				<u-grid-item name="AI挂号助手">
+					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
+					<text class="title">AI助手</text>
+				</u-grid-item>
 				<u-grid-item name="医生列表">
 					<view class="navigator-icon"><view class="navigator-icon-2" /></view>
 					<text class="title">医生</text>
 				</u-grid-item>
-<!-- 				<u-grid-item name="我的宠物">
-					<view class="navigator-icon"><view class="navigator-icon-3" /></view>
-					<text class="title">我的宠物</text>
-				</u-grid-item> -->
 				<u-grid-item name="疾病百科">
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">百科</text>
@@ -58,39 +57,14 @@
 					<view class="navigator-icon"><view class="navigator-icon-4" /></view>
 					<text class="title">{{ text.favoriteNavTitle }}</text>
 				</u-grid-item>
-<!-- 				<u-grid-item name="导诊问询">
-					<button open-type="contact" session-from="sessionFrom" plain="true" class="btn">
-									<view class="navigator-icon"><view class="navigator-icon-1" /></view>
-						<text class="title">导诊问询</text>
-					</button>
-				</u-grid-item> -->
-
 			</u-grid>
 		</view>
-<!-- 		<view class="favorite-container" v-if="flag == 'login'">
-			<view class="title-row">
-				<text class="title">{{ text.favoriteTitle }}</text>
-			</view>
-			<view v-if="favoriteDoctors.length > 0">
-				<view class="favorite-card" v-for="one in favoriteDoctors" :key="one.id" @tap="goDoctorDetail(one.id)">
-					<u-avatar :src="one.photo" size="46"></u-avatar>
-					<view class="favorite-info">
-						<view class="favorite-head">
-							<text class="favorite-name">{{ one.name }}</text>
-							<text class="favorite-job">{{ one.job }}</text>
-						</view>
-						<text class="favorite-remark">{{ one.remark || text.noRemark }}</text>
-						<view class="favorite-meta">
-							<text class="favorite-price">{{ text.pricePrefix }}{{ one.price || '--' }}</text>
-							<text class="favorite-time">{{ one.favoriteTime }}</text>
-						</view>
-					</view>
-				</view>
-			</view>
-			<view v-else class="favorite-empty">{{ text.noFavorite }}</view>
-		</view> -->
-		<view class="publicity-container"><image :src="publicityBannerUrl" mode="widthFix" class="banner" /></view>
-		 <view class="mine-container">
+
+		<view class="publicity-container">
+			<image :src="publicityBannerUrl" mode="widthFix" class="banner" />
+		</view>
+
+		<view class="mine-container">
 			<view class="title-row">
 				<text class="title">我的问诊</text>
 				<u-icon label="更多" labelPos="left" size="15" name="arrow-right"></u-icon>
@@ -120,10 +94,14 @@
 				</u-grid>
 				<image :src="otherBannerUrl" mode="widthFix" class="banner"></image>
 			</view>
-		</view> 
-		<view class="ad-container"><image :src="adBannerUrl[0]" mode="widthFix" class="banner" /></view>
-	
-				 <u-toast ref="uToast" />
+		</view>
+
+		<view class="ad-container">
+			<image :src="adBannerUrl[0]" mode="widthFix" class="banner" />
+		</view>
+
+		<u-toast ref="uToast" />
+
 		<view class="service-container">
 			<view class="title-row">
 				<text class="title">医疗挂号挂号服务</text>
@@ -193,10 +171,11 @@
 					</u-grid-item>
 				</u-grid>
 			</view>
-		</view> 
-		<view class="ad-container"><image :src="adBannerUrl[1]" mode="widthFix" class="banner" /></view>
-		<u-toast ref="uToast" />
-		
+		</view>
+
+		<view class="ad-container">
+			<image :src="adBannerUrl[1]" mode="widthFix" class="banner" />
+		</view>
 	</view>
 </template>
 
@@ -232,12 +211,12 @@ export default {
 			favoritePage: 1,
 			favoriteLength: 10,
 			text: {
-				favoriteTitle: '\u6211\u7684\u6536\u85cf\u533b\u751f',
-				favoriteNavName: '\u6211\u7684\u6536\u85cf',
-				favoriteNavTitle: '\u6211\u7684\u6536\u85cf',
-				noFavorite: '\u6682\u65e0\u6536\u85cf\u533b\u751f',
-				noRemark: '\u6682\u65e0\u64c5\u957f\u65b9\u5411\u4ecb\u7ecd',
-				pricePrefix: '\u6302\u53f7\u8d39 \u00a5'
+				favoriteTitle: '我的收藏医生',
+				favoriteNavName: '我的收藏',
+				favoriteNavTitle: '我的收藏',
+				noFavorite: '暂无收藏医生',
+				noRemark: '暂无擅长方向介绍',
+				pricePrefix: '挂号费 ¥'
 			},
 			user: {
 				username: '',
@@ -252,183 +231,158 @@ export default {
 	},
 	methods: {
 		openUserInfoCard: function() {
-				let token = uni.getStorageSync('token');
-				if (token == null || token.length == 0) {
-					uni.showToast({
-						icon: 'error',
-						title: '请先登录小程序'
-					});
-					return;
-				}
-				uni.navigateTo({
-					url: '/user/user_info_card_detail'
+			let token = uni.getStorageSync('token');
+			if (token == null || token.length == 0) {
+				uni.showToast({
+					icon: 'error',
+					title: '请先登录小程序'
 				});
-			},
-			loginOrRegister: function() {
-		    let that = this;
-		    //获取微信用户的临时授权
-		    uni.login({
-		        provider: 'weixin',
-		        success: function(resp) {
-		            let code = resp.code;
-		            that.code = code;
-		        }
-		    });
-		
-		    //获取用户的微信资料用于注册
-		    uni.getUserProfile({
-		        desc: '获取用户信息',
-		        success: function(resp) {
-		            let info = resp.userInfo;
-		            let nickname = info.nickName; //昵称
-		            let photo = info.avatarUrl;  //头像URL
-		            let sex = info.gender == 0 ? '男' : '女'; //性别
-		            let data = {
-		                code: that.code,
-		                nickname: nickname,
-		                photo: photo,
-		                sex: sex
-		            };
-		            //提交Ajax请求，执行登陆或注册
-		            that.ajax(that.api.loginOrRegister, 'POST', data, function(resp) {
-                  // console.log(resp);
-                  let msg = resp.data.msg;
-				  console.log(that);	
-				  console.log(that.$refs);	
-				  console.log(that.$refs.uToast);	
-		                that.$refs.uToast.show({
-		                    message: msg,
-		                    type: 'success',
-		                    duration: 1200,
-		                    complete: function() {
-		                        let token = resp.data.token;
-		                        //把Token保存到Storage
-		                        uni.setStorageSync('token', token);
-		                        //更新页面标志位变量
-		                        that.flag = 'login';
-		                        that.user.username = nickname;
-		                        that.user.photo = photo;
-		                        //如果用户创建了患者信息卡，就把电话显示在页面上
-		                        if (resp.data.hasOwnProperty('tel')) {
-		                            that.user.tel = resp.data.tel;
-		                        }
-		                        that.loadFavoriteDoctors();
-		                    }
-		                });
-		            });
-                
-		        }
-		    });
+				return;
+			}
+			uni.navigateTo({
+				url: '/user/user_info_card_detail'
+			});
 		},
-		
-		logout:function(){
-			//把Token保存到Storage
+		loginOrRegister: function() {
+			let that = this;
+			uni.login({
+				provider: 'weixin',
+				success: function(resp) {
+					that.code = resp.code;
+				}
+			});
+
+			uni.getUserProfile({
+				desc: '获取用户信息',
+				success: function(resp) {
+					let info = resp.userInfo;
+					let nickname = info.nickName;
+					let photo = info.avatarUrl;
+					let sex = info.gender == 0 ? '男' : '女';
+					let data = {
+						code: that.code,
+						nickname: nickname,
+						photo: photo,
+						sex: sex
+					};
+					that.ajax(that.api.loginOrRegister, 'POST', data, function(resp) {
+						let msg = resp.data.msg;
+						that.$refs.uToast.show({
+							message: msg,
+							type: 'success',
+							duration: 1200,
+							complete: function() {
+								let token = resp.data.token;
+								uni.setStorageSync('token', token);
+								that.flag = 'login';
+								that.user.username = nickname;
+								that.user.photo = photo;
+								if (resp.data.hasOwnProperty('tel')) {
+									that.user.tel = resp.data.tel;
+								}
+								that.loadFavoriteDoctors();
+							}
+						});
+					});
+				}
+			});
+		},
+		logout: function() {
 			uni.setStorageSync('token', null);
-			//更新页面标志位变量
 			this.flag = 'logout';
 			this.favoriteDoctors = [];
 			uni.showToast({
-			    icon: 'success',
-			    title: '退出成功'
+				icon: 'success',
+				title: '退出成功'
 			});
-
 		},
-	loadFavoriteDoctors: function() {
-		let that = this;
-		that.ajax(
-			that.api.searchFavoriteDoctorByPage,
-			'POST',
-			{
-				page: that.favoritePage,
-				length: that.favoriteLength
-			},
-			function(resp) {
-				let result = resp.data.result;
-				let list = result && result.list ? result.list : [];
-				for (let one of list) {
-					one.photo = that.doctorPhotoUrl(one.photo);
-				}
-				that.favoriteDoctors = list.slice(0, 3);
-			},
-			false
-		);
-	},
-	goDoctorDetail: function(doctorId) {
-		uni.navigateTo({
-			url: `/display/doctor_detail/doctor_detail?doctorId=${doctorId}`
-		});
-	},
-   navigatorHandle: function(name) {
-       let token = uni.getStorageSync('token');
-       if (token == null || token.length == 0) {
-           uni.showToast({
-               icon: 'error',
-               title: '请先登录小程序'
-           });
-           return;
-       }
-       let url = null;
-       if (name == '实名登记') {
-           url = '/user/fill_user_info/fill_user_info';
-       } 
-       else if (name == '医生列表') {
-		    url = '/display/allDoctor/allDoctor';
-       } 
-       else if (name == '我的宠物') {
-		      url = '/user/pet_info/pet_info';
-       } 
-       else if (name == '疾病百科') {
-		     url = '/display/allInfo/allInfo';
-		
-       } 
-       else if (name == '视频问诊') {
-           //这里是新添加的代码
-           url = '/video_diagnose/order_list/order_list';
-       }
-       else if (name == '我的评价') {
-           url = '/registration/evaluation/evaluation?mode=list';
-       }
-       else if (name == this.text.favoriteNavName) {
-           url = '/display/favorite_doctor/favorite_doctor';
-       }
-       else if (name == '挂号就诊') {
-
-        url= '/registration/medical_dept_list/medical_dept_list';
-       }
-       uni.navigateTo({
-           url: url
-       });
-   },
-    
-
-
+		loadFavoriteDoctors: function() {
+			let that = this;
+			that.ajax(
+				that.api.searchFavoriteDoctorByPage,
+				'POST',
+				{
+					page: that.favoritePage,
+					length: that.favoriteLength
+				},
+				function(resp) {
+					let result = resp.data.result;
+					let list = result && result.list ? result.list : [];
+					for (let one of list) {
+						one.photo = that.doctorPhotoUrl(one.photo);
+					}
+					that.favoriteDoctors = list.slice(0, 3);
+				},
+				false
+			);
+		},
+		goDoctorDetail: function(doctorId) {
+			uni.navigateTo({
+				url: `/display/doctor_detail/doctor_detail?doctorId=${doctorId}`
+			});
+		},
+		navigatorHandle: function(name) {
+			if (name == 'AI挂号助手') {
+				uni.navigateTo({
+					url: '/agent/chat/chat'
+				});
+				return;
+			}
+			let token = uni.getStorageSync('token');
+			if (token == null || token.length == 0) {
+				uni.showToast({
+					icon: 'error',
+					title: '请先登录小程序'
+				});
+				return;
+			}
+			let url = null;
+			if (name == '实名登记') {
+				url = '/user/fill_user_info/fill_user_info';
+			} else if (name == '医生列表') {
+				url = '/display/allDoctor/allDoctor';
+			} else if (name == '我的宠物') {
+				url = '/user/pet_info/pet_info';
+			} else if (name == '疾病百科') {
+				url = '/display/allInfo/allInfo';
+			} else if (name == '视频问诊') {
+				url = '/video_diagnose/order_list/order_list';
+			} else if (name == '我的评价') {
+				url = '/registration/evaluation/evaluation?mode=list';
+			} else if (name == this.text.favoriteNavName) {
+				url = '/display/favorite_doctor/favorite_doctor';
+			} else if (name == '挂号就诊') {
+				url = '/registration/medical_dept_list/medical_dept_list';
+			}
+			uni.navigateTo({
+				url: url
+			});
+		}
 	},
 	onShow: function() {
-	    let that = this;
-	    let token = uni.getStorageSync('token');
-	    if (token != null) {
-	        that.ajax(
-	            that.api.searchUserInfo,
-	            'GET',
-	            {},
-	            function(resp) {
-	                // console.log(resp);
-	                if (resp.data.hasOwnProperty('result')) {
-	                    that.flag = 'login';
-	                    let result = resp.data.result;
-	                    that.user.username = result.nickname;
-	                    that.user.photo = result.photo;
-	                    that.user.tel = result.tel;
-	                    that.loadFavoriteDoctors();
-	                }
-	            },
-	            false
-	        );
-	    } else {
-	        that.favoriteDoctors = [];
-	    }
+		let that = this;
+		let token = uni.getStorageSync('token');
+		if (token != null) {
+			that.ajax(
+				that.api.searchUserInfo,
+				'GET',
+				{},
+				function(resp) {
+					if (resp.data.hasOwnProperty('result')) {
+						that.flag = 'login';
+						let result = resp.data.result;
+						that.user.username = result.nickname;
+						that.user.photo = result.photo;
+						that.user.tel = result.tel;
+						that.loadFavoriteDoctors();
+					}
+				},
+				false
+			);
+		} else {
+			that.favoriteDoctors = [];
+		}
 	}
-
 };
 </script>
 

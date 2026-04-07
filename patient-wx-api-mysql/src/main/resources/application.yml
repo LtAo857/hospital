@@ -84,3 +84,9 @@ storage:
   local:
     root-path: D:/hospital-storage
 
+agent:
+  enabled: true
+  session-ttl-minutes: 30
+  confirm-required-for-write: true
+  mock-model-enabled: false
+
