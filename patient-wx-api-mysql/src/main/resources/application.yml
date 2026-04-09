@@ -5,7 +5,7 @@ server:
       selectors: 8
       min: 8
       max: 200
-  port: 8092
+  port: 8095
   servlet:
     context-path: /patient-wx-api
 
@@ -89,4 +89,11 @@ agent:
   session-ttl-minutes: 30
   confirm-required-for-write: true
   mock-model-enabled: false
+  llm-enabled: true
+  provider: dashscope
+  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  api-key: x
+  model: qwen-plus
+  temperature: 0.2
+  timeout-millis: 15000
 

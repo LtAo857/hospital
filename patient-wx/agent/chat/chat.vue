@@ -73,12 +73,16 @@ export default {
 				confirmation: null,
 				state: 'idle'
 			},
+			streamTimer: null,
 			scrollAnchor: 'anchor-bottom'
 		};
 	},
 	onLoad() {
 		this.sessionId = `${Date.now()}`;
 		this.sendAction('welcome');
+	},
+	beforeDestroy() {
+		this.clearStreamTimer();
 	},
 	methods: {
 		formatStepStatus(status) {
@@ -93,6 +97,34 @@ export default {
 		appendAssistantMessage(text) {
 			if (!text) return;
 			this.messages.push({ role: 'assistant', content: text });
+			this.scrollToBottom();
+		},
+		appendAssistantMessageStreaming(text) {
+			if (!text) return;
+			this.clearStreamTimer();
+			let message = { role: 'assistant', content: '' };
+			this.messages.push(message);
+			let index = this.messages.length - 1;
+			let chars = Array.from(text);
+			let cursor = 0;
+			this.scrollToBottom();
+			this.streamTimer = setInterval(() => {
+				if (cursor >= chars.length) {
+					this.clearStreamTimer();
+					return;
+				}
+				this.messages[index].content += chars[cursor];
+				cursor += 1;
+				this.scrollToBottom();
+			}, 25);
+		},
+		clearStreamTimer() {
+			if (this.streamTimer) {
+				clearInterval(this.streamTimer);
+				this.streamTimer = null;
+			}
+		},
+		scrollToBottom() {
 			this.$nextTick(() => {
 				this.scrollAnchor = `msg-${this.messages.length - 1}`;
 			});
@@ -173,7 +205,7 @@ export default {
 						confirmation: result.confirmation || null,
 						state: result.state || 'idle'
 					};
-					this.appendAssistantMessage(result.reply || '助手暂时没有返回内容。');
+					this.appendAssistantMessageStreaming(result.reply || '助手暂时没有返回内容。');
 				},
 				false
 			);
@@ -318,31 +350,30 @@ export default {
 	padding: 18rpx 8rpx;
 	font-size: 24rpx;
 	color: #1296db;
+	box-shadow: 0 6rpx 16rpx rgba(18, 150, 219, 0.08);
 }
 .composer {
 	display: flex;
 	gap: 16rpx;
 	align-items: center;
-	padding-bottom: 24rpx;
 }
 .composer-input {
 	flex: 1;
-	height: 80rpx;
 	background: #fff;
 	border-radius: 16rpx;
-	padding: 0 24rpx;
+	padding: 22rpx 24rpx;
 	font-size: 26rpx;
 }
 .composer-btn {
-	width: 140rpx;
-	height: 80rpx;
-	line-height: 80rpx;
-	background: #1296db;
-	color: #fff;
+	width: 150rpx;
 	border-radius: 16rpx;
+	background: linear-gradient(135deg, #1296db, #47c2ff);
+	color: #fff;
 	font-size: 26rpx;
+	border: none;
 }
 .slim {
 	padding-top: 20rpx;
+	padding-bottom: 20rpx;
 }
 </style>

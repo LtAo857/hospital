@@ -1,37 +1,51 @@
-# Agent 架构说明（一期）
+# Agent 架构说明
 
-## 设计目标
-把现有患者端挂号系统改造成“可扩展的 Agent 项目”，但第一期不引入真实模型，不升级框架，不重写既有业务逻辑。
+## 目标
+在不重写现有挂号业务的前提下，为患者侧增加一个可扩展的挂号助手编排层。
 
-## 一期落地方式
-- 后端：在 `patient-wx-api-mysql` 新增 `agent` 模块
-- 前端：在 `patient-wx` 新增独立 `AI挂号助手` 页面
-- 编排方式：规则引擎 + Tool 封装 + Redis 会话记忆 + 风险确认
+## 核心结构
+- 后端模块：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent`
+- 前端入口：`patient-wx/agent/chat/chat.vue`
+- 接口入口：`POST /agent/chat`
 
-## 后端结构
-- `agent/controller/AgentChatController.java`：统一入口 `/agent/chat`
-- `agent/service/AgentOrchestratorService.java`：主编排器
-- `agent/service/NoModelAgentEngine.java`：无模型规则引擎
-- `agent/tool/*`：复用既有 service 的工具封装
-- `agent/memory/*`：Redis 短期记忆
-- `agent/dto/*`：请求、响应、卡片、工具日志、确认结构
+## 主要组件
+- `AgentChatController`
+  - 对外提供 `/agent/chat`
+- `AgentOrchestratorService`
+  - 主编排器
+  - 负责意图分发、记忆读写、自动挂号、强确认挂号
+  - 负责对模型结果做二次校正
+- `NoModelAgentEngine`
+  - 无模型规则识别
+  - 负责基础意图识别与流程推进
+- `DashScopeAgentService`
+  - 可选模型决策层
+  - 仅负责生成结构化意图，不直接写业务
+- `AgentConversationMemoryService`
+  - Redis 会话记忆
+- `agent/tool/*`
+  - 复用现有 service 的工具封装
 
-## 前端结构
-- `patient-wx/agent/chat/chat.vue`：独立助手页
-- `patient-wx/pages/index/index.vue`：首页入口
-- `patient-wx/pages/mine/mine.vue`：个人中心入口
-- `patient-wx/main.js`：新增 `agentChat` API
-- `patient-wx/pages.json`：注册 `agent` 分包
+## 当前决策链路
+1. 前端发送用户消息到 `/agent/chat`
+2. 后端加载会话记忆
+3. 规则引擎先给出基础动作
+4. 若开启 LLM，则调用 `DashScopeAgentService` 返回结构化 JSON
+5. `AgentOrchestratorService` 合并模型结果与本地规则
+6. 编排层强制修正关键字段：
+   - 科室症状词映射
+   - 用户原话日期优先
+   - 流程阶段优先
+7. 根据动作调用只读工具或生成确认挂号动作
+8. 返回回复、步骤、卡片、工具日志
 
-## 运行流程
-1. 用户进入 AI 助手页
-2. 前端调用 `/agent/chat`
-3. 后端读取会话记忆并确定当前阶段
-4. 按阶段调用只读工具或准备确认动作
-5. 用户确认后，调用挂号工具执行
-6. 返回结构化结果、步骤、卡片和日志
+## 这轮补充的稳定性规则
+- 症状词可自动补全科室，例如“口腔难受”映射为 `口腔科`
+- 用户原话中的 `今天/明天/后天` 会覆盖模型误判日期
+- 医生无价格记录时，查询医生列表不再被过滤
+- 当天过期时段不会被自动挂号选中
 
-## 为什么先不接模型
-- 当前仓库还没有稳定的 AI SDK 接入
-- 一期目标是先把 Agent Runtime、工具层、确认机制和前端交互跑通
-- 后续可在 `NoModelAgentEngine` 前面替换为真实模型决策层
+## 风险边界
+- 自动挂号只做“查找最早可挂号源 + 生成确认动作”
+- 真正提交挂号必须经过 `checkRegistrationCondition` 和用户确认
+- 不允许模型直接决定写操作结果

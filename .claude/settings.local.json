@@ -24,7 +24,16 @@
       "Bash('D:\\\\Code\\\\env\\\\nvm\\\\nvm\\\\nvm.exe' list:*)",
       "Bash(mvn:*)",
       "Bash(npm:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(python:*)",
+      "Bash(node -e \"const fs=require\\('fs'\\); JSON.parse\\(fs.readFileSync\\('pages.json','utf8'\\)\\); console.log\\('pages.json ok'\\)\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git:*)",
+      "Read(//c/Users/hs/hospital-api-mysql/src/**)",
+      "Read(//c/Users/hs/patient-wx-api-mysql/src/**)",
+      "Read(//c/Users/hs/**)",
+      "WebSearch"
     ]
   }
 }

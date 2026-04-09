@@ -41,13 +41,13 @@ public class NoModelAgentEngine {
         if (!StringUtils.hasText(message)) {
             return AgentUiAction.WELCOME;
         }
-        if (message.contains("消息")) {
+        if (containsAny(message, "消息", "通知", "提醒")) {
             return AgentUiAction.VIEW_MESSAGES;
         }
-        if (message.contains("就诊卡") || message.contains("实名")) {
+        if (containsAny(message, "就诊卡", "实名", "身份信息")) {
             return AgentUiAction.VIEW_USER_CARD;
         }
-        if (message.contains("挂号") || message.contains("预约") || message.contains("科室") || message.contains("医生")) {
+        if (containsAny(message, "挂号", "预约", "科室", "诊室", "医生", "号源", "口腔", "牙")) {
             return AgentUiAction.START_REGISTRATION;
         }
         return AgentUiAction.WELCOME;
@@ -59,6 +59,18 @@ public class NoModelAgentEngine {
 
     public String fallbackReply() {
         return "我目前可以帮你完成科室、医生、号源、消息和挂号确认。你可以点下方卡片继续。";
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        if (!StringUtils.hasText(text) || keywords == null) {
+            return false;
+        }
+        for (String keyword : keywords) {
+            if (StringUtils.hasText(keyword) && text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String stringValue(Object value) {

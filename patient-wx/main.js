@@ -28,7 +28,7 @@ app.$mount()
 // #endif
 
 
-let fileBaseUrl = "http://127.0.0.1:8092/patient-wx-api/file"
+let fileBaseUrl = "http://127.0.0.1:8095/patient-wx-api/file"
 Vue.prototype.fileBaseUrl = fileBaseUrl
 Vue.prototype.fileUrl = function(path) {
 	if (!path) {
@@ -57,7 +57,7 @@ Vue.prototype.tencent = {
 	}
 }
 
-let baseUrl = "http://127.0.0.1:8092/patient-wx-api"
+let baseUrl = "http://127.0.0.1:8095/patient-wx-api"
 // let baseUrl = "http://192.168.0.156:8092/patient-wx-api"
 
 
@@ -158,7 +158,7 @@ Vue.prototype.ajax = function(url, method, data, fun, load) {
 			} else {
 				uni.showToast({
 					icon: "none",
-					title: "执行异常"
+					title: (resp.data && (resp.data.error || resp.data.msg)) || "执行异常"
 				})
 				console.error(resp.data)
 			}

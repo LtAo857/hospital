@@ -44,10 +44,10 @@
                d.description AS description,
                p.num AS num,
                p.maximum AS maximum,
-               FORMAT(dp.price_1, 2) AS price
+               FORMAT(IFNULL(dp.price_1, 0), 2) AS price
         FROM doctor_work_plan p
                  JOIN doctor d ON p.doctor_id = d.id
-                 JOIN doctor_price dp ON p.doctor_id = dp.doctor_id
+                 LEFT JOIN doctor_price dp ON p.doctor_id = dp.doctor_id
         WHERE p.dept_sub_id = #{deptSubId}
           AND p.date = STR_TO_DATE(#{date}, '%Y-%m-%d')
     </select>
