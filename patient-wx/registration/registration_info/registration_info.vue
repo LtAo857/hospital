@@ -37,8 +37,7 @@
 					<u-cell title="就诊时间" :border="false" :value="datetime"></u-cell>
 					<u-cell title="挂号人" :border="false" :value="patientName"></u-cell>
 					<u-cell title="挂号费" :border="false" :value="amount"></u-cell>
-					<u-cell  title="电子处方" :border="false" isLink :url="`/registration/prescription/prescription?registrationId=${id}`"></u-cell>
-<!--           <u-cell v-if="prescriptionId != null" title="电子处方" :border="false" isLink :url="`/registration/prescription/prescription?registrationId=${id}`"></u-cell> -->
+					<u-cell v-if="prescriptionId != null" title="电子处方" :border="false" isLink :url="`/registration/prescription/prescription?registrationId=${id}`"></u-cell>
 				</u-cell-group>
 			</view>
 			<view class="evaluation-btn" v-if="!hasEvaluated">

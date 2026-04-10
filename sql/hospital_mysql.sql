@@ -11,7 +11,7 @@
  Target Server Version : 80026
  File Encoding         : 65001
 
- Date: 01/04/2026 11:02:05
+ Date: 10/04/2026 16:42:22
 */
 
 SET NAMES utf8mb4;
@@ -73,7 +73,7 @@ CREATE TABLE `doctor_consult`  (
   `files` json NULL,
   `create_time` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_consult
@@ -95,12 +95,39 @@ CREATE TABLE `doctor_evaluation`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_doctor_id`(`doctor_id`) USING BTREE,
   INDEX `idx_registration_id`(`registration_id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_evaluation
 -- ----------------------------
 INSERT INTO `doctor_evaluation` VALUES (1, 4, 2, 2, NULL, 4, '好', '2026-03-14 17:00:50');
+INSERT INTO `doctor_evaluation` VALUES (2, 1, 2, 3, NULL, 4, '很好的医生', '2026-04-01 11:11:14');
+
+-- ----------------------------
+-- Table structure for doctor_prescription
+-- ----------------------------
+DROP TABLE IF EXISTS `doctor_prescription`;
+CREATE TABLE `doctor_prescription`  (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `uuid` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `patient_card_id` int NULL DEFAULT NULL,
+  `diagnosis` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `sub_dept_id` int NULL DEFAULT NULL,
+  `doctor_id` int NULL DEFAULT NULL,
+  `registration_id` int NULL DEFAULT NULL,
+  `rp` json NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `idx_registration_id_unique`(`registration_id`) USING BTREE,
+  INDEX `idx_doctor_prescription_uuid`(`uuid`) USING BTREE,
+  INDEX `idx_doctor_prescription_patient_card_id`(`patient_card_id`) USING BTREE,
+  INDEX `idx_doctor_prescription_sub_dept_id`(`sub_dept_id`) USING BTREE,
+  INDEX `idx_doctor_prescription_doctor_id`(`doctor_id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of doctor_prescription
+-- ----------------------------
+INSERT INTO `doctor_prescription` VALUES (1, '1638AE1E0A73489E8C41C923DABEAB4F', 2, '腰间盘突出', 3, 4, 7, '[{\"num\": 4, \"name\": \"健胃消食片\", \"spec\": \"1\", \"method\": \"一日三次\"}]');
 
 -- ----------------------------
 -- Table structure for doctor_price
@@ -134,7 +161,7 @@ CREATE TABLE `doctor_work_plan`  (
   `maximum` smallint NULL DEFAULT NULL,
   `num` smallint NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 8 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 16 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_work_plan
@@ -146,6 +173,14 @@ INSERT INTO `doctor_work_plan` VALUES (4, 1, 1, '2025-06-14', 45, 0);
 INSERT INTO `doctor_work_plan` VALUES (5, 1, 1, '2026-03-14', 45, 0);
 INSERT INTO `doctor_work_plan` VALUES (6, 1, 1, '2026-03-30', 45, 0);
 INSERT INTO `doctor_work_plan` VALUES (7, 6, 1, '2026-03-31', 30, 0);
+INSERT INTO `doctor_work_plan` VALUES (8, 1, 1, '2026-04-01', 45, 1);
+INSERT INTO `doctor_work_plan` VALUES (9, 4, 3, '2026-04-01', 45, 1);
+INSERT INTO `doctor_work_plan` VALUES (10, 6, 1, '2026-04-01', 45, 0);
+INSERT INTO `doctor_work_plan` VALUES (11, 1, 1, '2026-04-02', 45, 1);
+INSERT INTO `doctor_work_plan` VALUES (12, 4, 3, '2026-04-09', 150, 1);
+INSERT INTO `doctor_work_plan` VALUES (13, 4, 3, '2026-04-10', 45, 1);
+INSERT INTO `doctor_work_plan` VALUES (14, 6, 1, '2026-04-09', 45, 0);
+INSERT INTO `doctor_work_plan` VALUES (15, 1, 1, '2026-04-10', 150, 1);
 
 -- ----------------------------
 -- Table structure for doctor_work_plan_schedule
@@ -158,7 +193,7 @@ CREATE TABLE `doctor_work_plan_schedule`  (
   `maximum` smallint NULL DEFAULT NULL,
   `num` smallint NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 92 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 212 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of doctor_work_plan_schedule
@@ -249,6 +284,126 @@ INSERT INTO `doctor_work_plan_schedule` VALUES (83, 7, 7, 3, 0);
 INSERT INTO `doctor_work_plan_schedule` VALUES (84, 7, 8, 3, 0);
 INSERT INTO `doctor_work_plan_schedule` VALUES (85, 7, 9, 3, 0);
 INSERT INTO `doctor_work_plan_schedule` VALUES (86, 7, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (92, 8, 1, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (93, 8, 2, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (94, 8, 3, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (95, 8, 4, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (96, 8, 5, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (97, 8, 6, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (98, 8, 7, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (99, 8, 8, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (100, 8, 9, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (101, 8, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (102, 8, 11, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (103, 8, 12, 3, 1);
+INSERT INTO `doctor_work_plan_schedule` VALUES (104, 8, 13, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (105, 8, 14, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (106, 8, 15, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (107, 9, 1, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (108, 9, 2, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (109, 9, 3, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (110, 9, 4, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (111, 9, 5, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (112, 9, 6, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (113, 9, 7, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (114, 9, 8, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (115, 9, 9, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (116, 9, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (117, 9, 11, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (118, 9, 12, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (119, 9, 13, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (120, 9, 14, 3, 1);
+INSERT INTO `doctor_work_plan_schedule` VALUES (121, 9, 15, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (122, 10, 1, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (123, 10, 2, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (124, 10, 3, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (125, 10, 4, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (126, 10, 5, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (127, 10, 6, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (128, 10, 7, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (129, 10, 8, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (130, 10, 9, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (131, 10, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (132, 10, 11, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (133, 10, 12, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (134, 10, 13, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (135, 10, 14, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (136, 10, 15, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (137, 11, 1, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (138, 11, 2, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (139, 11, 3, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (140, 11, 4, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (141, 11, 5, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (142, 11, 6, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (143, 11, 7, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (144, 11, 8, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (145, 11, 9, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (146, 11, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (147, 11, 11, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (148, 11, 12, 3, 1);
+INSERT INTO `doctor_work_plan_schedule` VALUES (149, 11, 13, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (150, 11, 14, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (151, 11, 15, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (152, 12, 1, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (153, 12, 2, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (154, 12, 3, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (155, 12, 4, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (156, 12, 5, 10, 1);
+INSERT INTO `doctor_work_plan_schedule` VALUES (157, 12, 6, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (158, 12, 7, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (159, 12, 8, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (160, 12, 9, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (161, 12, 10, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (162, 12, 11, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (163, 12, 12, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (164, 12, 13, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (165, 12, 14, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (166, 12, 15, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (167, 13, 1, 3, 1);
+INSERT INTO `doctor_work_plan_schedule` VALUES (168, 13, 2, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (169, 13, 3, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (170, 13, 4, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (171, 13, 5, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (172, 13, 6, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (173, 13, 7, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (174, 13, 8, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (175, 13, 9, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (176, 13, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (177, 13, 11, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (178, 13, 12, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (179, 13, 13, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (180, 13, 14, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (181, 13, 15, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (182, 14, 1, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (183, 14, 2, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (184, 14, 3, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (185, 14, 4, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (186, 14, 5, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (187, 14, 6, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (188, 14, 7, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (189, 14, 8, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (190, 14, 9, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (191, 14, 10, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (192, 14, 11, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (193, 14, 12, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (194, 14, 13, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (195, 14, 14, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (196, 14, 15, 3, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (197, 15, 1, 10, 1);
+INSERT INTO `doctor_work_plan_schedule` VALUES (198, 15, 2, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (199, 15, 3, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (200, 15, 4, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (201, 15, 5, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (202, 15, 6, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (203, 15, 7, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (204, 15, 8, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (205, 15, 9, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (206, 15, 10, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (207, 15, 11, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (208, 15, 12, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (209, 15, 13, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (210, 15, 14, 10, 0);
+INSERT INTO `doctor_work_plan_schedule` VALUES (211, 15, 15, 10, 0);
 
 -- ----------------------------
 -- Table structure for illness
@@ -347,13 +502,19 @@ CREATE TABLE `medical_registration`  (
   `create_time` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_out_trade_no`(`out_trade_no`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of medical_registration
 -- ----------------------------
 INSERT INTO `medical_registration` VALUES (1, 1, 1, NULL, 1, 1, '2025-04-19', 1, 80.00, NULL, NULL, NULL, 1, '2025-04-12 21:47:55');
 INSERT INTO `medical_registration` VALUES (2, 2, 3, 23, 4, 1, '2025-04-14', 7, 11.00, 'DC5DE2E7844449B49A2BD8A3DCD715B1', '1', NULL, 1, '2025-04-14 09:55:05');
+INSERT INTO `medical_registration` VALUES (3, 2, 8, 103, 1, 1, '2026-04-01', 12, 80.00, 'D202FAB3CF4D473EB5196C644F8F64DF', '1', NULL, 1, '2026-04-01 11:10:40');
+INSERT INTO `medical_registration` VALUES (4, 2, 9, 120, 4, 3, '2026-04-01', 14, 30.00, 'EA4A18DF12924AFAB76AC2D3A1CC7FB2', '1', NULL, 1, '2026-04-01 11:13:26');
+INSERT INTO `medical_registration` VALUES (5, 2, 11, 148, 1, 1, '2026-04-02', 12, 80.00, '2DA1D2F2279B4A80BCE784F0909830FF', '1', NULL, 1, '2026-04-01 11:15:52');
+INSERT INTO `medical_registration` VALUES (6, 2, 12, 156, 4, 3, '2026-04-09', 5, 30.00, '33FB36BD26C847529113A4D832505C47', '1', NULL, 1, '2026-04-09 09:40:48');
+INSERT INTO `medical_registration` VALUES (7, 2, 13, 167, 4, 3, '2026-04-10', 1, 30.00, '6F7536E048674FDC89CF5216259867D9', '1', NULL, 1, '2026-04-09 15:22:02');
+INSERT INTO `medical_registration` VALUES (8, 2, 15, 197, 1, 1, '2026-04-10', 1, 80.00, '503B8530514C45C5B0C6E3DDA3D343DB', '1', NULL, 1, '2026-04-09 18:24:21');
 
 -- ----------------------------
 -- Table structure for mis_action
@@ -410,6 +571,7 @@ INSERT INTO `mis_module` VALUES (13, 'DOCTOR_PRICE', '诊费管理');
 INSERT INTO `mis_module` VALUES (14, 'SYSTEM', '系统管理');
 INSERT INTO `mis_module` VALUES (15, 'EVALUATION', '评价管理');
 INSERT INTO `mis_module` VALUES (17, 'FAVORITE', '收藏管理');
+INSERT INTO `mis_module` VALUES (18, 'PRESCRIPTION', '电子处方管理');
 
 -- ----------------------------
 -- Table structure for mis_permission
@@ -484,6 +646,9 @@ INSERT INTO `mis_permission` VALUES (54, 'SYSTEM:UPDATE', 16, 3);
 INSERT INTO `mis_permission` VALUES (55, 'SYSTEM:SELECT', 16, 4);
 INSERT INTO `mis_permission` VALUES (56, 'EVALUATION:SELECT', 15, 4);
 INSERT INTO `mis_permission` VALUES (57, 'FAVORITE:SELECT', 17, 4);
+INSERT INTO `mis_permission` VALUES (58, 'PRESCRIPTION:INSERT', 18, 1);
+INSERT INTO `mis_permission` VALUES (59, 'PRESCRIPTION:UPDATE', 18, 3);
+INSERT INTO `mis_permission` VALUES (60, 'PRESCRIPTION:SELECT', 18, 4);
 
 -- ----------------------------
 -- Table structure for mis_role
@@ -494,7 +659,7 @@ CREATE TABLE `mis_role`  (
   `role_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `remark` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of mis_role
@@ -528,6 +693,12 @@ INSERT INTO `mis_role_permission` VALUES (7, 2, 36);
 INSERT INTO `mis_role_permission` VALUES (8, 2, 37);
 INSERT INTO `mis_role_permission` VALUES (9, 0, 56);
 INSERT INTO `mis_role_permission` VALUES (10, 0, 57);
+INSERT INTO `mis_role_permission` VALUES (11, 0, 58);
+INSERT INTO `mis_role_permission` VALUES (12, 0, 59);
+INSERT INTO `mis_role_permission` VALUES (13, 0, 60);
+INSERT INTO `mis_role_permission` VALUES (14, 1, 58);
+INSERT INTO `mis_role_permission` VALUES (15, 1, 59);
+INSERT INTO `mis_role_permission` VALUES (16, 1, 60);
 
 -- ----------------------------
 -- Table structure for mis_user
@@ -617,7 +788,7 @@ CREATE TABLE `patient_face_auth`  (
   `patient_card_id` int NULL DEFAULT NULL,
   `date` datetime NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of patient_face_auth
@@ -641,12 +812,19 @@ CREATE TABLE `patient_message`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_user_id`(`user_id`) USING BTREE,
   INDEX `idx_create_time`(`create_time`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of patient_message
 -- ----------------------------
 INSERT INTO `patient_message` VALUES (1, 2, 4, '评价成功', '您的评价已提交成功，感谢您的反馈', 1, 1, '2026-03-14 17:00:50');
+INSERT INTO `patient_message` VALUES (2, 2, 1, '挂号成功', '您已成功挂号，就诊日期：2026-04-01', 3, 1, '2026-04-01 11:10:40');
+INSERT INTO `patient_message` VALUES (3, 2, 4, '评价成功', '您的评价已提交成功，感谢您的反馈', 2, 1, '2026-04-01 11:11:14');
+INSERT INTO `patient_message` VALUES (4, 2, 1, '挂号成功', '您已成功挂号，就诊日期：2026-04-01', 4, 1, '2026-04-01 11:13:26');
+INSERT INTO `patient_message` VALUES (5, 2, 1, '挂号成功', '您已成功挂号，就诊日期：2026-04-02', 5, 1, '2026-04-01 11:15:52');
+INSERT INTO `patient_message` VALUES (6, 2, 1, '挂号成功', '您已成功挂号，就诊日期：2026-04-09', 6, 1, '2026-04-09 09:40:48');
+INSERT INTO `patient_message` VALUES (7, 2, 1, '挂号成功', '您已成功挂号，就诊日期：2026-04-10', 7, 1, '2026-04-09 15:22:02');
+INSERT INTO `patient_message` VALUES (8, 2, 1, '挂号成功', '您已成功挂号，就诊日期：2026-04-10', 8, 1, '2026-04-09 18:24:21');
 
 -- ----------------------------
 -- Table structure for patient_user
@@ -693,7 +871,7 @@ CREATE TABLE `patient_user_info_card`  (
 -- Records of patient_user_info_card
 -- ----------------------------
 INSERT INTO `patient_user_info_card` VALUES (1, 1, '550e8400e29b41d4a716446655440000', '张三', '男', '110101199003077832', '13800138001', '1990-03-07', '[\"无\"]', '城镇医保', 1);
-INSERT INTO `patient_user_info_card` VALUES (2, 2, 'da42e00492a5444a8322d6c4933cdf33', '测试', '男', '110101199003077832', '15110790629', '1900-01-01', '[\"脑中风\",\"白血病\",\"癫痫\",\"脑梗\",\"心脏病\"]', '其他', 1);
+INSERT INTO `patient_user_info_card` VALUES (2, 2, 'da42e00492a5444a8322d6c4933cdf33', '测试', '男', '110101199003077832', '15111111111', '1900-01-01', '[\"脑中风\",\"白血病\",\"癫痫\",\"脑梗\",\"心脏病\"]', '其他', 1);
 
 -- ----------------------------
 -- Table structure for video_diagnose
@@ -724,7 +902,7 @@ CREATE TABLE `video_diagnose`  (
   INDEX `video_diagnose_idx_7`(`expect_start`) USING BTREE,
   INDEX `video_diagnose_idx_8`(`expect_end`) USING BTREE,
   INDEX `video_diagnose_idx_9`(`status`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of video_diagnose
@@ -743,7 +921,7 @@ CREATE TABLE `video_diagnose_file`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `video_diagnose_file_idx_1`(`video_diagnose_id`) USING BTREE,
   INDEX `video_diagnose_file_idx_2`(`create_time`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of video_diagnose_file

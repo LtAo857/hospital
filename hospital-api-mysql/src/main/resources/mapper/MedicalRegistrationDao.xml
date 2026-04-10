@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.api.db.dao.MedicalRegistrationDao">
+
+    <sql id="whereSql">
+        <where>
+            AND r.payment_status IN (1, 2)
+            <if test="doctorId != null">
+                AND r.doctor_id = #{doctorId}
+            </if>
+            <if test="doctorName != null and doctorName != ''">
+                AND d.name LIKE CONCAT('%', #{doctorName}, '%')
+            </if>
+            <if test="patientName != null and patientName != ''">
+                AND c.name LIKE CONCAT('%', #{patientName}, '%')
+            </if>
+            <if test="subDeptName != null and subDeptName != ''">
+                AND s.name LIKE CONCAT('%', #{subDeptName}, '%')
+            </if>
+            <if test="hasPrescription != null">
+                <choose>
+                    <when test="hasPrescription == 1">
+                        AND dp.id IS NOT NULL
+                    </when>
+                    <otherwise>
+                        AND dp.id IS NULL
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND r.date <![CDATA[>=]]> STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND r.date <![CDATA[<]]> DATE_ADD(STR_TO_DATE(#{endDate}, '%Y-%m-%d'), INTERVAL 1 DAY)
+            </if>
+        </where>
+    </sql>
+
+    <select id="searchPrescriptionRegistrationCount" parameterType="Map" resultType="long">
+        SELECT COUNT(*)
+        FROM medical_registration r
+                 JOIN patient_user_info_card c ON c.id = r.patient_card_id
+                 JOIN doctor d ON d.id = r.doctor_id
+                 JOIN medical_dept_sub s ON s.id = r.dept_sub_id
+                 LEFT JOIN doctor_prescription dp ON dp.registration_id = r.id
+        <include refid="whereSql"/>
+    </select>
+
+    <select id="searchPrescriptionRegistrationByPage" parameterType="Map" resultType="HashMap">
+        SELECT r.id AS registrationId,
+               DATE_FORMAT(r.date, '%Y-%m-%d') AS date,
+               r.slot AS slot,
+               c.name AS patientName,
+               c.sex AS patientSex,
+               TIMESTAMPDIFF(YEAR, c.birthday, CURDATE()) AS patientAge,
+               d.name AS doctorName,
+               s.name AS subDeptName,
+               r.payment_status AS paymentStatus,
+               dp.id AS prescriptionId,
+               CASE WHEN dp.id IS NULL THEN 0 ELSE 1 END AS hasPrescription
+        FROM medical_registration r
+                 JOIN patient_user_info_card c ON c.id = r.patient_card_id
+                 JOIN doctor d ON d.id = r.doctor_id
+                 JOIN medical_dept_sub s ON s.id = r.dept_sub_id
+                 LEFT JOIN doctor_prescription dp ON dp.registration_id = r.id
+        <include refid="whereSql"/>
+        ORDER BY r.date DESC, r.slot ASC
+        LIMIT #{length} OFFSET #{start}
+    </select>
+
+    <select id="searchPrescriptionRegistrationBaseInfo" parameterType="int" resultType="HashMap">
+        SELECT r.id AS registrationId,
+               r.patient_card_id AS patientCardId,
+               r.doctor_id AS doctorId,
+               r.dept_sub_id AS subDeptId,
+               DATE_FORMAT(r.date, '%Y-%m-%d') AS date,
+               r.slot AS slot,
+               r.payment_status AS paymentStatus,
+               c.name AS patientName,
+               c.sex AS patientSex,
+               TIMESTAMPDIFF(YEAR, c.birthday, CURDATE()) AS patientAge,
+               d.name AS doctorName,
+               s.name AS subDeptName
+        FROM medical_registration r
+                 JOIN patient_user_info_card c ON c.id = r.patient_card_id
+                 JOIN doctor d ON d.id = r.doctor_id
+                 JOIN medical_dept_sub s ON s.id = r.dept_sub_id
+        WHERE r.id = #{registrationId}
+    </select>
+</mapper>

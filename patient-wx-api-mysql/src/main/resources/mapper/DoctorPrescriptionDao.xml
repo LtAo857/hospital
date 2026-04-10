@@ -4,7 +4,8 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.hospital.patient.wx.api.db.dao.DoctorPrescriptionDao">
     <select id="searchPrescriptionByRegistrationId" parameterType="Map" resultType="HashMap">
-        SELECT dp.uuid AS uuid,
+        SELECT dp.id AS prescriptionId,
+        dp.uuid AS uuid,
         ds.name AS deptSub,
         dp.diagnosis AS diagnosis,
         dp.rp AS rp,

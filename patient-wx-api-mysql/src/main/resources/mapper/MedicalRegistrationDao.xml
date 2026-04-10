@@ -121,7 +121,8 @@
                d.job AS job,
                r.out_trade_no AS outTradeNo,
                FORMAT(r.amount, 2) AS amount,
-               r.payment_status AS paymentStatus
+               r.payment_status AS paymentStatus,
+               (SELECT dp.id FROM doctor_prescription dp WHERE dp.registration_id = r.id LIMIT 1) AS prescriptionId
         FROM medical_registration r
             JOIN patient_user_info_card c ON r.patient_card_id = c.id
             JOIN medical_dept_sub s ON r.dept_sub_id = s.id

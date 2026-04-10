@@ -1,10 +1,11 @@
 package com.example.hospital.api.db.dao;
 
-
 import com.example.hospital.api.db.pojo.DoctorPrescriptionEntity;
 
+import java.util.HashMap;
+
 public interface DoctorPrescriptionDao {
-    public void insert(DoctorPrescriptionEntity entity);
+    HashMap searchByRegistrationId(int registrationId);
 
+    void upsert(DoctorPrescriptionEntity entity);
 }
-

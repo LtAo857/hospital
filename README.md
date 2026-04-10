@@ -15,6 +15,7 @@ qq交流群： **1081725203**
 - 当前版本已移除挂号前的人脸识别前置校验，挂号不再依赖人脸录入与人脸验证
 - 新增患者侧 AI 挂号助手页，首页与个人中心都可进入助手流程
 - Agent 一期已打通“查询 → 条件校验 → 确认 → 挂号”链路，并保留 Redis 会话记忆与风险确认
+- 新增管理端“电子处方”独立页，医生可按挂号单开立/编辑处方，患者侧支持按挂号单查看处方详情
 
 # 项目结构
 ```
@@ -60,6 +61,7 @@ hospital
 - 挂号管理：挂号记录查询与管理
 - 评价管理：支持按医生/患者/评分/来源查询评价记录
 - 收藏管理：支持按医生/患者/手机号/时间查询收藏记录
+- 电子处方管理：支持医生按挂号单开立、编辑电子处方
 - 视频问诊管理：问诊订单管理
 - 系统管理：用户、角色、权限管理
 
@@ -189,3 +191,18 @@ hospital
     * 微信公众平台 https://mp.weixin.qq.com/?token=&lang=zh_CN
 ## 数据库部署
 * 在 `sql/` 目录下获取建表SQL文件，导入到Navicat或其他MySQL客户端执行
+* 使用最新 `sql/hospital_mysql.sql` 时请确保已包含 `doctor_prescription` 表及 `PRESCRIPTION:*` 权限初始化数据
+
+## 电子处方联调补充（MySQL链路）
+- 管理端页面路由：`hospital-vue` 的 `/doctor_prescription`
+- 管理端接口前缀：`/doctor_prescription`（查询挂号单、按挂号单查处方、保存处方）
+- 患者端查看接口：`patient-wx-api-mysql` 的 `/prescription/searchPrescriptionByRegistrationId`
+## 2026-04 最近补充
+- `patient-wx/pages/mine/mine.vue` 重做了患者端个人中心首页，改成卡片化布局，统一了登录态、消息、就诊卡和收藏医生的展示方式。
+- 个人中心中未落地或当前没有实际跳转价值的历史功能入口已在页面内注释保留，不再直接展示，避免用户点进无效页面。
+- 页面完整性已补齐到个人中心：新增收藏医生预览、就医服务分组、温馨提示和底部说明区，减少空白感和功能断层。
+
+## 2026-04 Personal Center Update
+- Reworked `patient-wx/pages/mine/mine.vue` into a cleaner card-based personal center layout for the patient mini app.
+- Hid unused legacy actions from the visible UI and kept them as inline comments in the page source to avoid dead-end navigation.
+- Completed the page with favorite doctor preview, grouped medical services, guidance tips, and a footer summary block.

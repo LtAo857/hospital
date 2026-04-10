@@ -22,9 +22,8 @@ import Illness from "../views/illness.vue"
 import Patient from "../views/patient.vue"
 import Evaluation from "../views/evaluation.vue"
 import Favorite from "../views/favorite.vue"
+import DoctorPrescription from "../views/doctor_prescription.vue"
 import NotFound from "../views/404.vue"
-
-
 
 const routes = [{
 		path: '/login',
@@ -124,7 +123,6 @@ const routes = [{
 					isTab: true
 				}
 			},
-
 			{
 				path: '/doctor_schedule/:deptName/:deptSubId/:date',
 				name: 'DoctorSchedule',
@@ -144,6 +142,15 @@ const routes = [{
 				}
 			},
 			{
+				path: '/doctor_prescription',
+				name: 'DoctorPrescription',
+				component: DoctorPrescription,
+				meta: {
+					title: '电子处方',
+					isTab: true
+				}
+			},
+			{
 				path: '/illness',
 				name: 'Illness',
 				component: Illness,
@@ -155,7 +162,7 @@ const routes = [{
 			{
 				path: '/patient',
 				name: 'Patient',
-				component:Patient,
+				component: Patient,
 				meta: {
 					title: '患者信息',
 					isTab: true
@@ -178,10 +185,7 @@ const routes = [{
 					title: '收藏管理',
 					isTab: true
 				}
-			},
-
-
-
+			}
 		]
 	},
 	{

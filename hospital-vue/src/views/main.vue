@@ -94,6 +94,7 @@
             v-if="
               isAuth(['ROOT', 'SCHEDULE:SELECT']) ||
               isAuth(['ROOT', 'VIDEO_DIAGNOSE:DIAGNOSE']) ||
+              canViewPrescription() ||
               canViewEvaluation() ||
               canViewFavorite()
             "
@@ -132,6 +133,14 @@
             >
               <SvgIcon name="camera_fill" class="icon-svg" />
               <span>视频问诊</span>
+            </el-menu-item>
+            <el-menu-item
+              v-if="canViewPrescription()"
+              index="电子处方"
+              @click="$router.push({ name: 'DoctorPrescription' })"
+            >
+              <SvgIcon name="calendar_fill" class="icon-svg" />
+              <span>电子处方</span>
             </el-menu-item>
             <el-menu-item v-if="canViewEvaluation()" index="评价管理" @click="$router.push({ name: 'Evaluation' })">
               <SvgIcon name="camera_fill" class="icon-svg" />
@@ -265,6 +274,9 @@ export default {
     },
     isDoctorUser() {
       return this.job === '医生' && !!this.refId;
+    },
+    canViewPrescription() {
+      return this.isDoctorUser() || this.isAuth(['ROOT', 'PRESCRIPTION:SELECT']);
     },
     canViewEvaluation() {
       return this.isDoctorUser() || this.isAuth(['ROOT', 'EVALUATION:SELECT']);
