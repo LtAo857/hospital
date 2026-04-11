@@ -108,6 +108,7 @@ Vue.prototype.api = {
 	readAllMessage: baseUrl + "/message/readAllMessage",
 	agentChat: baseUrl + "/agent/chat",
 	agentReactChat: baseUrl + "/agent/react/chat",
+	agentCcChat: baseUrl + "/agent/cc/chat",
 	// 评价相关
 	insertEvaluation: baseUrl + "/evaluation/insert",
 	searchEvaluationByPage: baseUrl + "/evaluation/searchByPage",

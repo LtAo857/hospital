@@ -1,4 +1,4 @@
-package com.example.hospital.patient.wx.api.agent.react.service;
+package com.example.hospital.patient.wx.api.agent.cc.service;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.json.JSONUtil;
@@ -6,14 +6,14 @@ import com.example.hospital.patient.wx.api.agent.dto.AgentChatRequest;
 import com.example.hospital.patient.wx.api.agent.dto.AgentChatResponse;
 import com.example.hospital.patient.wx.api.agent.dto.AgentConfirmation;
 import com.example.hospital.patient.wx.api.agent.dto.AgentResponseCard;
-import com.example.hospital.patient.wx.api.agent.react.config.TraditionalAgentPromptCatalog;
-import com.example.hospital.patient.wx.api.agent.react.config.TraditionalAgentProperties;
+import com.example.hospital.patient.wx.api.agent.cc.config.ClaudeCodeAgentPromptCatalog;
+import com.example.hospital.patient.wx.api.agent.cc.config.ClaudeCodeAgentProperties;
+import com.example.hospital.patient.wx.api.agent.cc.dto.ClaudeCodeAgentToolResult;
+import com.example.hospital.patient.wx.api.agent.cc.memory.ClaudeCodeAgentMemoryService;
+import com.example.hospital.patient.wx.api.agent.cc.tool.ClaudeCodeAgentToolRegistry;
 import com.example.hospital.patient.wx.api.agent.react.dto.TraditionalAgentModelDecision;
-import com.example.hospital.patient.wx.api.agent.react.dto.TraditionalAgentToolResult;
-import com.example.hospital.patient.wx.api.agent.react.memory.TraditionalAgentMemoryService;
-import com.example.hospital.patient.wx.api.agent.support.AgentPlanStep;
-import com.example.hospital.patient.wx.api.agent.react.tool.TraditionalAgentToolRegistry;
 import com.example.hospital.patient.wx.api.agent.tool.DoctorAgentTools;
+import com.example.hospital.patient.wx.api.agent.support.AgentPlanStep;
 import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.common.PageUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-public class TraditionalAgentExecutorService {
+public class ClaudeCodeAgentExecutorService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final Pattern DEPT_PATTERN = Pattern.compile("([\\u4e00-\\u9fa5]{1,8}科)");
     private static final Pattern DEPT_SUB_PATTERN = Pattern.compile("([\\u4e00-\\u9fa5]{1,8}(?:[一二三四五六七八九十0-9]+诊|门诊|诊室))");
@@ -41,16 +41,16 @@ public class TraditionalAgentExecutorService {
     private static final Pattern SLOT_COLON_PATTERN = Pattern.compile("(上午|中午|下午|晚上)?\\s*(\\d{1,2}):(\\d{2})");
     private static final Pattern SLOT_CLOCK_PATTERN = Pattern.compile("(上午|中午|下午|晚上)?\\s*(\\d{1,2})点(?:(半)|(\\d{1,2})分?)?");
     @Resource
-    private TraditionalAgentProperties properties;
+    private ClaudeCodeAgentProperties properties;
 
     @Resource
-    private TraditionalAgentMemoryService memoryService;
+    private ClaudeCodeAgentMemoryService memoryService;
 
     @Resource
-    private TraditionalAgentLlmService llmService;
+    private ClaudeCodeAgentLlmService llmService;
 
     @Resource
-    private TraditionalAgentToolRegistry toolRegistry;
+    private ClaudeCodeAgentToolRegistry toolRegistry;
 
     @Resource
     private DoctorAgentTools doctorAgentTools;
@@ -61,7 +61,7 @@ public class TraditionalAgentExecutorService {
         Map<String, Object> memory = memoryService.load(sessionId);
         AgentChatResponse response = new AgentChatResponse();
         response.setSessionId(sessionId);
-        response.setSystemPromptVersion(TraditionalAgentPromptCatalog.SYSTEM_PROMPT_VERSION);
+        response.setSystemPromptVersion(ClaudeCodeAgentPromptCatalog.SYSTEM_PROMPT_VERSION);
 
         if (userId != null) {
             memory.put("userId", userId);
@@ -88,26 +88,26 @@ public class TraditionalAgentExecutorService {
             }
 
             List<Map<String, Object>> trace = new ArrayList<>();
-            TraditionalAgentToolResult lastToolResult = null;
+            ClaudeCodeAgentToolResult lastToolResult = null;
             for (int step = 1; step <= properties.getMaxSteps(); step++) {
-                TraditionalAgentModelDecision decision = llmService.decide(safeRequest, memory, trace, toolRegistry.describeTools());
+                TraditionalAgentModelDecision decision = llmService.decide(safeRequest, memory, trace, null);
                 TraditionalAgentModelDecision guardedDecision = guardDecision(safeRequest, decision, memory);
                 if (guardedDecision != decision) {
                     response.getToolLogs().add(toolRegistry.toToolLog(
-                            "react_tool_guard_" + step,
+                        "cc_tool_guard_" + step,
                             "success",
                             "Unsafe tool selection was rewritten to an earlier discovery step."
                     ));
                     decision = guardedDecision;
                 }
                 response.getToolLogs().add(toolRegistry.toToolLog(
-                        "react_decision_" + step,
+                        "cc_decision_" + step,
                         "success",
                         summarizeDecision(decision)
                 ));
 
                 if (decision == null || !StringUtils.hasText(decision.getAction())) {
-                    response.setReply("传统 Agent 没有生成有效决策，请稍后重试。");
+                    response.setReply("第三套 CC Agent 没有生成有效决策，请稍后重试。");
                     response.setState("error");
                     break;
                 }
@@ -117,7 +117,7 @@ public class TraditionalAgentExecutorService {
                     if (fallbackDecision != null && "tool".equals(fallbackDecision.getAction()) && toolRegistry.hasTool(fallbackDecision.getToolName())) {
                         decision = fallbackDecision;
                         response.getToolLogs().add(toolRegistry.toToolLog(
-                                "react_finish_guard_" + step,
+                                "cc_finish_guard_" + step,
                                 "success",
                                 "Finish was ignored because no tool had run yet; switched to fallback tool."
                         ));
@@ -143,7 +143,7 @@ public class TraditionalAgentExecutorService {
                 }
 
                 if (!"tool".equals(decision.getAction()) || !toolRegistry.hasTool(decision.getToolName())) {
-                    response.setReply("传统 Agent 生成了无效工具动作，请重新输入。");
+                    response.setReply("第三套 CC Agent 生成了无效工具动作，请重新输入。");
                     response.setState("error");
                     break;
                 }
@@ -195,10 +195,10 @@ public class TraditionalAgentExecutorService {
                 }
             }
         } catch (Exception e) {
-            log.error("Traditional agent execution failed", e);
-            response.setReply("第二套传统 Agent 架构暂时不可用，请稍后再试。");
+            log.error("Claude Code agent execution failed", e);
+            response.setReply("第三套 CC Agent 架构暂时不可用，请稍后再试。");
             response.setState("error");
-            response.getToolLogs().add(toolRegistry.toToolLog("traditional_agent", "error", e.getMessage()));
+            response.getToolLogs().add(toolRegistry.toToolLog("cc_agent", "error", e.getMessage()));
         }
 
         finalizeResponse(response, memory, sessionId);
@@ -218,7 +218,7 @@ public class TraditionalAgentExecutorService {
             return true;
         }
         if ("view_messages".equals(action)) {
-            TraditionalAgentToolResult result = toolRegistry.execute("list_messages", request.getPayload(), userId, memory);
+            ClaudeCodeAgentToolResult result = toolRegistry.execute("list_messages", request.getPayload(), userId, memory);
             mergeMemory(memory, result.getMemoryUpdates());
             response.getToolLogs().add(toolRegistry.toToolLog("list_messages", result.isSuccess() ? "success" : "error", result.getSummary()));
             response.setReply(renderImmediateReply("消息中心", result.getObservation(), "已查询最近消息。"));
@@ -226,7 +226,7 @@ public class TraditionalAgentExecutorService {
             return true;
         }
         if ("view_user_card".equals(action)) {
-            TraditionalAgentToolResult result = toolRegistry.execute("get_user_card_status", request.getPayload(), userId, memory);
+            ClaudeCodeAgentToolResult result = toolRegistry.execute("get_user_card_status", request.getPayload(), userId, memory);
             mergeMemory(memory, result.getMemoryUpdates());
             response.getToolLogs().add(toolRegistry.toToolLog("get_user_card_status", result.isSuccess() ? "success" : "error", result.getSummary()));
             response.setReply(renderImmediateReply("就诊卡状态", result.getObservation(), "已查询就诊卡状态。"));
@@ -234,7 +234,7 @@ public class TraditionalAgentExecutorService {
             return true;
         }
         if ("start_registration".equals(action) || "view_departments".equals(action)) {
-            TraditionalAgentToolResult result = toolRegistry.execute("list_departments", request.getPayload(), userId, memory);
+            ClaudeCodeAgentToolResult result = toolRegistry.execute("list_departments", request.getPayload(), userId, memory);
             mergeMemory(memory, result.getMemoryUpdates());
             response.getToolLogs().add(toolRegistry.toToolLog("list_departments", result.isSuccess() ? "success" : "error", result.getSummary()));
             response.setReply(renderImmediateReply("可挂号科室", result.getObservation(), "已查询门诊科室。"));
@@ -264,7 +264,7 @@ public class TraditionalAgentExecutorService {
         String toolName = stringValue(memory.get("pendingToolName"), null);
         Map<String, Object> toolInput = mapValue(memory.get("pendingToolInput"));
         toolInput.put("confirmed", true);
-        TraditionalAgentToolResult result = toolRegistry.execute(toolName, toolInput, userId, memory);
+        ClaudeCodeAgentToolResult result = toolRegistry.execute(toolName, toolInput, userId, memory);
         mergeMemory(memory, result.getMemoryUpdates());
         response.getToolLogs().add(toolRegistry.toToolLog(toolName, result.isSuccess() ? "success" : "error", result.getSummary()));
         if (result.isTerminal()) {
@@ -295,8 +295,8 @@ public class TraditionalAgentExecutorService {
         response.setState("awaiting_confirmation");
         String confirmationSummary = buildRegistrationConfirmationSummary(memory, toolInput);
         response.setReply(StringUtils.hasText(confirmationSummary)
-                ? "传统 Agent 已经准备好提交挂号：" + confirmationSummary + "。请确认是否继续。"
-                : "传统 Agent 已经准备好提交挂号，请确认是否继续。");
+                ? "第三套 CC Agent 已经规划好提交挂号：" + confirmationSummary + "。请确认是否继续。"
+                : "第三套 CC Agent 已经规划好提交挂号，请确认是否继续。");
         AgentConfirmation confirmation = new AgentConfirmation();
         confirmation.setAction(AgentAction.CREATE_REGISTRATION);
         confirmation.setLabel("确认挂号");
@@ -317,7 +317,7 @@ public class TraditionalAgentExecutorService {
 
     private Map<String, Object> buildTraceStep(int step,
                                                TraditionalAgentModelDecision decision,
-                                               TraditionalAgentToolResult toolResult) {
+                                               ClaudeCodeAgentToolResult toolResult) {
         Map<String, Object> traceStep = new LinkedHashMap<>();
         traceStep.put("step", step);
         traceStep.put("thought", decision.getThought());
@@ -356,7 +356,7 @@ public class TraditionalAgentExecutorService {
         if (!requiresEarlierDiscovery(decision.getToolName(), trustedInput)) {
             return decision;
         }
-        TraditionalAgentModelDecision fallbackDecision = llmService.fallbackDecision(request, memory);
+            TraditionalAgentModelDecision fallbackDecision = llmService.fallbackDecision(request, memory);
         if (fallbackDecision != null
                 && "tool".equals(fallbackDecision.getAction())
                 && toolRegistry.hasTool(fallbackDecision.getToolName())
@@ -461,7 +461,7 @@ public class TraditionalAgentExecutorService {
 
     private void finalizeResponse(AgentChatResponse response, Map<String, Object> memory, String sessionId) {
         if (!StringUtils.hasText(response.getReply())) {
-            response.setReply("第二套传统 Agent 架构已完成当前轮次。");
+            response.setReply("第三套 CC Agent 架构已完成当前轮次。");
         }
         if (!StringUtils.hasText(response.getState())) {
             response.setState(hasPendingWrite(memory) ? "awaiting_confirmation" : "completed");
@@ -494,7 +494,7 @@ public class TraditionalAgentExecutorService {
     }
 
     private void fillWelcomeResponse(AgentChatResponse response) {
-        response.setReply("这里是第二套传统 Agent 架构。你可以直接告诉我想挂哪个科室、哪天、哪位医生，我会通过工具一步步查询，并在确认后提交挂号。");
+        response.setReply("这里是第三套 CC Agent 架构。你可以直接告诉我想挂哪个科室、哪天、哪位医生，我会先生成计划，再自动串行执行到可确认结果。");
         response.setState("idle");
         response.getCards().add(actionCard("开始挂号", "从查询科室开始", "start_registration", null, "挂号"));
         response.getCards().add(actionCard("查看消息", "查询最近消息与提醒", "view_messages", null, "消息"));
@@ -533,17 +533,17 @@ public class TraditionalAgentExecutorService {
         return "tool: " + stringValue(decision.getToolName(), "") + ", thought: " + stringValue(decision.getThought(), "");
     }
 
-    private String buildFallbackReply(TraditionalAgentToolResult lastToolResult, Map<String, Object> memory) {
+    private String buildFallbackReply(ClaudeCodeAgentToolResult lastToolResult, Map<String, Object> memory) {
         if (lastToolResult != null && StringUtils.hasText(lastToolResult.getSummary())) {
-            return "传统 Agent 已完成多步查询，当前结果是：" + lastToolResult.getSummary();
+            return "第三套 CC Agent 已完成计划执行，当前结果是：" + lastToolResult.getSummary();
         }
         if (memory.get("lastObservation") != null) {
-            return "传统 Agent 已完成查询，你可以继续补充更具体的日期、医生或时段。";
+            return "第三套 CC Agent 已完成当前查询，你可以继续补充更具体的日期、医生或时段。";
         }
-        return "传统 Agent 已结束本轮，但信息还不够完整。你可以继续补充科室、日期或医生。";
+        return "第三套 CC Agent 已结束本轮，但信息还不够完整。你可以继续补充科室、日期或医生。";
     }
 
-    private boolean shouldReplyAfterTool(TraditionalAgentToolResult lastToolResult) {
+    private boolean shouldReplyAfterTool(ClaudeCodeAgentToolResult lastToolResult) {
         if (lastToolResult == null || lastToolResult.getObservation() == null) {
             return false;
         }
@@ -572,7 +572,7 @@ public class TraditionalAgentExecutorService {
         return false;
     }
 
-    private String buildGroundedReply(TraditionalAgentToolResult lastToolResult, Map<String, Object> memory) {
+    private String buildGroundedReply(ClaudeCodeAgentToolResult lastToolResult, Map<String, Object> memory) {
         if (lastToolResult == null) {
             return buildNoObservationReply(memory);
         }
@@ -845,7 +845,7 @@ public class TraditionalAgentExecutorService {
         memory.remove("slotSelectionPendingConfirmation");
     }
 
-    private boolean applySlotPreferenceSelection(Map<String, Object> memory, TraditionalAgentToolResult lastToolResult) {
+    private boolean applySlotPreferenceSelection(Map<String, Object> memory, ClaudeCodeAgentToolResult lastToolResult) {
         Map<String, Object> observationMap;
         List<Map<String, Object>> slots;
         String slotPreference;

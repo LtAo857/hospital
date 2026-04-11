@@ -76,6 +76,13 @@
 						"navigationBarTitleText": "传统Agent挂号助手",
 						"enablePullDownRefresh": false
 					}
+				},
+				{
+					"path": "cc_chat/cc_chat",
+					"style": {
+						"navigationBarTitleText": "CC Agent挂号助手",
+						"enablePullDownRefresh": false
+					}
 				}
 			]
 		},

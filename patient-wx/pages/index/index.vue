@@ -17,6 +17,14 @@
 			<u-icon name="arrow-right" size="18" color="#2d6a9f"></u-icon>
 		</view>
 
+		<view class="agent-entry cc-entry" @tap="goCcAgent">
+			<view>
+				<text class="agent-title">CC Agent挂号助手</text>
+				<text class="agent-desc">第三套 Claude Code 风格架构，先规划再自动串行推进到可确认结果</text>
+			</view>
+			<u-icon name="arrow-right" size="18" color="#1f7a5d"></u-icon>
+		</view>
+
 		<view class="doctor-container">
 			<view class="title-row">
 				<text class="title">名医专家</text>
@@ -142,6 +150,11 @@ export default {
 		goReactAgent: function() {
 			uni.navigateTo({
 				url: '/user/react_chat/react_chat'
+			});
+		},
+		goCcAgent: function() {
+			uni.navigateTo({
+				url: '/user/cc_chat/cc_chat'
 			});
 		},
 		navigatorHandle: function(name) {

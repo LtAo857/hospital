@@ -142,6 +142,13 @@ hospital
 - 第二套问题复盘与修复说明见 `docs/agent/traditional-agent-issues.md`。
 - 第二套基础说明见 `docs/agent/traditional-agent.md`。
 
+# Agent 三期对照架构说明
+- 当前仓库已新增第三套独立的 CC Agent，后端入口为 `POST /agent/cc/chat`。
+- 第三套前端入口页为 `patient-wx/user/cc_chat/cc_chat.vue`，首页与个人中心均已接入跳转。
+- 第三套与第一套、第二套独立隔离，代码位于 `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/cc/`。
+- 当前版本已完成独立配置、独立 Redis 会话、独立接口与独立页面，可单独用于三套架构对比。
+- 第三套基础说明见 `docs/agent/cc-agent.md`。
+
 ## Agent 规则补充
 - 症状词可映射科室：例如“口腔难受”“牙痛”“牙龈不舒服”“智齿疼”等输入，会优先补全到 `口腔科`，再继续查询诊室、日期和号源。
 - 用户原话中的日期优先级高于模型返回值：若用户明确说了“今天”“明天”“后天”或具体日期，编排层会强制以用户原话解析结果为准，避免模型把日期识别错后覆盖真实查询条件。
@@ -220,3 +227,29 @@ hospital
 - Reworked `patient-wx/pages/mine/mine.vue` into a cleaner card-based personal center layout for the patient mini app.
 - Hid unused legacy actions from the visible UI and kept them as inline comments in the page source to avoid dead-end navigation.
 - Completed the page with favorite doctor preview, grouped medical services, guidance tips, and a footer summary block.
+
+## Agent Docs Index
+
+- First architecture overview:
+  `docs/agent/architecture.md`
+- First architecture issue summary:
+  `docs/agent/first-agent-issues.md`
+- Traditional Agent overview:
+  `docs/agent/traditional-agent.md`
+- Traditional Agent issue summary:
+  `docs/agent/traditional-agent-issues.md`
+- CC Agent overview:
+  `docs/agent/cc-agent.md`
+- CC Agent issue summary:
+  `docs/agent/cc-agent-issues.md`
+
+## CC Agent Latest Notes
+
+- Third architecture route:
+  `POST /agent/cc/chat`
+- Third architecture frontend page:
+  `patient-wx/user/cc_chat/cc_chat.vue`
+- Third architecture issue summary and fixes:
+  `docs/agent/cc-agent-issues.md`
+- This round fixed:
+  mini-program page load failure, repeated doctor-list replies, bare doctor-name recognition, direct first-turn doctor matching, `earliest/latest` slot preference handling, and confirmation summary display.
