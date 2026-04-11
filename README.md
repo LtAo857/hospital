@@ -128,6 +128,20 @@ hospital
 - 一期暂不开放：取消挂号、评价提交、收藏写操作、视频问诊写操作、人脸认证流程。
 - 详细设计见 `docs/agent/system-prompt.md`、`docs/agent/tool-spec.md`、`docs/agent/architecture.md`。
 
+# Agent 二期对照架构说明
+- 当前仓库已新增第二套独立的传统 ReAct 风格 Agent，后端入口为 `POST /agent/react/chat`。
+- 第二套前端入口页为 `patient-wx/user/react_chat/react_chat.vue`，首页与个人中心均已接入跳转。
+- 第二套与第一套隔离实现，代码位于 `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/react/`，不改动第一套编排代码。
+- 第二套的职责边界已调整为“LLM 负责选下一步工具，真实工具负责产出事实，编排层负责状态守卫与写操作确认”。
+- 本轮已集中修复的问题包括：
+  - LLM 提前收口并生成未验证结论
+  - 查到真实候选后仍输出英文内部摘要
+  - 单候选诊室/医生仍要求用户重复选择
+  - 用户已明确指定日期却停在日期列表
+  - 用户已指定具体时段却重复返回时段列表
+- 第二套问题复盘与修复说明见 `docs/agent/traditional-agent-issues.md`。
+- 第二套基础说明见 `docs/agent/traditional-agent.md`。
+
 ## Agent 规则补充
 - 症状词可映射科室：例如“口腔难受”“牙痛”“牙龈不舒服”“智齿疼”等输入，会优先补全到 `口腔科`，再继续查询诊室、日期和号源。
 - 用户原话中的日期优先级高于模型返回值：若用户明确说了“今天”“明天”“后天”或具体日期，编排层会强制以用户原话解析结果为准，避免模型把日期识别错后覆盖真实查询条件。

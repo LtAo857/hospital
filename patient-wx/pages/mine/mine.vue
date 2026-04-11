@@ -159,6 +159,8 @@ const copy = {
 	menuRegistrationDesc: '\u6309\u79d1\u5ba4\u548c\u533b\u751f\u5feb\u901f\u9884\u7ea6',
 	menuAiTitle: 'AI\u52a9\u624b',
 	menuAiDesc: '\u901a\u8fc7\u75c7\u72b6\u63cf\u8ff0\u8f85\u52a9\u6302\u53f7',
+	menuReactTitle: '\u4f20\u7edfAgent',
+	menuReactDesc: '\u4f53\u9a8c\u7b2c\u4e8c\u5957ReAct\u67b6\u6784',
 	menuRegistrationListTitle: '\u6211\u7684\u6302\u53f7',
 	menuRegistrationListDesc: '\u67e5\u770b\u5386\u53f2\u8bb0\u5f55\u548c\u72b6\u6001',
 	menuMessageTitle: '\u6d88\u606f\u4e2d\u5fc3',
@@ -210,6 +212,7 @@ export default {
 				{ key: 'userCard', title: copy.menuUserCardTitle, desc: copy.menuUserCardDesc, iconText: '\u5361', accent: 'blue', requireLogin: true },
 				{ key: 'registration', title: copy.menuRegistrationTitle, desc: copy.menuRegistrationDesc, iconText: '\u6302', accent: 'orange', requireLogin: false },
 				{ key: 'aiAgent', title: copy.menuAiTitle, desc: copy.menuAiDesc, iconText: 'AI', accent: 'green', requireLogin: false },
+				{ key: 'reactAgent', title: copy.menuReactTitle, desc: copy.menuReactDesc, iconText: 'R', accent: 'cyan', requireLogin: false },
 				{ key: 'registrationList', title: copy.menuRegistrationListTitle, desc: copy.menuRegistrationListDesc, iconText: '\u5355', accent: 'navy', requireLogin: true },
 				{ key: 'messageCenter', title: copy.menuMessageTitle, desc: copy.menuMessageDesc, iconText: '\u4fe1', accent: 'red', requireLogin: true },
 				{ key: 'doctorList', title: copy.menuDoctorTitle, desc: copy.menuDoctorDesc, iconText: '\u533b', accent: 'cyan', requireLogin: false },
@@ -447,6 +450,9 @@ export default {
 					break;
 				case 'aiAgent':
 					uni.navigateTo({ url: '/agent/chat/chat' });
+					break;
+				case 'reactAgent':
+					uni.navigateTo({ url: '/user/react_chat/react_chat' });
 					break;
 				case 'registrationList':
 					uni.switchTab({ url: '/pages/registration_list/registration_list' });

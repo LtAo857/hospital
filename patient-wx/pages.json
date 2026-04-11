@@ -69,6 +69,13 @@
 						"navigationBarTitleText": "就诊卡信息",
 						"enablePullDownRefresh": false
 					}
+				},
+				{
+					"path": "react_chat/react_chat",
+					"style": {
+						"navigationBarTitleText": "传统Agent挂号助手",
+						"enablePullDownRefresh": false
+					}
 				}
 			]
 		},

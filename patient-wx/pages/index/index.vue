@@ -9,6 +9,14 @@
 			<u-icon name="arrow-right" size="18" color="#1296db"></u-icon>
 		</view>
 
+		<view class="agent-entry react-entry" @tap="goReactAgent">
+			<view>
+				<text class="agent-title">传统Agent挂号助手</text>
+				<text class="agent-desc">第二套 ReAct 架构，逐轮调用工具完成查询、确认和挂号</text>
+			</view>
+			<u-icon name="arrow-right" size="18" color="#2d6a9f"></u-icon>
+		</view>
+
 		<view class="doctor-container">
 			<view class="title-row">
 				<text class="title">名医专家</text>
@@ -131,6 +139,11 @@ export default {
 				url: '/agent/chat/chat'
 			});
 		},
+		goReactAgent: function() {
+			uni.navigateTo({
+				url: '/user/react_chat/react_chat'
+			});
+		},
 		navigatorHandle: function(name) {
 			let url = null;
 			if (name == 'doctor') {
@@ -226,6 +239,11 @@ export default {
 	border-radius: 20rpx;
 	background: linear-gradient(135deg, #eef8ff, #ffffff);
 	box-shadow: 0 8rpx 24rpx rgba(18, 150, 219, 0.08);
+}
+
+.react-entry {
+	background: linear-gradient(135deg, #edf3f9, #ffffff);
+	box-shadow: 0 8rpx 24rpx rgba(45, 106, 159, 0.08);
 }
 
 .agent-title {
