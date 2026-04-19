@@ -40,7 +40,7 @@ spring:
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
-  type-aliases-package: com.example.hospital.api.db.pojo
+  type-aliases-package: com.example.hospital.patient.wx.api.db.pojo
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
@@ -63,14 +63,15 @@ sa-token:
 
 
 wechat:
-  app-id: wx3e30239x
-  app-secret: 4abaeb547f7d580865x
+  app-id: wx3e302392b738718d
+  app-secret: 4abaeb547f7d580865be4324e2a8dbf0
+
 
 tencent:
   cloud:
     appId: 1308222269
-    secretId: AKID3zx
-    secretKey: zut273qVxDGIOx
+    secretId: AKID3zf7b4Skv7AzZyGVar8KRixNC9eJzhRK
+    secretKey: zut273qVxDGIOTOLGA527KPPFqGWZSDn
     face:
       groupName: hospital
       region: ap-beijing
@@ -91,7 +92,7 @@ agent:
   llm-enabled: true
   provider: dashscope
   base-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-  api-key: sk-03747d36451b4a9ca5a01fb560xxx
+  api-key: sk-03747d36451b4a9ca5a01fb5608575fd
   model: qwen-plus
   temperature: 0.2
   timeout-millis: 15000

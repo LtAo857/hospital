@@ -90,7 +90,7 @@ hospital
 - `patient-wx-api-mysql`
   - 启动入口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/PatientWxApiApplication.java`
   - 关键配置：`patient-wx-api-mysql/src/main/resources/application.yml`
-  - 默认端口：`8092`
+  - 默认端口：`8095`
   - 上下文路径：`/patient-wx-api`
   - 额外关注：每日就诊提醒 Quartz 配置位于 `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/config/QuartzConfig.java`
 
@@ -101,7 +101,7 @@ hospital
 - 当前采用“全局 `$http` + 页面直接调接口”的组织方式，排查联调问题时优先查看 `src/main.js`
 
 ## 患者端小程序 `patient-wx`
-- 接口根地址定义在 `patient-wx/main.js`，默认请求 `http://127.0.0.1:8092/patient-wx-api`
+- 接口根地址定义在 `patient-wx/main.js`，默认请求 `http://127.0.0.1:8095/patient-wx-api`
 - 页面与分包定义在 `patient-wx/pages.json`
 - 小程序与插件配置位于 `patient-wx/manifest.json`
 - 当前统一通过 `main.js` 里的 `ajax()` 封装请求与 token 处理
@@ -223,33 +223,42 @@ hospital
 - 个人中心中未落地或当前没有实际跳转价值的历史功能入口已在页面内注释保留，不再直接展示，避免用户点进无效页面。
 - 页面完整性已补齐到个人中心：新增收藏医生预览、就医服务分组、温馨提示和底部说明区，减少空白感和功能断层。
 
-## 2026-04 Personal Center Update
-- Reworked `patient-wx/pages/mine/mine.vue` into a cleaner card-based personal center layout for the patient mini app.
-- Hid unused legacy actions from the visible UI and kept them as inline comments in the page source to avoid dead-end navigation.
-- Completed the page with favorite doctor preview, grouped medical services, guidance tips, and a footer summary block.
+## 2026-04 个人中心更新
+- 将 `patient-wx/pages/mine/mine.vue` 重构为更清晰的卡片化个人中心布局。
+- 未落地或无有效跳转价值的历史入口已从可见 UI 隐藏，并在源码中以内联注释保留。
+- 页面补齐了收藏医生预览、就医服务分组、使用提示与底部说明区块。
 
-## Agent Docs Index
+## Agent 文档索引
 
-- First architecture overview:
+- 一期架构总览：
   `docs/agent/architecture.md`
-- First architecture issue summary:
+- 一期问题总结：
   `docs/agent/first-agent-issues.md`
-- Traditional Agent overview:
+- 二期 Traditional Agent 说明：
   `docs/agent/traditional-agent.md`
-- Traditional Agent issue summary:
+- 二期 Traditional Agent 问题总结：
   `docs/agent/traditional-agent-issues.md`
-- CC Agent overview:
+- 三期 CC Agent 说明：
   `docs/agent/cc-agent.md`
-- CC Agent issue summary:
+- 三期 CC Agent 问题总结：
   `docs/agent/cc-agent-issues.md`
 
-## CC Agent Latest Notes
+## CC Agent 最新说明
 
-- Third architecture route:
+- 三期后端接口：
   `POST /agent/cc/chat`
-- Third architecture frontend page:
+- 三期前端页面：
   `patient-wx/user/cc_chat/cc_chat.vue`
-- Third architecture issue summary and fixes:
+- 三期问题与修复记录：
   `docs/agent/cc-agent-issues.md`
-- This round fixed:
-  mini-program page load failure, repeated doctor-list replies, bare doctor-name recognition, direct first-turn doctor matching, `earliest/latest` slot preference handling, and confirmation summary display.
+- 本轮已修复：
+  小程序页面加载失败、重复输出医生列表、仅医生名输入识别不足、首轮直接命中医生、`earliest/latest` 时段偏好处理、确认摘要展示问题。
+
+## Multi-Agent 最新说明
+
+- 多 Agent 后端接口：
+  `POST /agent/multi/chat`
+- 多 Agent 后端代码目录：
+  `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/`
+- 多 Agent 设计与测试文档：
+  `docs/agent/multi-agent.md`

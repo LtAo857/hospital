@@ -25,6 +25,9 @@ export default {
 	    let that = this;
 	    //获取URL传入的参数
 	    that.roomId = options.roomId;
+	    if (options.appId) {
+	        that.trtcConfig.sdkAppID = Number(options.appId);
+	    }
 	    that.trtcConfig.userID = options.userId;
 	    that.trtcConfig.userSig = options.userSig;
 	    that.expectEnd = options.expectEnd;

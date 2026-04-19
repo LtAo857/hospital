@@ -40,7 +40,14 @@
         </if>
         AND d.status = #{status}
         <if test="order!=null">
-            ORDER BY md.id ${order}
+            <choose>
+                <when test='order == "asc" or order == "ASC"'>
+                    ORDER BY md.id ASC
+                </when>
+                <otherwise>
+                    ORDER BY md.id DESC
+                </otherwise>
+            </choose>
         </if>
         LIMIT #{length} OFFSET #{start}
     </select>

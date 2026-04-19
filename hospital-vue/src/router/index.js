@@ -211,9 +211,10 @@ router.beforeEach((to, from, next) => {
 			next({
 				name: 'Login'
 			})
+			return
 		}
 	}
-	return next()
+	next()
 })
 
 export default router

@@ -256,8 +256,9 @@ export default {
                     that.ajax(that.api.searchUserSig, 'GET', null, function(resp) {
                         let userId = resp.data.userId;
                         let userSig = resp.data.userSig;
+                        let appId = resp.data.appId;
                         uni.navigateTo({
-                            url: `../video_diagnose/video_diagnose?roomId=${that.roomId}&userId=${userId}&userSig=${userSig}&expectEnd=${that.expectEnd}`
+                            url: `../video_diagnose/video_diagnose?roomId=${that.roomId}&userId=${userId}&userSig=${userSig}&appId=${appId}&expectEnd=${that.expectEnd}`
                         });
                     });
                 }

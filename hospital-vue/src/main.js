@@ -19,7 +19,7 @@ app.use(router) //挂载路由插件
 
 //使用WebSocket，后端项目给前端页面推送通知
 import VueNativeSock from "vue-native-websocket-vue3";
-app.use(VueNativeSock, "ws://localhost:8092/hospital-api/socket", {
+app.use(VueNativeSock, "ws://localhost:8094/hospital-api/socket", {
 	"format": "json"
 });
 
