@@ -7,6 +7,8 @@ import java.util.Map;
 public interface DoctorWorkPlanScheduleDao {
     public ArrayList<HashMap> searchDoctorWorkPlanSchedule(Map param);
 
+    public HashMap searchScheduleSnapshot(Map param);
+
 //    public ArrayList<HashMap> searchEligibleSchedule(Map param);
 
     public int updateNumById(Map param);

@@ -6,34 +6,42 @@ import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.NumberUtil;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
+import com.example.hospital.patient.wx.api.agent.multi.service.MultiAgentRegistrationAuditService;
 import com.example.hospital.patient.wx.api.common.PageUtils;
 import com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanDao;
 import com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanScheduleDao;
 import com.example.hospital.patient.wx.api.db.dao.MedicalRegistrationDao;
 import com.example.hospital.patient.wx.api.db.dao.UserDao;
 import com.example.hospital.patient.wx.api.db.pojo.MedicalRegistrationEntity;
-//import com.example.hospital.patient.wx.api.service.FaceAuthService;
-//import com.example.hospital.patient.wx.api.service.PaymentService;
-//import com.example.hospital.patient.wx.api.service.PaymentService;
+import com.example.hospital.patient.wx.api.exception.HospitalException;
 import com.example.hospital.patient.wx.api.service.MessageService;
 import com.example.hospital.patient.wx.api.service.RegistrationService;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 public class RegistrationServiceImpl implements RegistrationService {
+    private static final String PASS_RESULT = "满足挂号条件";
+    private static final byte ACTIVE_PAYMENT_STATUS = 2;
+    private static final int DAILY_LIMIT = 3;
+    private static final long SUBMIT_LOCK_TTL_SECONDS = 15L;
+
     @Resource
     private DoctorWorkPlanDao doctorWorkPlanDao;
 
@@ -52,11 +60,8 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Resource
     private MessageService messageService;
 
-//    @Resource
-//    private PaymentService paymentService;
-
-    private String notifyUrl = "/registration/transactionCallback";
-
+    @Resource
+    private MultiAgentRegistrationAuditService multiAgentRegistrationAuditService;
 
     @Override
     public ArrayList<String> searchCanRegisterInDateRange(Map param) {
@@ -77,7 +82,6 @@ public class RegistrationServiceImpl implements RegistrationService {
                 result.add(new HashMap() {{
                     put("date", date);
                     put("status", "无号");
-
                 }});
             }
         }
@@ -86,102 +90,122 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Override
     public ArrayList<HashMap> searchDeptSubDoctorPlanInDay(Map param) {
-        ArrayList<HashMap> list = doctorWorkPlanDao.searchDeptSubDoctorPlanInDay(param);
-        return list;
+        return doctorWorkPlanDao.searchDeptSubDoctorPlanInDay(param);
     }
 
     @Override
     public String checkRegisterCondition(Map param) {
-        //检查当天用户是否已经挂号3次以上
         param.put("today", DateUtil.today());
         long count = medicalRegistrationDao.searchRegistrationCountInToday(param);
-        if (count == 50) {
+        if (count >= DAILY_LIMIT) {
             return "已经达到当天挂号上限";
         }
 
-        //检查当天是否已经挂过该门诊的号
         Integer id = medicalRegistrationDao.hasRegisterRecordInDay(param);
         if (id != null) {
             return "已经挂过该诊室的号";
         }
 
-        return "满足挂号条件";
+        return PASS_RESULT;
     }
 
     @Override
     public ArrayList<HashMap> searchDoctorWorkPlanSchedule(Map param) {
         ArrayList<HashMap> list = doctorWorkPlanScheduleDao.searchDoctorWorkPlanSchedule(param);
+        if (list == null || list.isEmpty()) {
+            return list;
+        }
+        for (HashMap schedule : list) {
+            Integer scheduleId = intValue(schedule.get("scheduleId"));
+            if (scheduleId == null) {
+                continue;
+            }
+            String key = "doctor_schedule_" + scheduleId;
+            HashMap<String, Object> cache = new HashMap<>();
+            cache.put("maximum", intValue(schedule.get("maximum")));
+            cache.put("num", intValue(schedule.get("num")));
+            redisTemplate.opsForHash().putAll(key, cache);
+        }
         return list;
     }
 
     @Override
-//    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public HashMap registerMedicalAppointment(Map param) {
-        int workPlanId = MapUtil.getInt(param, "workPlanId");
-        int scheduleId = MapUtil.getInt(param, "scheduleId");
-
-        //检查Redis中是否存在日程缓存（过期的出诊计划和时段会自动删除），不存在缓存就不执行挂号
-        String key = "doctor_schedule_" + scheduleId;
-        if (!redisTemplate.hasKey(key)) {
-            return null;
+        Integer userId = intValue(param.get("userId"));
+        Integer workPlanId = intValue(param.get("workPlanId"));
+        Integer scheduleId = intValue(param.get("scheduleId"));
+        Integer doctorId = intValue(param.get("doctorId"));
+        Integer deptSubId = intValue(param.get("deptSubId"));
+        Integer slot = intValue(param.get("slot"));
+        String date = stringValue(param.get("date"));
+        BigDecimal inputAmount = decimalValue(param.get("amount"));
+        String sessionId = stringValue(param.get("sessionId"));
+        String requestId = stringValue(param.get("requestId"));
+        boolean auditEnabled = StringUtils.hasText(sessionId) || StringUtils.hasText(requestId);
+        if (auditEnabled && !StringUtils.hasText(requestId)) {
+            requestId = IdUtil.simpleUUID();
+            param.put("requestId", requestId);
+        }
+        String lockOwner = StringUtils.hasText(requestId) ? requestId : IdUtil.simpleUUID();
+        String submitLockKey = buildSubmitLockKey(userId, scheduleId, date, slot);
+        String scheduleKey = scheduleId == null ? null : "doctor_schedule_" + scheduleId;
+        String traceJson = auditEnabled ? multiAgentRegistrationAuditService.toTraceJson(buildAuditSnapshot(param)) : null;
+        if (auditEnabled) {
+            multiAgentRegistrationAuditService.prepare(requestId, sessionId, userId, param, traceJson);
         }
 
-        //Redis事务代码必须写到execute()回调函数中
-        Object execute = redisTemplate.execute(new SessionCallback() {
-            @Override
-            public Object execute(RedisOperations operations) throws DataAccessException {
-                //关注缓存数据（拿到乐观锁的Version）
-                operations.watch(key);
-
-                //拿到缓存的数据
-                Map entry = operations.opsForHash().entries(key);
-                //拿到缓存该时段最大接诊人数和已挂号人数
-                int maximum = Integer.parseInt(entry.get("maximum").toString());
-                int num = Integer.parseInt(entry.get("num").toString());
-
-                //如果已挂号人数小于最大人数就可以挂号
-                if (num < maximum) {
-                    //开启Redis事务
-                    operations.multi();
-                    //已挂号人数+1
-                    operations.opsForHash().increment(key, "num", 1);
-                    //提交事务
-                    return operations.exec();
-                }
-                //到达挂号人数上限就不执行挂号
-                else {
-                    operations.unwatch();
-                    return null;
-                }
-            }
-        });
-
-        //如果Redis事务提交失败就结束Service方法
-        if (execute == null) {
-            return null;
+        if (userId == null || workPlanId == null || scheduleId == null || doctorId == null || deptSubId == null
+                || slot == null || !StringUtils.hasText(date) || inputAmount == null) {
+            return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "挂号参数不完整，请重新选择号源。", true, traceJson);
         }
 
-        //如果Redis事务提交成功，就执行下面的代码
+        if (!tryAcquireSubmitLock(submitLockKey, lockOwner)) {
+            return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_DUPLICATE_SUBMIT, "挂号请求正在处理中，请勿重复提交。", true, traceJson);
+        }
+
+        boolean redisReserved = false;
+        String outTradeNo = null;
         try {
-            //下面是新添加的代码
-            int userId = MapUtil.getInt(param, "userId");
-            //查询患者openId字符串，用于创建支付单
-            HashMap map = userDao.searchOpenId(userId);
-            String openId = MapUtil.getStr(map, "openId");
+            HashMap userMap = userDao.searchOpenId(userId);
+            Integer patientCardId = userMap == null ? null : MapUtil.getInt(userMap, "patientCardId");
+            if (patientCardId == null) {
+                return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_USER_CARD_REQUIRED, "挂号前需要先创建就诊卡。", false, traceJson);
+            }
 
-            int patientCardId = MapUtil.getInt(map, "patientCardId");
-            int doctorId = MapUtil.getInt(param, "doctorId");
-            int deptSubId = MapUtil.getInt(param, "deptSubId");
-            String date = MapUtil.getStr(param, "date");
-            int slot = MapUtil.getInt(param, "slot");
-            String temp = MapUtil.getStr(param, "amount");
-            int total = NumberUtil.mul(temp, "100").intValue();
-            String outTradeNo = IdUtil.simpleUUID().toUpperCase();
+            String condition = checkRegisterCondition(new HashMap<String, Object>() {{
+                put("userId", userId);
+                put("deptSubId", deptSubId);
+                put("date", date);
+            }});
+            if (!PASS_RESULT.equals(condition)) {
+                return failByCondition(auditEnabled, requestId, condition, traceJson);
+            }
 
-            //创建支付订单
-//            ObjectNode objectNode = paymentService.unifiedOrder(outTradeNo, openId, total, "挂号费", notifyUrl, null);
-//            //支付单的预支付ID
-//            String prepayId = objectNode.get("prepay_id").textValue();
+            HashMap snapshot = doctorWorkPlanScheduleDao.searchScheduleSnapshot(new HashMap<String, Object>() {{
+                put("workPlanId", workPlanId);
+                put("scheduleId", scheduleId);
+            }});
+            HashMap snapshotFailure = validateSnapshot(snapshot, doctorId, deptSubId, date, slot, inputAmount);
+            if (snapshotFailure != null) {
+                String errorCode = MapUtil.getStr(snapshotFailure, "errorCode");
+                String message = MapUtil.getStr(snapshotFailure, "message");
+                Boolean retryable = MapUtil.getBool(snapshotFailure, "retryable", true);
+                return failResult(auditEnabled, requestId, errorCode, message, retryable, traceJson);
+            }
+
+            if (!redisTemplate.hasKey(scheduleKey)) {
+                return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_SLOT_EXHAUSTED, "该时段号源已满，请重新选择。", true, traceJson);
+            }
+            redisReserved = reserveScheduleSlot(scheduleKey);
+            if (!redisReserved) {
+                return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_SLOT_EXHAUSTED, "该时段号源已满，请重新选择。", true, traceJson);
+            }
+
+            outTradeNo = IdUtil.simpleUUID().toUpperCase();
+            if (auditEnabled) {
+                multiAgentRegistrationAuditService.markReserved(requestId, outTradeNo, traceJson);
+            }
 
             MedicalRegistrationEntity entity = new MedicalRegistrationEntity();
             entity.setWorkPlanId(workPlanId);
@@ -191,103 +215,56 @@ public class RegistrationServiceImpl implements RegistrationService {
             entity.setDeptSubId(deptSubId);
             entity.setDate(date);
             entity.setSlot(slot);
-            entity.setAmount(new BigDecimal(temp));
+            entity.setAmount(decimalValue(snapshot.get("amount")));
             entity.setOutTradeNo(outTradeNo);
             entity.setPrepayId("1");
-            entity.setPaymentStatus((byte) 2);
-            //保存挂号记录
+            entity.setPaymentStatus(ACTIVE_PAYMENT_STATUS);
             medicalRegistrationDao.insert(entity);
 
-            //更新出诊计划实际挂号人数
-            doctorWorkPlanDao.updateNumById(new HashMap() {{
+            doctorWorkPlanDao.updateNumById(new HashMap<String, Object>() {{
                 put("id", workPlanId);
                 put("n", 1);
             }});
-
-            //更新出诊时段实际挂号人数
-            doctorWorkPlanScheduleDao.updateNumById(new HashMap() {{
+            doctorWorkPlanScheduleDao.updateNumById(new HashMap<String, Object>() {{
                 put("id", scheduleId);
                 put("n", 1);
             }});
 
-            /*
-             * 在Redis中缓存付款记录，并设置过期时间。
-             * (1) 如果15分钟内患者支付了挂号费，会有Java程序删除该缓存。
-             * (2) 如果该缓存过期，说明15分钟内患者没有支付挂号费。
-             * 如果患者没有付款，就关闭挂号单，并且恢复缓存和数据库中的已挂号人数。
-             */
-//            redisTemplate.opsForHash().putAll("registration_payment_" + outTradeNo, new HashMap() {{
-//                put("workPlanId", workPlanId);
-//                put("scheduleId", scheduleId);
-//                put("outTradeNo", outTradeNo);
-//            }});
+            try {
+                messageService.sendMessage(userId, (byte) 1, "挂号成功", "您已成功挂号，就诊日期：" + date, entity.getId());
+            } catch (Exception e) {
+                log.error("send registration success message failed", e);
+            }
 
-//            DateTime now = new DateTime();
-//            now.offset(DateField.MINUTE, 15);
-//            //15分钟后缓存过期
-//            redisTemplate.expireAt("registration_payment_" + outTradeNo, now);
-
-            HashMap result = new HashMap() {{
-                put("outTradeNo", "1");
-                put("prepayId", "1");
-                put("timeStamp", "1");
-                put("nonceStr", "1");
-                put("package", "1");
-                put("signType","1");
-                put("paySign", 1);
-            }};
-
-            // 发送挂号成功消息通知
-            messageService.sendMessage(userId, (byte) 1, "挂号成功", "您已成功挂号，就诊日期：" + date, entity.getId());
-//                        HashMap result = new HashMap() {{
-//                put("outTradeNo", outTradeNo);
-//                put("prepayId", prepayId);
-//                put("timeStamp", objectNode.get("timeStamp").asText());
-//                put("nonceStr", objectNode.get("nonceStr").asText());
-//                put("package", objectNode.get("package").asText());
-//                put("signType", objectNode.get("signType").asText());
-//                put("paySign", objectNode.get("paySign").asText());
-//            }};
-            return result;
-        } catch (Exception e) {
-//            if (redisTemplate.hasKey(key)) {
-//                //恢复缓存该日程已经挂号数量
-//                redisTemplate.opsForHash().increment(key, "num", -1);
-//            }
+            if (auditEnabled) {
+                multiAgentRegistrationAuditService.markSuccess(requestId, entity.getId(), outTradeNo, traceJson);
+            }
+            return successResult(entity.getId(), outTradeNo);
+        } catch (HospitalException e) {
+            if (redisReserved && scheduleKey != null) {
+                boolean compensated = releaseScheduleReservation(scheduleKey);
+                markCompensation(auditEnabled, requestId, traceJson, e.getMsg(), compensated, MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR);
+            } else if (auditEnabled) {
+                multiAgentRegistrationAuditService.markFail(requestId, MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, e.getMsg(), traceJson);
+            }
             throw e;
+        } catch (Exception e) {
+            log.error("register medical appointment failed", e);
+            if (redisReserved && scheduleKey != null) {
+                boolean compensated = releaseScheduleReservation(scheduleKey);
+                markCompensation(auditEnabled, requestId, traceJson, "挂号提交失败，请稍后重试。", compensated, MultiAgentErrorCode.REGISTRATION_DB_WRITE_FAILED);
+            } else if (auditEnabled) {
+                multiAgentRegistrationAuditService.markFail(requestId, MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, "挂号提交失败，请稍后重试。", traceJson);
+            }
+            throw new HospitalException("挂号提交失败，请稍后重试。", e);
+        } finally {
+            releaseSubmitLock(submitLockKey, lockOwner);
         }
     }
 
-    //    @Override
-//    @Transactional
-//    public void updatePayment(Map param) {
-//        String outTradeNo = MapUtil.getStr(param, "outTradeNo");
-//        //既然患者支付了挂号费，我们就该删除Redis中对应的挂号缓存
-//        redisTemplate.delete("registration_payment_" + outTradeNo);
-//        //更新挂号单付款为已付款状态（2状态）
-//        medicalRegistrationDao.updatePayment(param);
-//    }
-////
-//    @Transactional
-//    @Override
-//    public boolean searchPaymentResult(String outTradeNo) {
-//        String transactionId = paymentService.searchPaymentResult(outTradeNo);
-//        if (transactionId != null) {
-//            //更新挂号单为已付款，并且记录transactionId
-//            this.updatePayment(new HashMap() {{
-//                put("outTradeNo", outTradeNo);
-//                put("transactionId", transactionId);
-//                put("paymentStatus", 2);
-//            }});
-//            return true;
-//        } else {
-//            return false;
-//        }
-//    }
-//
     @Override
     public PageUtils searchRegistrationByPage(Map param) {
-        ArrayList list = null;
+        ArrayList list;
         long count = medicalRegistrationDao.searchRegistrationCount(param);
         if (count > 0) {
             list = medicalRegistrationDao.searchRegistrationByPage(param);
@@ -296,48 +273,233 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
         int page = MapUtil.getInt(param, "page");
         int length = MapUtil.getInt(param, "length");
-        PageUtils pageUtils = new PageUtils(list, count, page, length);
-        return pageUtils;
+        return new PageUtils(list, count, page, length);
     }
 
-    //    @Transactional
-//    @Override
-//    public HashMap repayRegistration(Map param) {
-//        //先查询openId和付款金额
-//        HashMap map = medicalRegistrationDao.searchRepayInfo(param);
-//        String openId = MapUtil.getStr(map, "openId");
-//        String temp = MapUtil.getStr(map, "amount");
-//        int amount = NumberUtil.mul(temp, "100").intValue();
-//        //生成新的流水号
-//        String outTradeNo = IdUtil.simpleUUID();
-//
-//        //创建新的支付订单
-//        ObjectNode objectNode = paymentService.unifiedOrder(outTradeNo, openId, amount, "挂号费", notifyUrl, null);
-//        String prepayId = objectNode.get("prepay_id").textValue();  //预支付订单ID
-//
-//
-//        param.put("outTradeNo", outTradeNo);
-//        param.put("prepayId", prepayId);
-//        //保存prepayId和新的outTradeNo
-//        medicalRegistrationDao.updateRepayInfo(param);
-//
-//        //返回小程序弹出付款弹窗必备的参数
-//        HashMap result = new HashMap() {{
-//            put("outTradeNo", outTradeNo);
-//            put("prepayId", prepayId);
-//            put("timeStamp", objectNode.get("timeStamp").asText());
-//            put("nonceStr", objectNode.get("nonceStr").asText());
-//            put("package", objectNode.get("package").asText());
-//            put("signType", objectNode.get("signType").asText());
-//            put("paySign", objectNode.get("paySign").asText());
-//        }};
-//        return result;
-//    }
-//
     @Override
     public HashMap searchRegistrationInfo(Map param) {
-        HashMap map = medicalRegistrationDao.searchRegistrationInfo(param);
-        return map;
+        return medicalRegistrationDao.searchRegistrationInfo(param);
     }
 
+    private HashMap failByCondition(boolean auditEnabled, String requestId, String condition, String traceJson) {
+        if ("已经达到当天挂号上限".equals(condition)) {
+            return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_DAILY_LIMIT_REACHED, condition, false, traceJson);
+        }
+        if ("已经挂过该诊室的号".equals(condition)) {
+            return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_REPEAT_IN_DAY, condition, false, traceJson);
+        }
+        return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, condition, true, traceJson);
+    }
+
+    private HashMap validateSnapshot(HashMap snapshot,
+                                     Integer doctorId,
+                                     Integer deptSubId,
+                                     String date,
+                                     Integer slot,
+                                     BigDecimal inputAmount) {
+        if (snapshot == null || snapshot.isEmpty()) {
+            return buildErrorResult(MultiAgentErrorCode.REGISTRATION_SLOT_CHANGED, "该号源已变化，请重新选择。", true);
+        }
+        if (!equalsNumber(snapshot.get("doctorId"), doctorId)
+                || !equalsNumber(snapshot.get("deptSubId"), deptSubId)
+                || !equalsNumber(snapshot.get("slot"), slot)
+                || !equalsText(snapshot.get("date"), date)) {
+            return buildErrorResult(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "挂号信息已变化，请重新选择号源。", true);
+        }
+        BigDecimal actualAmount = decimalValue(snapshot.get("amount"));
+        if (actualAmount == null || inputAmount == null || actualAmount.compareTo(inputAmount) != 0) {
+            return buildErrorResult(MultiAgentErrorCode.REGISTRATION_SLOT_CHANGED, "号源费用已变化，请重新选择。", true);
+        }
+        return null;
+    }
+
+    private boolean reserveScheduleSlot(String key) {
+        Object execute = redisTemplate.execute(new SessionCallback() {
+            @Override
+            public Object execute(RedisOperations operations) throws DataAccessException {
+                operations.watch(key);
+                Map entry = operations.opsForHash().entries(key);
+                if (entry == null || entry.isEmpty() || entry.get("maximum") == null || entry.get("num") == null) {
+                    operations.unwatch();
+                    return null;
+                }
+                int maximum = Integer.parseInt(String.valueOf(entry.get("maximum")));
+                int num = Integer.parseInt(String.valueOf(entry.get("num")));
+                if (num >= maximum) {
+                    operations.unwatch();
+                    return null;
+                }
+                operations.multi();
+                operations.opsForHash().increment(key, "num", 1);
+                return operations.exec();
+            }
+        });
+        if (execute == null) {
+            return false;
+        }
+        if (execute instanceof List) {
+            return !((List) execute).isEmpty();
+        }
+        return true;
+    }
+
+    private boolean releaseScheduleReservation(String key) {
+        try {
+            Object execute = redisTemplate.execute(new SessionCallback() {
+                @Override
+                public Object execute(RedisOperations operations) throws DataAccessException {
+                    operations.watch(key);
+                    Map entry = operations.opsForHash().entries(key);
+                    if (entry == null || entry.isEmpty() || entry.get("num") == null) {
+                        operations.unwatch();
+                        return null;
+                    }
+                    int num = Integer.parseInt(String.valueOf(entry.get("num")));
+                    if (num <= 0) {
+                        operations.unwatch();
+                        return Boolean.TRUE;
+                    }
+                    operations.multi();
+                    operations.opsForHash().increment(key, "num", -1);
+                    return operations.exec();
+                }
+            });
+            if (execute == null) {
+                return false;
+            }
+            if (execute instanceof List) {
+                return !((List) execute).isEmpty();
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("release schedule reservation failed", e);
+            return false;
+        }
+    }
+
+    private HashMap successResult(Integer registrationId, String outTradeNo) {
+        HashMap<String, Object> result = new HashMap<>();
+        result.put("registrationId", registrationId);
+        result.put("outTradeNo", outTradeNo);
+        result.put("paymentStatus", ACTIVE_PAYMENT_STATUS);
+        return result;
+    }
+
+    private HashMap failResult(boolean auditEnabled,
+                               String requestId,
+                               String errorCode,
+                               String message,
+                               boolean retryable,
+                               String traceJson) {
+        if (auditEnabled) {
+            multiAgentRegistrationAuditService.markFail(requestId, errorCode, message, traceJson);
+        }
+        return buildErrorResult(errorCode, message, retryable);
+    }
+
+    private HashMap buildErrorResult(String errorCode, String message, boolean retryable) {
+        HashMap<String, Object> result = new HashMap<>();
+        result.put("errorCode", errorCode);
+        result.put("message", message);
+        result.put("retryable", retryable);
+        return result;
+    }
+
+    private void markCompensation(boolean auditEnabled,
+                                  String requestId,
+                                  String traceJson,
+                                  String message,
+                                  boolean compensated,
+                                  String errorCode) {
+        if (!auditEnabled) {
+            return;
+        }
+        if (compensated) {
+            multiAgentRegistrationAuditService.markCompensated(requestId, errorCode, message, traceJson);
+            return;
+        }
+        multiAgentRegistrationAuditService.markRepairPending(requestId, errorCode, message, traceJson);
+    }
+
+    private Map<String, Object> buildAuditSnapshot(Map param) {
+        HashMap<String, Object> snapshot = new HashMap<>();
+        snapshot.put("requestId", stringValue(param.get("requestId")));
+        snapshot.put("sessionId", stringValue(param.get("sessionId")));
+        snapshot.put("userId", intValue(param.get("userId")));
+        snapshot.put("workPlanId", intValue(param.get("workPlanId")));
+        snapshot.put("scheduleId", intValue(param.get("scheduleId")));
+        snapshot.put("doctorId", intValue(param.get("doctorId")));
+        snapshot.put("deptSubId", intValue(param.get("deptSubId")));
+        snapshot.put("date", stringValue(param.get("date")));
+        snapshot.put("slot", intValue(param.get("slot")));
+        snapshot.put("amount", stringValue(param.get("amount")));
+        return snapshot;
+    }
+
+    private boolean tryAcquireSubmitLock(String key, String owner) {
+        if (!StringUtils.hasText(key) || !StringUtils.hasText(owner)) {
+            return false;
+        }
+        Boolean locked = redisTemplate.opsForValue().setIfAbsent(key, owner, SUBMIT_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(locked);
+    }
+
+    private void releaseSubmitLock(String key, String owner) {
+        if (!StringUtils.hasText(key) || !StringUtils.hasText(owner)) {
+            return;
+        }
+        try {
+            Object value = redisTemplate.opsForValue().get(key);
+            if (value != null && owner.equals(String.valueOf(value))) {
+                redisTemplate.delete(key);
+            }
+        } catch (Exception e) {
+            log.warn("release submit lock failed", e);
+        }
+    }
+
+    private String buildSubmitLockKey(Integer userId, Integer scheduleId, String date, Integer slot) {
+        if (userId == null || scheduleId == null || !StringUtils.hasText(date) || slot == null) {
+            return null;
+        }
+        return "agent_register_submit:" + userId + ":" + scheduleId + ":" + date + ":" + slot;
+    }
+
+    private Integer intValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String && StringUtils.hasText((String) value)) {
+            return Integer.parseInt((String) value);
+        }
+        return null;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private BigDecimal decimalValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean equalsNumber(Object left, Integer right) {
+        Integer leftInt = intValue(left);
+        return leftInt != null && leftInt.equals(right);
+    }
+
+    private boolean equalsText(Object left, String right) {
+        String leftText = stringValue(left);
+        return StringUtils.hasText(leftText) && leftText.equals(right);
+    }
 }

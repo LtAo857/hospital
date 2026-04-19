@@ -27,7 +27,7 @@ public class MultiAgentChatController {
     @PostMapping("/chat")
     public R chat(@RequestBody(required = false) AgentChatRequest request) {
         if (!properties.isEnabled()) {
-            throw new HospitalException("Multi-agent is disabled");
+            throw new HospitalException("多 Agent 功能未启用");
         }
         Integer userId = StpUtil.isLogin() ? StpUtil.getLoginIdAsInt() : null;
         AgentChatResponse response = coordinatorService.chat(request, userId);

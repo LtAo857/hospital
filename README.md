@@ -15,6 +15,9 @@ qq交流群： **1081725203**
 - 当前版本已移除挂号前的人脸识别前置校验，挂号不再依赖人脸录入与人脸验证
 - 新增患者侧 AI 挂号助手页，首页与个人中心都可进入助手流程
 - Agent 一期已打通“查询 → 条件校验 → 确认 → 挂号”链路，并保留 Redis 会话记忆与风险确认
+- 当前多 Agent 默认走 `POST /agent/multi/chat`，前端页面仍复用 `patient-wx/agent/chat/chat.vue`
+- 当前多 Agent 仅支持挂号相关操作，不作为通用闲聊助手使用；页面会展示“当前步骤 / Agent 执行流程 / 可执行卡片”
+- 多 Agent 挂号链路已补充事务、幂等锁、二次复核、审计表和 Quartz 巡检补偿，数据库升级脚本见 `sql/patient_wx_multi_agent_registration_upgrade.sql`
 - 新增管理端“电子处方”独立页，医生可按挂号单开立/编辑处方，患者侧支持按挂号单查看处方详情
 
 # 项目结构
@@ -43,6 +46,15 @@ hospital
 | `patient-wx` | 患者 | 小程序挂号、消息、评价、收藏、视频问诊、就诊卡 | uni-app、Vue2、uView、微信插件、TRTC | `main.js`、`pages.json`、`manifest.json` |
 
 面向 Claude/协作者的项目级说明见根目录 `CLAUDE.md`。
+
+## Claude Code / Karpathy Skills
+- 当前仓库已接入本地 Karpathy 风格 Claude Code 能力。
+- 项目级协作说明位于：`CLAUDE.md`
+- 本地 Skill 文件位于：`.claude/skills/karpathy-guidelines/SKILL.md`
+- 本地命令文件位于：`.claude/commands/karpathy.md`
+- 在 Claude Code 中可直接使用：`/karpathy`
+- 示例：`/karpathy patient-wx 挂号流程`、`/karpathy hospital-vue 页面重构`
+- 该能力会强化四个协作原则：先想再写、简单优先、手术式修改、目标驱动。
 
 # 功能模块
 ## 患者端小程序
@@ -256,9 +268,25 @@ hospital
 
 ## Multi-Agent 最新说明
 
+- 多 Agent 前端页面：
+  `patient-wx/agent/chat/chat.vue`
 - 多 Agent 后端接口：
   `POST /agent/multi/chat`
+- 多 Agent 前端 API：
+  `patient-wx/main.js` 中的 `api.agentChat`
+- 当前能力范围：
+  仅支持挂号相关操作，包括查科室、查医生、查号源、条件校验、确认挂号和失败兜底；不支持通用闲聊
+- 页面可见信息：
+  当前步骤、Agent 执行流程、可执行卡片、错误态提示
 - 多 Agent 后端代码目录：
   `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/`
+- 当前编排阶段：
+  `INTENT_PARSE -> SLOT_QUERY -> POLICY_CHECK -> EXECUTE_APPOINTMENT`
+- Schedule Agent 的 ReAct 试点体现：
+  当前在 `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/ScheduleAgentWorker.java` 内部引入了轻量 ReAct 式决策循环，按“决定下一步查询 → 守卫跳步 → 执行工具 → 根据观察继续”的方式补齐科室、诊室、日期、医生信息；对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 三类稳定结果，以及 `ASK_USER -> SLOT_QUERY`、`HANDOFF -> POLICY_CHECK` 的既有协议，不改前端页面协议。
+- 上线加固点：
+  事务保护、重复提交幂等锁、最终二次复核、审计落库、Quartz 巡检补偿
+- 数据库升级脚本：
+  `sql/patient_wx_multi_agent_registration_upgrade.sql`
 - 多 Agent 设计与测试文档：
   `docs/agent/multi-agent.md`

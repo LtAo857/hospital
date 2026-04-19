@@ -44,12 +44,13 @@
 
 ## 联调关系
 - `hospital-vue` 默认对接 `http://localhost:8094/hospital-api`
-- `patient-wx` 默认对接 `http://127.0.0.1:8092/patient-wx-api`
+- `patient-wx` 当前默认对接 `http://127.0.0.1:8095/patient-wx-api`
 - `hospital-api-mysql` 默认端口 `8094`，context-path 为 `/hospital-api`
-- `patient-wx-api-mysql` 默认端口 `8092`，context-path 为 `/patient-wx-api`
+- `patient-wx-api-mysql` 当前默认端口 `8095`，context-path 为 `/patient-wx-api`
 - 视频问诊能力需要前后端共同配置 TRTC 参数
 - 管理端消息推送依赖 WebSocket；患者侧就诊提醒依赖 Quartz 定时任务
-- 患者侧 Agent 一期入口为 `patient-wx/agent/chat/chat.vue`，后端接口为 `patient-wx-api-mysql` 的 `/agent/chat`
+- 患者侧多 Agent 页面仍为 `patient-wx/agent/chat/chat.vue`，后端接口为 `patient-wx-api-mysql` 的 `POST /agent/multi/chat`
+- 当前多 Agent 仅支持挂号相关操作，不作为通用闲聊助手使用
 
 ## Agent 模块导航
 ### patient-wx-api-mysql
@@ -66,6 +67,23 @@
 - 页面注册：`patient-wx/pages.json`
 - 首页入口：`patient-wx/pages/index/index.vue`
 - 个人中心入口：`patient-wx/pages/mine/mine.vue`
+
+### 当前多 Agent 说明
+- 前端页面仍使用：`patient-wx/agent/chat/chat.vue`
+- 后端接口：`POST /agent/multi/chat`
+- 当前能力范围：仅支持挂号相关操作（查科室、查医生、查号源、条件校验、确认挂号、失败兜底）
+- 前端可见区块：当前步骤、Agent 执行流程、可执行卡片、错误态提示
+- 关键编排器：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorService.java`
+- 关键 Worker 目录：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/`
+- 审计与巡检：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentRegistrationAuditService.java`、`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/job/MultiAgentRegistrationRepairJob.java`
+- SQL 升级脚本：`sql/patient_wx_multi_agent_registration_upgrade.sql`
+
+#### 当前多 Agent 分工
+- `MultiAgentCoordinatorService`：负责统一编排、维护 session memory、决定下一跳 stage、组装前端步骤/流程/卡片/错误态。
+- `TriageAgentWorker`：负责识别用户是否进入挂号流程，提取日期等基础意图信息；非挂号请求会被拦回挂号入口。
+- `ScheduleAgentWorker`：负责补全科室/诊室/日期，查询医生与时段号源，并挑选候选挂号单写入 `pendingOrder`。当前该 Worker 内部已试点轻量 ReAct 式决策：按“决定下一步查询 → 守卫跳步 → 执行工具 → 根据观察继续”的小循环推进，但对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 和原有 handoff 契约不变。
+- `PolicyAgentWorker`：负责校验登录态、就诊卡、当日上限、重复挂号等规则；通过后进入确认或执行，失败则返回结构化错误码。
+- `ExecutionAgentWorker`：负责真正提交挂号，传递 `requestId/sessionId`，并把业务异常转换成结构化失败结果。
 
 ## 推荐阅读顺序
 ### 后端问题
@@ -93,3 +111,17 @@
 
 ## 敏感配置提醒
 两个后端的 `application.yml` 都包含数据库、Redis、微信、腾讯云/TRTC 等配置项。阅读时可用来定位配置位置，但不能直接把其中的值当作可复用凭证。若后续需要补文档，只描述“改哪里”，不要抄写真实密钥。
+
+## Karpathy 协作补充
+- 先想再写：如果需求存在歧义、信息缺失或有多种解释，先明确假设或先问清，不要静默选择一种理解直接实现。
+- 简单优先：默认采用能解决当前问题的最小改动，不为单次场景额外设计抽象、扩展点或配置化。
+- 手术式修改：只改与当前需求直接相关的代码，不顺手重构无关逻辑、注释或格式；只清理因本次改动产生的无用代码。
+- 目标驱动：非琐碎任务优先给出简短步骤与验证方式，完成后以可验证结果判断是否达成目标。
+
+## Claude Code 本地 Skills/命令
+- 本仓库已接入本地 Karpathy 风格协作能力。
+- Skills 文件：`.claude/skills/karpathy-guidelines/SKILL.md`
+- 命令文件：`.claude/commands/karpathy.md`
+- 在 Claude Code 中可直接使用 `/karpathy`。
+- 也可带参数调用，例如：`/karpathy patient-wx 挂号流程`、`/karpathy hospital-vue 页面重构`
+- 该命令用于在当前任务中强化“先想再写、简单优先、手术式修改、目标驱动”的执行方式。

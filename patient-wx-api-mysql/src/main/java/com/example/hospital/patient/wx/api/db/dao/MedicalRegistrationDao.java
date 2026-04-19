@@ -15,6 +15,7 @@ public interface MedicalRegistrationDao {
 
     public int discardPayment(String outTradeNo);
     public HashMap searchWorkPlanIdAndScheduleId(String outTradeNo);
+    public HashMap searchByOutTradeNo(String outTradeNo);
 
     public int updatePayment(Map param);
 

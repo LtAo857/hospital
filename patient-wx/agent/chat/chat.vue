@@ -12,12 +12,34 @@
 				</view>
 			</view>
 
+			<view v-if="agent.errorMessage" class="section-card error-card">
+				<view class="section-title">当前状态</view>
+				<view class="error-head">
+					<text class="error-text">{{ agent.errorMessage }}</text>
+					<text class="error-badge" v-if="agent.retryable">可重试</text>
+				</view>
+			</view>
+
 			<view v-if="agent.steps && agent.steps.length > 0" class="section-card">
 				<view class="section-title">当前步骤</view>
 				<view class="step-list">
 					<view class="step-item" v-for="step in agent.steps" :key="step.key">
 						<text class="step-label">{{ step.label }}</text>
 						<text :class="step.status === 'completed' ? 'step-status success' : step.status === 'in_progress' ? 'step-status active' : 'step-status'">{{ formatStepStatus(step.status) }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view v-if="agent.agentFlows && agent.agentFlows.length > 0" class="section-card">
+				<view class="section-title">Agent 执行流程</view>
+				<view class="step-list">
+					<view class="flow-item" v-for="flow in agent.agentFlows" :key="flow.key">
+						<view class="flow-head">
+							<text class="step-label">{{ flow.title }}</text>
+							<text :class="flow.status === 'completed' ? 'step-status success' : flow.status === 'failed' ? 'step-status failed' : flow.status === 'waiting' ? 'step-status waiting' : 'step-status active'">{{ formatFlowStatus(flow.status) }}</text>
+						</view>
+						<text class="flow-summary">{{ flow.summary }}</text>
+						<text class="flow-meta" v-if="flow.toolCount">调用工具 {{ flow.toolCount }} 次</text>
 					</view>
 				</view>
 			</view>
@@ -70,10 +92,15 @@ export default {
 				cards: [],
 				toolLogs: [],
 				steps: [],
+				agentFlows: [],
 				confirmation: null,
-				state: 'idle'
+				state: 'idle',
+				errorCode: '',
+				retryable: null,
+				errorMessage: ''
 			},
 			streamTimer: null,
+			submitting: false,
 			scrollAnchor: 'anchor-bottom'
 		};
 	},
@@ -90,14 +117,15 @@ export default {
 			if (status === 'in_progress') return '进行中';
 			return '待处理';
 		},
+		formatFlowStatus(status) {
+			if (status === 'completed') return '已完成';
+			if (status === 'failed') return '执行失败';
+			if (status === 'waiting') return '等待补充';
+			return '进行中';
+		},
 		appendUserMessage(text) {
 			if (!text) return;
 			this.messages.push({ role: 'user', content: text });
-		},
-		appendAssistantMessage(text) {
-			if (!text) return;
-			this.messages.push({ role: 'assistant', content: text });
-			this.scrollToBottom();
 		},
 		appendAssistantMessageStreaming(text) {
 			if (!text) return;
@@ -130,6 +158,9 @@ export default {
 			});
 		},
 		submitText() {
+			if (this.submitting) {
+				return;
+			}
 			let text = (this.inputText || '').trim();
 			if (!text) {
 				return;
@@ -142,6 +173,9 @@ export default {
 			});
 		},
 		sendAction(action, payload) {
+			if (this.submitting) {
+				return;
+			}
 			this.chat({
 				action: action,
 				payload: payload || {},
@@ -149,7 +183,7 @@ export default {
 			});
 		},
 		handleCard(card) {
-			if (!card || !card.action) {
+			if (!card || !card.action || this.submitting) {
 				return;
 			}
 			if (card.action === 'navigate') {
@@ -168,6 +202,7 @@ export default {
 					content: '是否确认提交本次挂号？',
 					success: (resp) => {
 						if (!resp.confirm) return;
+						this.submitting = true;
 						this.chat({
 							action: card.action,
 							payload: {
@@ -202,12 +237,20 @@ export default {
 						cards: result.cards || [],
 						toolLogs: result.toolLogs || [],
 						steps: result.steps || [],
+						agentFlows: result.agentFlows || [],
 						confirmation: result.confirmation || null,
-						state: result.state || 'idle'
+						state: result.state || 'idle',
+						errorCode: result.errorCode || '',
+						retryable: typeof result.retryable === 'boolean' ? result.retryable : null,
+						errorMessage: result.errorMessage || ''
 					};
+					this.submitting = false;
 					this.appendAssistantMessageStreaming(result.reply || '助手暂时没有返回内容。');
 				},
-				false
+				false,
+				() => {
+					this.submitting = false;
+				}
 			);
 		}
 	}
@@ -276,6 +319,29 @@ export default {
 	color: #222;
 	margin-bottom: 18rpx;
 }
+.error-card {
+	border: 1rpx solid #ffd7d7;
+	background: #fff7f7;
+}
+.error-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16rpx;
+}
+.error-text {
+	flex: 1;
+	font-size: 24rpx;
+	line-height: 1.6;
+	color: #c62828;
+}
+.error-badge {
+	font-size: 22rpx;
+	color: #ed6c02;
+	background: rgba(237, 108, 2, 0.12);
+	padding: 6rpx 12rpx;
+	border-radius: 999rpx;
+}
 .card-list {
 	display: flex;
 	flex-direction: column;
@@ -321,6 +387,31 @@ export default {
 	justify-content: space-between;
 	gap: 20rpx;
 }
+.flow-item {
+	padding: 18rpx 20rpx;
+	border-radius: 16rpx;
+	background: #f7fbff;
+	border: 1rpx solid #dceefe;
+}
+.flow-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 20rpx;
+}
+.flow-summary {
+	display: block;
+	margin-top: 10rpx;
+	font-size: 24rpx;
+	line-height: 1.6;
+	color: #555;
+}
+.flow-meta {
+	display: block;
+	margin-top: 8rpx;
+	font-size: 22rpx;
+	color: #999;
+}
 .step-label,
 .tool-name {
 	font-size: 24rpx;
@@ -336,6 +427,12 @@ export default {
 }
 .step-status.active {
 	color: #1296db;
+}
+.step-status.failed {
+	color: #d32f2f;
+}
+.step-status.waiting {
+	color: #ed6c02;
 }
 .quick-actions {
 	display: grid;

@@ -33,7 +33,13 @@
       "Read(//c/Users/hs/hospital-api-mysql/src/**)",
       "Read(//c/Users/hs/patient-wx-api-mysql/src/**)",
       "Read(//c/Users/hs/**)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:github.com)",
+      "Bash(ls -la /tmp)",
+      "Bash(rm -rf /tmp/andrej-karpathy-skills)",
+      "Read(//tmp/**)"
     ]
   }
 }

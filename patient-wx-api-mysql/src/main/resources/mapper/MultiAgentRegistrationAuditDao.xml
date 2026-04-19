@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.hospital.patient.wx.api.db.dao.MultiAgentRegistrationAuditDao">
+
+    <insert id="insert" parameterType="com.example.hospital.patient.wx.api.db.pojo.MultiAgentRegistrationAuditEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO multi_agent_registration_audit(
+            session_id, request_id, user_id, work_plan_id, schedule_id,
+            doctor_id, dept_sub_id, date, slot, amount,
+            out_trade_no, status, error_code, error_message,
+            registration_id, trace_json, created_at, updated_at
+        )
+        VALUES(
+            #{sessionId}, #{requestId}, #{userId}, #{workPlanId}, #{scheduleId},
+            #{doctorId}, #{deptSubId}, STR_TO_DATE(#{date}, '%Y-%m-%d'), #{slot}, #{amount},
+            #{outTradeNo}, #{status}, #{errorCode}, #{errorMessage},
+            #{registrationId}, #{traceJson}, NOW(), NOW()
+        )
+    </insert>
+
+    <select id="searchByRequestId" parameterType="String" resultType="HashMap">
+        SELECT id,
+               session_id AS sessionId,
+               request_id AS requestId,
+               user_id AS userId,
+               work_plan_id AS workPlanId,
+               schedule_id AS scheduleId,
+               doctor_id AS doctorId,
+               dept_sub_id AS deptSubId,
+               DATE_FORMAT(date, '%Y-%m-%d') AS date,
+               slot,
+               FORMAT(amount, 2) AS amount,
+               out_trade_no AS outTradeNo,
+               status,
+               error_code AS errorCode,
+               error_message AS errorMessage,
+               registration_id AS registrationId,
+               trace_json AS traceJson,
+               DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS createdAt,
+               DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS updatedAt
+        FROM multi_agent_registration_audit
+        WHERE request_id = #{requestId}
+        LIMIT 1
+    </select>
+
+    <update id="updateByRequestId" parameterType="Map">
+        UPDATE multi_agent_registration_audit
+        <set>
+            <if test="sessionId != null">session_id = #{sessionId},</if>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="workPlanId != null">work_plan_id = #{workPlanId},</if>
+            <if test="scheduleId != null">schedule_id = #{scheduleId},</if>
+            <if test="doctorId != null">doctor_id = #{doctorId},</if>
+            <if test="deptSubId != null">dept_sub_id = #{deptSubId},</if>
+            <if test="date != null">date = STR_TO_DATE(#{date}, '%Y-%m-%d'),</if>
+            <if test="slot != null">slot = #{slot},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="outTradeNo != null">out_trade_no = #{outTradeNo},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="errorCode != null or _parameter.containsKey('errorCode')">error_code = #{errorCode},</if>
+            <if test="errorMessage != null or _parameter.containsKey('errorMessage')">error_message = #{errorMessage},</if>
+            <if test="registrationId != null or _parameter.containsKey('registrationId')">registration_id = #{registrationId},</if>
+            <if test="traceJson != null or _parameter.containsKey('traceJson')">trace_json = #{traceJson},</if>
+            updated_at = NOW()
+        </set>
+        WHERE request_id = #{requestId}
+    </update>
+
+    <select id="searchRepairCandidatesBeforeMinutes" parameterType="int" resultType="HashMap">
+        SELECT id,
+               session_id AS sessionId,
+               request_id AS requestId,
+               user_id AS userId,
+               work_plan_id AS workPlanId,
+               schedule_id AS scheduleId,
+               out_trade_no AS outTradeNo,
+               status,
+               error_code AS errorCode,
+               error_message AS errorMessage,
+               trace_json AS traceJson
+        FROM multi_agent_registration_audit
+        WHERE status = 'RESERVED'
+          AND updated_at &lt;= DATE_SUB(NOW(), INTERVAL #{minutes} MINUTE)
+        ORDER BY id ASC
+    </select>
+</mapper>

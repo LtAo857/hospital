@@ -38,6 +38,9 @@ public class TriageAgentWorker implements AgentWorker {
         if (StringUtils.hasText(date)) {
             patch.put("date", date);
         }
+        patch.put("errorCode", null);
+        patch.put("retryable", null);
+        patch.put("errorMessage", null);
 
         AgentResult result = new AgentResult();
         result.setAgent("triage-agent");
@@ -47,7 +50,7 @@ public class TriageAgentWorker implements AgentWorker {
             patch.put("confirmed", true);
             result.setHandoffAction(HandoffAction.HANDOFF);
             result.setNextStage(MultiAgentStage.POLICY_CHECK);
-            result.setReply("Confirmation detected. Starting policy check.");
+            result.setReply("已识别到确认提交，开始校验挂号条件。");
             result.setSummary("direct_create_detected");
             return result;
         }
@@ -55,14 +58,14 @@ public class TriageAgentWorker implements AgentWorker {
         if (isRegistrationIntent(action, message, payload, memory)) {
             result.setHandoffAction(HandoffAction.HANDOFF);
             result.setNextStage(MultiAgentStage.SLOT_QUERY);
-            result.setReply("Registration intent detected. Start searching slots.");
+            result.setReply("已识别挂号需求，开始为你查询号源。");
             result.setSummary("registration_intent_detected");
             return result;
         }
 
         result.setHandoffAction(HandoffAction.ASK_USER);
         result.setNextStage(MultiAgentStage.INTENT_PARSE);
-        result.setReply("This multi-agent flow only handles registration. Please provide clinic and date.");
+        result.setReply("当前多 Agent 仅支持挂号相关操作，请告诉我科室和日期。");
         result.setSummary("intent_not_supported");
         result.setConfidence(0.5d);
         return result;
@@ -83,7 +86,7 @@ public class TriageAgentWorker implements AgentWorker {
         if (memory.get("pendingOrder") instanceof Map && !((Map<?, ?>) memory.get("pendingOrder")).isEmpty()) {
             return true;
         }
-        return containsAny(message, "registration", "register", "\u6302\u53f7", "\u9884\u7ea6", "\u79d1\u5ba4", "\u8bca\u5ba4", "\u533b\u751f", "\u53f7\u6e90");
+        return containsAny(message, "registration", "register", "挂号", "预约", "科室", "诊室", "医生", "号源", "内科", "外科", "骨科", "儿科", "口腔科", "眼科", "耳鼻喉科", "皮肤科", "妇科", "产科", "神经内科", "神经外科", "肿瘤科", "康复科");
     }
 
     private boolean isDirectCreate(String action, Map<String, Object> payload) {

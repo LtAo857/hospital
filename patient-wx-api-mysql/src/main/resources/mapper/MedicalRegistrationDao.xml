@@ -33,7 +33,7 @@
         VALUES(
                   #{patientCardId}, #{workPlanId}, #{doctorScheduleId},
                   #{doctorId}, #{deptSubId}, STR_TO_DATE(#{date}, '%Y-%m-%d'),
-                  #{slot}, #{amount}, #{outTradeNo}, #{prepayId}, 1, NOW()
+                  #{slot}, #{amount}, #{outTradeNo}, #{prepayId}, #{paymentStatus}, NOW()
               )
     </insert>
 
@@ -51,6 +51,18 @@
                work_plan_id AS workPlanId
         FROM medical_registration
         WHERE out_trade_no = #{outTradeNo}
+    </select>
+
+    <select id="searchByOutTradeNo" parameterType="String" resultType="HashMap">
+        SELECT id,
+               out_trade_no AS outTradeNo,
+               payment_status AS paymentStatus,
+               DATE_FORMAT(date, '%Y-%m-%d') AS date,
+               doctor_schedule_id AS doctorScheduleId,
+               work_plan_id AS workPlanId
+        FROM medical_registration
+        WHERE out_trade_no = #{outTradeNo}
+        LIMIT 1
     </select>
     <update id="updatePayment" parameterType="Map">
         UPDATE medical_registration

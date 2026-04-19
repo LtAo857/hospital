@@ -20,7 +20,25 @@ class TriageAgentWorkerTest {
         AgentContext context = new AgentContext();
         context.setPayload(new HashMap<String, Object>());
         context.setMemory(new HashMap<String, Object>());
-        context.setUserMessage("\u6211\u660e\u5929\u60f3\u6302\u53f7");
+        context.setUserMessage("我明天想挂号");
+
+        AgentResult result = worker.execute(context);
+
+        Assertions.assertEquals(HandoffAction.HANDOFF, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentStage.SLOT_QUERY, result.getNextStage());
+        Assertions.assertEquals(
+                LocalDate.now().plusDays(1).format(DATE_FORMATTER),
+                result.getMemoryPatch().get("date")
+        );
+    }
+
+    @Test
+    void shouldRouteToSlotQueryWhenOnlyDeptAndDateProvided() {
+        TriageAgentWorker worker = new TriageAgentWorker();
+        AgentContext context = new AgentContext();
+        context.setPayload(new HashMap<String, Object>());
+        context.setMemory(new HashMap<String, Object>());
+        context.setUserMessage("明天的骨科");
 
         AgentResult result = worker.execute(context);
 

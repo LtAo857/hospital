@@ -3,6 +3,7 @@ package com.example.hospital.patient.wx.api.agent.multi.worker;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentContext;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
@@ -56,19 +57,25 @@ public class PolicyAgentWorker implements AgentWorker {
         if (deptSubId == null || !StringUtils.hasText(date)) {
             result.setHandoffAction(HandoffAction.ASK_USER);
             result.setNextStage(MultiAgentStage.POLICY_CHECK);
-            result.setReply("Missing deptSubId or date. Please select slot first.");
+            result.setReply("缺少诊室或日期信息，请先选择号源后再继续。");
             result.setSummary("policy_missing_order_fields");
             patch.put("policyChecked", false);
+            patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH);
+            patch.put("retryable", true);
+            patch.put("errorMessage", "缺少诊室或日期信息，请先选择号源后再继续。");
             return result;
         }
 
         if (userId == null) {
             result.setHandoffAction(HandoffAction.ASK_USER);
             result.setNextStage(MultiAgentStage.POLICY_CHECK);
-            result.setReply("Please login before submitting registration.");
+            result.setReply("确认挂号前请先登录小程序。");
             result.setSummary("policy_login_required");
             patch.put("requiresLogin", true);
             patch.put("awaitingConfirmation", false);
+            patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_LOGIN_REQUIRED);
+            patch.put("retryable", false);
+            patch.put("errorMessage", "确认挂号前请先登录小程序。");
             return result;
         }
 
@@ -78,9 +85,12 @@ public class PolicyAgentWorker implements AgentWorker {
         if (!hasUserCard) {
             result.setHandoffAction(HandoffAction.ASK_USER);
             result.setNextStage(MultiAgentStage.POLICY_CHECK);
-            result.setReply("A valid patient card is required before registration.");
+            result.setReply("挂号前需要先创建就诊卡。");
             result.setSummary("policy_user_card_required");
             patch.put("awaitingConfirmation", false);
+            patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_USER_CARD_REQUIRED);
+            patch.put("retryable", false);
+            patch.put("errorMessage", "挂号前需要先创建就诊卡。");
             return result;
         }
 
@@ -99,9 +109,12 @@ public class PolicyAgentWorker implements AgentWorker {
         if (!StringUtils.hasText(condition) || !condition.contains(PASS_KEYWORD)) {
             result.setHandoffAction(HandoffAction.FAIL);
             result.setNextStage(MultiAgentStage.MANUAL_FALLBACK);
-            result.setReply(StringUtils.hasText(condition) ? condition : "Policy check failed. Please adjust and retry.");
+            result.setReply(StringUtils.hasText(condition) ? condition : "挂号条件校验未通过，请调整后重试。");
             result.setSummary("policy_check_failed");
             patch.put("awaitingConfirmation", false);
+            patch.put("errorCode", resolveConditionErrorCode(condition));
+            patch.put("retryable", false);
+            patch.put("errorMessage", StringUtils.hasText(condition) ? condition : "挂号条件校验未通过，请调整后重试。");
             return result;
         }
 
@@ -111,18 +124,34 @@ public class PolicyAgentWorker implements AgentWorker {
         if (!confirmed) {
             result.setHandoffAction(HandoffAction.ASK_USER);
             result.setNextStage(MultiAgentStage.CONFIRM_WAIT);
-            result.setReply("Policy check passed. Please confirm submission.");
+            result.setReply("挂号条件校验通过，请确认是否提交挂号。");
             result.setSummary("policy_waiting_confirmation");
             patch.put("awaitingConfirmation", true);
+            patch.put("errorCode", null);
+            patch.put("retryable", null);
+            patch.put("errorMessage", null);
             return result;
         }
 
         patch.put("awaitingConfirmation", false);
+        patch.put("errorCode", null);
+        patch.put("retryable", null);
+        patch.put("errorMessage", null);
         result.setHandoffAction(HandoffAction.HANDOFF);
         result.setNextStage(MultiAgentStage.EXECUTE_APPOINTMENT);
-        result.setReply("Policy check passed. Start execution.");
+        result.setReply("挂号条件校验通过，开始为你提交挂号。");
         result.setSummary("policy_check_passed");
         return result;
+    }
+
+    private String resolveConditionErrorCode(String condition) {
+        if ("已经达到当天挂号上限".equals(condition)) {
+            return MultiAgentErrorCode.REGISTRATION_DAILY_LIMIT_REACHED;
+        }
+        if ("已经挂过该诊室的号".equals(condition)) {
+            return MultiAgentErrorCode.REGISTRATION_REPEAT_IN_DAY;
+        }
+        return MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH;
     }
 
     private boolean booleanValue(Object value) {

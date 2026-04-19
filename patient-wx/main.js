@@ -73,7 +73,7 @@ Vue.prototype.api = {
     searchMedicalDeptSubList: baseUrl + "/medical/dept/sub/searchMedicalDeptSubList",
     searchCanRegisterInDateRange: baseUrl + "/registration/searchCanRegisterInDateRange",
     searchDeptSubDoctorPlanInDay: baseUrl + "/registration/searchDeptSubDoctorPlanInDay",
-    checkRegisterCondition: baseUrl + "/registration/checkRegisterCondition",  
+    checkRegisterCondition: baseUrl + "/registration/checkRegisterCondition",
 	searchDoctorInfo: baseUrl + "/doctor/searchDoctorInfo",
     searchDoctorWorkPlanSchedule: baseUrl + "/registration/searchDoctorWorkPlanSchedule",
     searchDoctorInfoById: baseUrl + "/doctor/searchDoctorInfoById",
@@ -93,8 +93,8 @@ Vue.prototype.api = {
     searchRoomId: baseUrl + "/video_diagnose/searchRoomId",
     searchUserSig: baseUrl + "/video_diagnose/searchUserSig",
     searchPrescriptionByRegistrationId: baseUrl + "/prescription/searchPrescriptionByRegistrationId",
-	
-	
+
+
 	searchByPageAndId:baseUrl + "/pet/searchByPageAndId",
 	addPetInfo:baseUrl + "/pet/insert",
 	updatePetInfo:baseUrl + "/pet/update",
@@ -106,7 +106,7 @@ Vue.prototype.api = {
 	searchUnreadCount: baseUrl + "/message/searchUnreadCount",
 	readMessage: baseUrl + "/message/readMessage",
 	readAllMessage: baseUrl + "/message/readAllMessage",
-	agentChat: baseUrl + "/agent/chat",
+	agentChat: baseUrl + "/agent/multi/chat",
 	agentReactChat: baseUrl + "/agent/react/chat",
 	agentCcChat: baseUrl + "/agent/cc/chat",
 	// 评价相关
@@ -117,7 +117,7 @@ Vue.prototype.api = {
 }
 
 
-Vue.prototype.ajax = function(url, method, data, fun, load) {
+Vue.prototype.ajax = function(url, method, data, fun, load, failFun) {
 	let timer = null
 	if (load == true || load == undefined) {
 		uni.showLoading({
@@ -145,11 +145,14 @@ Vue.prototype.ajax = function(url, method, data, fun, load) {
 					icon: "error",
 					title: "请登录小程序"
 				})
+				if (typeof failFun === 'function') {
+					failFun(resp)
+				}
 				setTimeout(() => {
 					uni.switchTab({
 						"url":"/pages/mine/mine"
 					})
-				}, 2000);
+				}, 2000)
 			} else if (resp.statusCode == 200 && resp.data.code == 200) {
 				let data = resp.data
 				if (data.hasOwnProperty("token")) {
@@ -163,12 +166,18 @@ Vue.prototype.ajax = function(url, method, data, fun, load) {
 					title: (resp.data && (resp.data.error || resp.data.msg)) || "执行异常"
 				})
 				console.error(resp.data)
+				if (typeof failFun === 'function') {
+					failFun(resp)
+				}
 			}
 		},
 		fail: function(error) {
 			if (load == true || load == undefined) {
 				clearTimeout(timer)
 				uni.hideLoading()
+			}
+			if (typeof failFun === 'function') {
+				failFun(error)
 			}
 		}
 	})

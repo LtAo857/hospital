@@ -7,6 +7,7 @@ import com.example.hospital.patient.wx.api.agent.multi.memory.MultiAgentMemorySe
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentContext;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.multi.worker.AgentWorker;
 import org.junit.jupiter.api.Assertions;
@@ -50,7 +51,7 @@ class MultiAgentCoordinatorServiceTest {
         MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-1");
-        request.setMessage("\u6302\u53f7");
+        request.setMessage("挂号");
 
         AgentChatResponse response = service.chat(request, 1001);
 
@@ -68,11 +69,96 @@ class MultiAgentCoordinatorServiceTest {
         Assertions.assertEquals("OT-1", savedMemory.get("lastOrderNo"));
     }
 
+    @Test
+    void shouldExposeFallbackCardForLoginRequiredFailure() {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(2);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        Mockito.when(memoryService.load("session-2")).thenReturn(new HashMap<String, Object>());
+
+        List<AgentWorker> workers = Arrays.asList(
+                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.FAIL, MultiAgentStage.MANUAL_FALLBACK, "请先登录", new HashMap<String, Object>() {{
+                    put("errorCode", MultiAgentErrorCode.REGISTRATION_LOGIN_REQUIRED);
+                    put("retryable", false);
+                    put("errorMessage", "确认挂号前请先登录小程序。");
+                    put("requiresLogin", true);
+                }})
+        );
+
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, workers);
+        AgentChatRequest request = new AgentChatRequest();
+        request.setSessionId("session-2");
+        request.setMessage("挂号");
+
+        AgentChatResponse response = service.chat(request, null);
+
+        Assertions.assertEquals("need_login", response.getState());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_LOGIN_REQUIRED, response.getErrorCode());
+        Assertions.assertEquals(Boolean.FALSE, response.getRetryable());
+        Assertions.assertEquals("确认挂号前请先登录小程序。", response.getErrorMessage());
+        Assertions.assertFalse(response.getCards().isEmpty());
+        Assertions.assertEquals("去登录", response.getCards().get(0).getTitle());
+        Assertions.assertEquals("navigate", response.getCards().get(0).getAction());
+        Assertions.assertEquals("/pages/mine/mine", response.getCards().get(0).getPayload().get("url"));
+    }
+
+    @Test
+    void shouldBuildToolLogsAndFlowsForScheduleWorkerContract() {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(3);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        Mockito.when(memoryService.load("session-3")).thenReturn(new HashMap<String, Object>());
+
+        List<AgentWorker> workers = Arrays.asList(
+                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.HANDOFF, MultiAgentStage.SLOT_QUERY, "识别完成", null),
+                fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK, "已选中号源", new HashMap<String, Object>() {{
+                    put("pendingOrder", new HashMap<String, Object>() {{
+                        put("deptSubId", 10);
+                        put("date", "2026-04-20");
+                    }});
+                    put("awaitingConfirmation", true);
+                }}, "schedule-agent", "searchScheduleSlots", "slot_selected", new HashMap<String, Object>() {{
+                    put("selectedOrder", new HashMap<String, Object>() {{
+                        put("doctorId", 9);
+                    }});
+                }})
+        );
+
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, workers);
+        AgentChatRequest request = new AgentChatRequest();
+        request.setSessionId("session-3");
+        request.setMessage("明天口腔科");
+
+        AgentChatResponse response = service.chat(request, 1001);
+
+        Assertions.assertEquals("awaiting_confirmation", response.getState());
+        Assertions.assertFalse(response.getToolLogs().isEmpty());
+        Assertions.assertEquals("查询号源时段", response.getToolLogs().get(0).getName());
+        Assertions.assertEquals("已选中可挂号源", response.getToolLogs().get(0).getSummary());
+        Assertions.assertFalse(response.getAgentFlows().isEmpty());
+        Assertions.assertEquals("号源查询 Agent", response.getAgentFlows().get(1).getTitle());
+        Assertions.assertTrue(response.getAgentFlows().get(1).getSummary().contains("已选中可挂号源"));
+    }
+
     private AgentWorker fixedWorker(final MultiAgentStage stage,
                                     final HandoffAction action,
                                     final MultiAgentStage nextStage,
                                     final String reply,
                                     final Map<String, Object> patch) {
+        return fixedWorker(stage, action, nextStage, reply, patch, "test-" + stage.name(), null, null, null);
+    }
+
+    private AgentWorker fixedWorker(final MultiAgentStage stage,
+                                    final HandoffAction action,
+                                    final MultiAgentStage nextStage,
+                                    final String reply,
+                                    final Map<String, Object> patch,
+                                    final String agent,
+                                    final String toolName,
+                                    final String summary,
+                                    final Map<String, Object> observation) {
         return new AgentWorker() {
             @Override
             public MultiAgentStage stage() {
@@ -82,11 +168,14 @@ class MultiAgentCoordinatorServiceTest {
             @Override
             public AgentResult execute(AgentContext context) {
                 AgentResult result = new AgentResult();
-                result.setAgent("test-" + stage.name());
+                result.setAgent(agent);
                 result.setHandoffAction(action);
                 result.setNextStage(nextStage);
                 result.setReply(reply);
                 result.setMemoryPatch(patch);
+                result.setToolName(toolName);
+                result.setSummary(summary);
+                result.setObservation(observation);
                 return result;
             }
         };

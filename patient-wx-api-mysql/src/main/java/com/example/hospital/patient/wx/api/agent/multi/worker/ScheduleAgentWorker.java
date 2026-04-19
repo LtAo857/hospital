@@ -19,7 +19,9 @@ import java.util.regex.Pattern;
 
 @Component
 public class ScheduleAgentWorker implements AgentWorker {
+    private static final int MAX_REACT_STEPS = 4;
     private static final Pattern DATE_HINT_PATTERN = Pattern.compile("(\\u4eca\\u5929|\\u660e\\u5929|\\u540e\\u5929|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}\\u6708\\d{1,2}\\u65e5)");
+    private static final Pattern DOCTOR_HINT_PATTERN = Pattern.compile("([\\u4e00-\\u9fa5]{2,4})(主任医师|医生|医师)");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final MedicalDeptAgentTools medicalDeptAgentTools;
@@ -38,108 +40,181 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     @Override
     public AgentResult execute(AgentContext context) {
-        Map<String, Object> payload = safeMap(context.getPayload());
-        Map<String, Object> memory = safeMap(context.getMemory());
-        Map<String, Object> patch = new HashMap<>();
+        QueryState state = buildTrustedState(safeMap(context.getPayload()), safeMap(context.getMemory()), context.getUserMessage());
         Map<String, Object> observation = new HashMap<>();
 
-        Integer deptId = firstInt(payload.get("deptId"), memory.get("deptId"));
-        Integer deptSubId = firstInt(payload.get("deptSubId"), memory.get("deptSubId"));
-        Integer doctorId = firstInt(payload.get("doctorId"), memory.get("doctorId"));
-        String deptName = firstText(payload.get("deptName"), memory.get("deptName"));
-        String deptSubName = firstText(payload.get("deptSubName"), memory.get("deptSubName"));
-        String date = firstText(payload.get("date"), memory.get("date"));
-        if (!StringUtils.hasText(date)) {
-            date = parseDateHint(context.getUserMessage());
-        }
-
-        if (deptId == null && StringUtils.hasText(deptName)) {
-            deptId = matchDeptIdByName(deptName);
-        }
-        if (deptSubId == null && deptId != null) {
-            ArrayList<HashMap> subDepartments = medicalDeptAgentTools.searchSubDepartments(deptId);
-            if (!subDepartments.isEmpty()) {
-                HashMap selectedSub = subDepartments.get(0);
-                deptSubId = intValue(selectedSub.get("id"));
-                if (!StringUtils.hasText(deptSubName)) {
-                    deptSubName = stringValue(selectedSub.get("name"));
-                }
-                if (!StringUtils.hasText(deptName)) {
-                    deptName = stringValue(selectedSub.get("deptName"));
-                }
-                observation.put("subDepartments", subDepartments);
+        for (int step = 0; step < MAX_REACT_STEPS; step++) {
+            ToolDecision decision = guardDecision(decideNextTool(state), state);
+            TerminalOutcome outcome = runToolStep(decision, state, observation);
+            if (outcome == TerminalOutcome.SUCCESS) {
+                return buildSuccessResult(state, observation);
+            }
+            if (outcome == TerminalOutcome.NO_SLOT) {
+                return buildNoSlotResult(state, observation);
+            }
+            if (outcome == TerminalOutcome.ASK_USER) {
+                return buildAskUserResult(state, observation);
             }
         }
 
-        if (deptSubId == null || !StringUtils.hasText(date)) {
-            AgentResult askResult = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
-            askResult.setReply("Please provide deptSubId and date (for example: tomorrow).");
-            askResult.setSummary("missing_slots_input");
-            askResult.setObservation(observation);
-            askResult.setMemoryPatch(patch);
-            return askResult;
+        if (state.getCandidate() != null) {
+            return buildSuccessResult(state, observation);
         }
-
-        Candidate candidate = findCandidate(deptSubId, doctorId, date);
-        if (candidate == null) {
-            AgentResult askResult = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
-            askResult.setReply("No available slot found. Please change date or clinic.");
-            askResult.setSummary("no_slot_available");
-            askResult.setToolName("searchScheduleSlots");
-            askResult.setObservation(observation);
-            askResult.setMemoryPatch(patch);
-            return askResult;
+        if (state.getDeptSubId() == null || !StringUtils.hasText(state.getDate())) {
+            return buildAskUserResult(state, observation);
         }
-
-        Map<String, Object> order = candidate.toOrderPayload();
-        order.put("deptSubId", deptSubId);
-        order.put("deptId", deptId);
-        if (StringUtils.hasText(deptName)) {
-            order.put("deptName", deptName);
-        }
-        if (StringUtils.hasText(deptSubName)) {
-            order.put("deptSubName", deptSubName);
-        }
-
-        patch.put("deptId", deptId);
-        patch.put("deptName", deptName);
-        patch.put("deptSubId", deptSubId);
-        patch.put("deptSubName", deptSubName);
-        patch.put("date", date);
-        patch.put("doctorId", candidate.getDoctorId());
-        patch.put("doctorName", candidate.getDoctorName());
-        patch.put("pendingOrder", order);
-        patch.put("awaitingConfirmation", true);
-        patch.put("requiresLogin", false);
-
-        observation.put("selectedOrder", order);
-
-        AgentResult handoffResult = buildResult("schedule-agent", HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK);
-        handoffResult.setReply("Slot selected. Move to policy check.");
-        handoffResult.setSummary("slot_selected");
-        handoffResult.setToolName("searchScheduleSlots");
-        handoffResult.setObservation(observation);
-        handoffResult.setMemoryPatch(patch);
-        Map<String, Object> toolInput = new HashMap<>();
-        toolInput.put("deptSubId", deptSubId);
-        toolInput.put("doctorId", candidate.getDoctorId());
-        toolInput.put("date", date);
-        handoffResult.setToolInput(toolInput);
-        return handoffResult;
+        return buildNoSlotResult(state, observation);
     }
 
-    private Candidate findCandidate(Integer deptSubId, Integer doctorId, String date) {
-        ArrayList<HashMap> doctors = registrationAgentTools.searchDoctorPlansInDay(deptSubId, date);
+    private QueryState buildTrustedState(Map<String, Object> payload, Map<String, Object> memory, String userMessage) {
+        QueryState state = new QueryState();
+        state.setDeptId(firstInt(payload.get("deptId"), memory.get("deptId")));
+        state.setDeptSubId(firstInt(payload.get("deptSubId"), memory.get("deptSubId")));
+        state.setDoctorId(firstInt(payload.get("doctorId"), memory.get("doctorId")));
+        state.setDeptName(firstText(payload.get("deptName"), memory.get("deptName")));
+        if (!StringUtils.hasText(state.getDeptName())) {
+            state.setDeptName(extractDeptName(userMessage));
+        }
+        state.setDeptSubName(firstText(payload.get("deptSubName"), memory.get("deptSubName")));
+        state.setDoctorName(firstText(payload.get("doctorName"), memory.get("doctorName")));
+        if (!StringUtils.hasText(state.getDoctorName())) {
+            state.setDoctorName(extractDoctorName(userMessage));
+        }
+        state.setDate(firstText(payload.get("date"), memory.get("date")));
+        if (!StringUtils.hasText(state.getDate())) {
+            state.setDate(parseDateHint(userMessage));
+        }
+        return state;
+    }
+
+    private ToolDecision decideNextTool(QueryState state) {
+        if (state.getCandidate() != null) {
+            return ToolDecision.FINISH;
+        }
+        if (state.getDeptSubId() == null) {
+            if (state.getDeptId() == null) {
+                return StringUtils.hasText(state.getDeptName()) ? ToolDecision.MATCH_DEPARTMENT : ToolDecision.ASK_USER;
+            }
+            return ToolDecision.SEARCH_SUB_DEPARTMENTS;
+        }
+        if (!StringUtils.hasText(state.getDate())) {
+            return ToolDecision.ASK_USER;
+        }
+        if (state.getDoctors() == null) {
+            return ToolDecision.SEARCH_DOCTORS;
+        }
+        return ToolDecision.SEARCH_SLOTS;
+    }
+
+    private ToolDecision guardDecision(ToolDecision decision, QueryState state) {
+        if (decision == ToolDecision.SEARCH_SLOTS && state.getDoctors() == null) {
+            return ToolDecision.SEARCH_DOCTORS;
+        }
+        if ((decision == ToolDecision.SEARCH_DOCTORS || decision == ToolDecision.SEARCH_SLOTS) && !StringUtils.hasText(state.getDate())) {
+            return ToolDecision.ASK_USER;
+        }
+        if ((decision == ToolDecision.SEARCH_DOCTORS || decision == ToolDecision.SEARCH_SLOTS) && state.getDeptSubId() == null) {
+            if (state.getDeptId() != null) {
+                return ToolDecision.SEARCH_SUB_DEPARTMENTS;
+            }
+            if (StringUtils.hasText(state.getDeptName())) {
+                return ToolDecision.MATCH_DEPARTMENT;
+            }
+            return ToolDecision.ASK_USER;
+        }
+        if (decision == ToolDecision.SEARCH_SUB_DEPARTMENTS && state.getDeptId() == null) {
+            return StringUtils.hasText(state.getDeptName()) ? ToolDecision.MATCH_DEPARTMENT : ToolDecision.ASK_USER;
+        }
+        return decision;
+    }
+
+    private TerminalOutcome runToolStep(ToolDecision decision, QueryState state, Map<String, Object> observation) {
+        switch (decision) {
+            case MATCH_DEPARTMENT:
+                return matchDepartment(state, observation);
+            case SEARCH_SUB_DEPARTMENTS:
+                return searchSubDepartments(state, observation);
+            case SEARCH_DOCTORS:
+                return searchDoctors(state, observation);
+            case SEARCH_SLOTS:
+                return searchSlots(state, observation);
+            case FINISH:
+                return TerminalOutcome.SUCCESS;
+            case ASK_USER:
+            default:
+                return TerminalOutcome.ASK_USER;
+        }
+    }
+
+    private TerminalOutcome matchDepartment(QueryState state, Map<String, Object> observation) {
+        ArrayList<HashMap> departments = medicalDeptAgentTools.searchDepartments(null, true);
+        state.setDepartments(departments);
+        observation.put("departments", departments);
+        HashMap matchedDepartment = matchDepartmentByName(state.getDeptName(), departments);
+        if (matchedDepartment == null) {
+            return TerminalOutcome.ASK_USER;
+        }
+        state.setDeptId(intValue(matchedDepartment.get("id")));
+        state.setDeptName(stringValue(matchedDepartment.get("name")));
+        return TerminalOutcome.CONTINUE;
+    }
+
+    private TerminalOutcome searchSubDepartments(QueryState state, Map<String, Object> observation) {
+        ArrayList<HashMap> subDepartments = medicalDeptAgentTools.searchSubDepartments(state.getDeptId());
+        state.setSubDepartments(subDepartments);
+        observation.put("subDepartments", subDepartments);
+        if (subDepartments == null || subDepartments.isEmpty()) {
+            return TerminalOutcome.ASK_USER;
+        }
+        HashMap selectedSub = matchSubDepartment(state.getDeptSubId(), state.getDeptSubName(), subDepartments);
+        if (selectedSub == null) {
+            selectedSub = subDepartments.get(0);
+        }
+        state.setDeptSubId(intValue(selectedSub.get("id")));
+        state.setDeptSubName(stringValue(selectedSub.get("name")));
+        if (!StringUtils.hasText(state.getDeptName())) {
+            state.setDeptName(stringValue(selectedSub.get("deptName")));
+        }
+        return TerminalOutcome.CONTINUE;
+    }
+
+    private TerminalOutcome searchDoctors(QueryState state, Map<String, Object> observation) {
+        ArrayList<HashMap> doctors = registrationAgentTools.searchDoctorPlansInDay(state.getDeptSubId(), state.getDate());
+        state.setDoctors(doctors);
+        observation.put("doctors", doctors);
+        if (doctors == null || doctors.isEmpty()) {
+            return TerminalOutcome.NO_SLOT;
+        }
+        if (state.getDoctorId() != null || StringUtils.hasText(state.getDoctorName())) {
+            HashMap matchedDoctor = matchDoctor(state.getDoctorId(), state.getDoctorName(), doctors);
+            if (matchedDoctor == null) {
+                return TerminalOutcome.NO_SLOT;
+            }
+            state.setDoctorId(intValue(matchedDoctor.get("id")));
+            state.setDoctorName(stringValue(matchedDoctor.get("name")));
+        }
+        return TerminalOutcome.CONTINUE;
+    }
+
+    private TerminalOutcome searchSlots(QueryState state, Map<String, Object> observation) {
+        Candidate candidate = selectCandidate(state.getDoctors(), state.getDoctorId(), state.getDoctorName(), state.getDate());
+        if (candidate == null) {
+            return TerminalOutcome.NO_SLOT;
+        }
+        state.setCandidate(candidate);
+        state.setDoctorId(candidate.getDoctorId());
+        state.setDoctorName(candidate.getDoctorName());
+        observation.put("selectedOrder", buildOrderPayload(state));
+        return TerminalOutcome.SUCCESS;
+    }
+
+    private Candidate selectCandidate(ArrayList<HashMap> doctors, Integer doctorId, String doctorName, String date) {
         if (doctors == null || doctors.isEmpty()) {
             return null;
         }
-        if (doctorId != null) {
-            for (HashMap doctor : doctors) {
-                if (doctorId.equals(intValue(doctor.get("id")))) {
-                    return findAvailableByDoctor(doctor, date);
-                }
-            }
-            return null;
+        if (doctorId != null || StringUtils.hasText(doctorName)) {
+            HashMap matchedDoctor = matchDoctor(doctorId, doctorName, doctors);
+            return matchedDoctor == null ? null : findAvailableByDoctor(matchedDoctor, date);
         }
         for (HashMap doctor : doctors) {
             Candidate candidate = findAvailableByDoctor(doctor, date);
@@ -148,6 +223,132 @@ public class ScheduleAgentWorker implements AgentWorker {
             }
         }
         return null;
+    }
+
+    private HashMap matchDepartmentByName(String deptName, ArrayList<HashMap> departments) {
+        if (!StringUtils.hasText(deptName) || departments == null || departments.isEmpty()) {
+            return null;
+        }
+        for (HashMap department : departments) {
+            String name = stringValue(department.get("name"));
+            if (matchesName(name, deptName)) {
+                return department;
+            }
+        }
+        return null;
+    }
+
+    private HashMap matchSubDepartment(Integer deptSubId, String deptSubName, ArrayList<HashMap> subDepartments) {
+        if (subDepartments == null || subDepartments.isEmpty()) {
+            return null;
+        }
+        if (deptSubId != null) {
+            for (HashMap subDepartment : subDepartments) {
+                if (deptSubId.equals(intValue(subDepartment.get("id")))) {
+                    return subDepartment;
+                }
+            }
+        }
+        if (!StringUtils.hasText(deptSubName)) {
+            return null;
+        }
+        for (HashMap subDepartment : subDepartments) {
+            String name = stringValue(subDepartment.get("name"));
+            if (matchesName(name, deptSubName)) {
+                return subDepartment;
+            }
+        }
+        return null;
+    }
+
+    private HashMap matchDoctor(Integer doctorId, String doctorName, ArrayList<HashMap> doctors) {
+        if (doctors == null || doctors.isEmpty()) {
+            return null;
+        }
+        if (doctorId != null) {
+            for (HashMap doctor : doctors) {
+                if (doctorId.equals(intValue(doctor.get("id")))) {
+                    return doctor;
+                }
+            }
+        }
+        if (!StringUtils.hasText(doctorName)) {
+            return null;
+        }
+        for (HashMap doctor : doctors) {
+            String name = stringValue(doctor.get("name"));
+            if (matchesName(name, doctorName)) {
+                return doctor;
+            }
+        }
+        return null;
+    }
+
+    private AgentResult buildAskUserResult(QueryState state, Map<String, Object> observation) {
+        AgentResult result = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
+        result.setReply("请先告诉我诊室和日期，例如：明天口腔科。");
+        result.setSummary("missing_slots_input");
+        result.setObservation(observation);
+        result.setMemoryPatch(buildQueryPatch(state, false));
+        return result;
+    }
+
+    private AgentResult buildNoSlotResult(QueryState state, Map<String, Object> observation) {
+        AgentResult result = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
+        result.setReply("暂时没有找到可用号源，请换个日期或诊室再试。");
+        result.setSummary("no_slot_available");
+        result.setToolName("searchScheduleSlots");
+        result.setObservation(observation);
+        result.setMemoryPatch(buildQueryPatch(state, false));
+        return result;
+    }
+
+    private AgentResult buildSuccessResult(QueryState state, Map<String, Object> observation) {
+        AgentResult result = buildResult("schedule-agent", HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK);
+        result.setReply("已为你选中可挂号源，开始校验挂号条件。");
+        result.setSummary("slot_selected");
+        result.setToolName("searchScheduleSlots");
+        result.setObservation(observation);
+        result.setMemoryPatch(buildQueryPatch(state, true));
+        Map<String, Object> toolInput = new HashMap<>();
+        toolInput.put("deptSubId", state.getDeptSubId());
+        toolInput.put("doctorId", state.getDoctorId());
+        toolInput.put("date", state.getDate());
+        result.setToolInput(toolInput);
+        return result;
+    }
+
+    private Map<String, Object> buildQueryPatch(QueryState state, boolean selected) {
+        Map<String, Object> patch = new HashMap<>();
+        patch.put("deptId", state.getDeptId());
+        patch.put("deptName", state.getDeptName());
+        patch.put("deptSubId", state.getDeptSubId());
+        patch.put("deptSubName", state.getDeptSubName());
+        patch.put("date", state.getDate());
+        patch.put("doctorId", state.getDoctorId());
+        patch.put("doctorName", state.getDoctorName());
+        patch.put("requiresLogin", false);
+        if (selected) {
+            patch.put("pendingOrder", buildOrderPayload(state));
+            patch.put("awaitingConfirmation", true);
+            return patch;
+        }
+        patch.put("pendingOrder", null);
+        patch.put("awaitingConfirmation", false);
+        return patch;
+    }
+
+    private Map<String, Object> buildOrderPayload(QueryState state) {
+        Map<String, Object> order = state.getCandidate().toOrderPayload();
+        order.put("deptSubId", state.getDeptSubId());
+        order.put("deptId", state.getDeptId());
+        if (StringUtils.hasText(state.getDeptName())) {
+            order.put("deptName", state.getDeptName());
+        }
+        if (StringUtils.hasText(state.getDeptSubName())) {
+            order.put("deptSubName", state.getDeptSubName());
+        }
+        return order;
     }
 
     private Candidate findAvailableByDoctor(HashMap doctor, String date) {
@@ -185,18 +386,30 @@ public class ScheduleAgentWorker implements AgentWorker {
         return maximum - num;
     }
 
-    private Integer matchDeptIdByName(String deptName) {
+    private String extractDeptName(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
         ArrayList<HashMap> departments = medicalDeptAgentTools.searchDepartments(null, true);
         for (HashMap department : departments) {
             String name = stringValue(department.get("name"));
-            if (!StringUtils.hasText(name)) {
-                continue;
-            }
-            if (name.contains(deptName) || deptName.contains(name)) {
-                return intValue(department.get("id"));
+            if (matchesName(name, message)) {
+                return name;
             }
         }
         return null;
+    }
+
+    private String extractDoctorName(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        Matcher matcher = DOCTOR_HINT_PATTERN.matcher(message);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private boolean matchesName(String left, String right) {
+        return StringUtils.hasText(left) && StringUtils.hasText(right) && (left.contains(right) || right.contains(left));
     }
 
     private AgentResult buildResult(String agent, HandoffAction action, MultiAgentStage nextStage) {
@@ -270,6 +483,124 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     private Map<String, Object> safeMap(Map<String, Object> map) {
         return map == null ? new HashMap<String, Object>() : map;
+    }
+
+    private enum ToolDecision {
+        MATCH_DEPARTMENT,
+        SEARCH_SUB_DEPARTMENTS,
+        SEARCH_DOCTORS,
+        SEARCH_SLOTS,
+        ASK_USER,
+        FINISH
+    }
+
+    private enum TerminalOutcome {
+        CONTINUE,
+        SUCCESS,
+        NO_SLOT,
+        ASK_USER
+    }
+
+    private static class QueryState {
+        private Integer deptId;
+        private String deptName;
+        private Integer deptSubId;
+        private String deptSubName;
+        private Integer doctorId;
+        private String doctorName;
+        private String date;
+        private ArrayList<HashMap> departments;
+        private ArrayList<HashMap> subDepartments;
+        private ArrayList<HashMap> doctors;
+        private Candidate candidate;
+
+        public Integer getDeptId() {
+            return deptId;
+        }
+
+        public void setDeptId(Integer deptId) {
+            this.deptId = deptId;
+        }
+
+        public String getDeptName() {
+            return deptName;
+        }
+
+        public void setDeptName(String deptName) {
+            this.deptName = deptName;
+        }
+
+        public Integer getDeptSubId() {
+            return deptSubId;
+        }
+
+        public void setDeptSubId(Integer deptSubId) {
+            this.deptSubId = deptSubId;
+        }
+
+        public String getDeptSubName() {
+            return deptSubName;
+        }
+
+        public void setDeptSubName(String deptSubName) {
+            this.deptSubName = deptSubName;
+        }
+
+        public Integer getDoctorId() {
+            return doctorId;
+        }
+
+        public void setDoctorId(Integer doctorId) {
+            this.doctorId = doctorId;
+        }
+
+        public String getDoctorName() {
+            return doctorName;
+        }
+
+        public void setDoctorName(String doctorName) {
+            this.doctorName = doctorName;
+        }
+
+        public String getDate() {
+            return date;
+        }
+
+        public void setDate(String date) {
+            this.date = date;
+        }
+
+        public ArrayList<HashMap> getDepartments() {
+            return departments;
+        }
+
+        public void setDepartments(ArrayList<HashMap> departments) {
+            this.departments = departments;
+        }
+
+        public ArrayList<HashMap> getSubDepartments() {
+            return subDepartments;
+        }
+
+        public void setSubDepartments(ArrayList<HashMap> subDepartments) {
+            this.subDepartments = subDepartments;
+        }
+
+        public ArrayList<HashMap> getDoctors() {
+            return doctors;
+        }
+
+        public void setDoctors(ArrayList<HashMap> doctors) {
+            this.doctors = doctors;
+        }
+
+        public Candidate getCandidate() {
+            return candidate;
+        }
+
+        public void setCandidate(Candidate candidate) {
+            this.candidate = candidate;
+        }
     }
 
     private static class Candidate {

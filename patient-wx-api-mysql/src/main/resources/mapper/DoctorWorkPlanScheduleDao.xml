@@ -17,6 +17,24 @@
         ORDER BY s.id
     </select>
 
+    <select id="searchScheduleSnapshot" parameterType="Map" resultType="HashMap">
+        SELECT p.id AS workPlanId,
+               p.doctor_id AS doctorId,
+               p.dept_sub_id AS deptSubId,
+               DATE_FORMAT(p.date, '%Y-%m-%d') AS date,
+               s.id AS scheduleId,
+               s.slot,
+               s.maximum AS maximum,
+               s.num AS num,
+               FORMAT(IFNULL(dp.price_1, 0), 2) AS amount
+        FROM doctor_work_plan p
+                 JOIN doctor_work_plan_schedule s ON p.id = s.work_plan_id
+                 LEFT JOIN doctor_price dp ON p.doctor_id = dp.doctor_id
+        WHERE p.id = #{workPlanId}
+          AND s.id = #{scheduleId}
+        LIMIT 1
+    </select>
+
     <!-- 更新时段号源数量 -->
     <update id="updateNumById" parameterType="Map">
         UPDATE doctor_work_plan_schedule

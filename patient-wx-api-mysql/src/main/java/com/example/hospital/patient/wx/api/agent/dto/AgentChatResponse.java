@@ -18,6 +18,10 @@ public class AgentChatResponse {
     private List<AgentResponseCard> cards = new ArrayList<>();
     private List<AgentToolLog> toolLogs = new ArrayList<>();
     private List<AgentPlanStep> steps = new ArrayList<>();
+    private List<AgentFlowItem> agentFlows = new ArrayList<>();
     private AgentConfirmation confirmation;
+    private String errorCode;
+    private Boolean retryable;
+    private String errorMessage;
     private Map<String, Object> memory;
 }
