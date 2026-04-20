@@ -138,6 +138,7 @@ hospital
 - 一期已覆盖：科室查询、诊室查询、医生查询、号源日期/时段查询、就诊卡状态查询、消息查询、确认后挂号。
 - 一期挂号写操作保持强确认，用户需先完成条件校验，再在助手中确认后才会真正执行挂号。
 - 一期暂不开放：取消挂号、评价提交、收藏写操作、视频问诊写操作、人脸认证流程。
+- 当前 `/agent/chat` 的 DashScope 意图识别已补充一次分类重试（429/5xx）、失败降级、prompt 截断、memory 白名单和 token/latency 观测，避免模型抖动直接打断编排。
 - 详细设计见 `docs/agent/system-prompt.md`、`docs/agent/tool-spec.md`、`docs/agent/architecture.md`。
 
 # Agent 二期对照架构说明
@@ -254,6 +255,8 @@ hospital
   `docs/agent/cc-agent.md`
 - 三期 CC Agent 问题总结：
   `docs/agent/cc-agent-issues.md`
+- 多 Agent 说明：
+  `docs/agent/multi-agent.md`
 
 ## CC Agent 最新说明
 
@@ -276,8 +279,24 @@ hospital
   `patient-wx/main.js` 中的 `api.agentChat`
 - 当前能力范围：
   仅支持挂号相关操作，包括查科室、查医生、查号源、条件校验、确认挂号和失败兜底；不支持通用闲聊
+- 能力边界补充：
+  当前 ReAct 试点只发生在 `ScheduleAgentWorker` 内部；前端页面展示的是压缩后的流程结果、步骤和卡片，不展示 Worker 内部每一步完整思考过程
+- 解释型 RAG：
+  当用户询问“为什么推荐这个”等解释类问题时，后端会从 `docs/agent/*.md` 检索说明片段，并补充“知识来源”卡片；当前知识源已不再使用硬编码片段。
+- 混合检索与降级：
+  explain 链路已升级为“关键词 + 可选 embedding”的最小混合检索；默认可使用本地 `local-hash` embedding，失败时会自动回落到关键词片段回答。
+- 运行观测：
+  当前 `response.memory` 会暴露 `ragMode`、`ragHitCount`、`ragScoreMax`、`ragLatencyMs`、`ragFallbackReason`、`ragCacheHit`、`traceSize`、`chatLatencyMs` 等字段，便于联调、测试和面试讲解。
+- 请求治理：
+  当前 `/agent/multi/chat` 已增加最小请求间隔和每分钟请求数限制，避免 explain/重试请求连续放大。
+- 事实边界：
+  RAG 只负责规则说明和推荐解释，实时号源、医生排班、就诊卡状态、挂号结果仍以 MySQL 数据和真实工具查询为准。
 - 页面可见信息：
   当前步骤、Agent 执行流程、可执行卡片、错误态提示
+- 本轮补充的 2+3 能力：
+  - 闭环能力：支持从多 Agent 内直接给出“查看我的挂号 / 查看消息 / 查看就诊卡”入口，不必每次都重新走挂号问答
+  - 可解释与兜底能力：在已有候选号源或待确认时，会补充“为什么推荐当前结果”卡片，以及“普通挂号”兜底入口
+  - 能力边界：当前“查看我的挂号 / 查看消息 / 查看就诊卡”仍以页面跳转为主，暂未在多 Agent 内直接展开完整列表；取消挂号也还没有在 multi-agent 内打通独立写操作闭环
 - 多 Agent 后端代码目录：
   `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/`
 - 当前编排阶段：
@@ -290,3 +309,30 @@ hospital
   `sql/patient_wx_multi_agent_registration_upgrade.sql`
 - 多 Agent 设计与测试文档：
   `docs/agent/multi-agent.md`
+
+### 小程序演示建议
+- 演示入口：从首页或“我的”进入 AI 挂号助手，对应页面为 `patient-wx/agent/chat/chat.vue`
+- 推荐输入：
+  - `明天口腔科`
+  - `明天呼吸内科`
+  - `挂张医生明天的号`
+- 成功演示点：
+  页面会依次展示当前步骤、Agent 执行流程、可执行卡片；命中候选号源后点击“确认挂号”，再到“我的挂号”查看结果
+- 解释演示点：
+  输入“为什么推荐这个”后，回复会结合 `docs/agent/*.md` 中的说明片段生成压缩解释，并出现“知识来源”卡片
+- 失败演示点：
+  - 未登录：跳 `/pages/mine/mine`
+  - 未建卡：跳 `/user/fill_user_info/fill_user_info`
+  - 无号源或参数失效：提示重新选号
+- ReAct 演示点：
+  - 说“口腔科挂号”但不说日期时，系统会先补科室/诊室，再追问日期
+  - 说“挂张医生的号”但没日期时，系统不会直接乱查时段，而是先停在补日期
+
+### 当前水平与差距
+- 如果只看患者侧多 Agent 挂号助手这条链路，当前大致可到“大型医院试点上线”水平，而不是全院正式生产级
+- 离大型医院正式生产还差：
+  - HIS / EMR / 排班中心真实对接
+  - 支付、取消、退款闭环
+  - 统一认证、实名、医保链路
+  - 监控告警、压测、灰度发布
+  - 高可用、容灾、人工运营后台

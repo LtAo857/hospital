@@ -41,6 +41,7 @@ public class TriageAgentWorker implements AgentWorker {
         patch.put("errorCode", null);
         patch.put("retryable", null);
         patch.put("errorMessage", null);
+        patch.put("requestedView", null);
 
         AgentResult result = new AgentResult();
         result.setAgent("triage-agent");
@@ -52,6 +53,43 @@ public class TriageAgentWorker implements AgentWorker {
             result.setNextStage(MultiAgentStage.POLICY_CHECK);
             result.setReply("已识别到确认提交，开始校验挂号条件。");
             result.setSummary("direct_create_detected");
+            return result;
+        }
+
+        if (isViewMessagesIntent(action, message)) {
+            result.setHandoffAction(HandoffAction.FINISH);
+            result.setNextStage(MultiAgentStage.DONE);
+            result.setReply("可以直接去消息中心查看挂号提醒和系统通知。若你想继续挂号，也可以告诉我科室和日期。");
+            result.setSummary("view_messages_requested");
+            patch.put("requestedView", AgentUiAction.VIEW_MESSAGES);
+            return result;
+        }
+
+        if (isViewUserCardIntent(action, message)) {
+            result.setHandoffAction(HandoffAction.FINISH);
+            result.setNextStage(MultiAgentStage.DONE);
+            result.setReply("可以先查看就诊卡状态；如果还没建卡，我也会给你补建卡入口。");
+            result.setSummary("view_user_card_requested");
+            patch.put("requestedView", AgentUiAction.VIEW_USER_CARD);
+            return result;
+        }
+
+        if (isViewRegistrationsIntent(action, message)) {
+            result.setHandoffAction(HandoffAction.FINISH);
+            result.setNextStage(MultiAgentStage.DONE);
+            result.setReply("可以直接去“我的挂号”查看已有预约记录。若要继续挂号，也可以告诉我科室和日期。 ");
+            result.setSummary("view_registrations_requested");
+            patch.put("requestedView", AgentUiAction.VIEW_REGISTRATIONS);
+            return result;
+        }
+
+        if (isExplainIntent(action, message, memory)) {
+            result.setHandoffAction(HandoffAction.FINISH);
+            result.setNextStage(MultiAgentStage.DONE);
+            result.setReply("我先结合当前挂号上下文和知识库为你解释一下。");
+            result.setSummary("explanation_requested");
+            patch.put("requestedView", AgentUiAction.EXPLAIN_RECOMMENDATION);
+            patch.put("ragQuestion", firstText(message, "为什么推荐当前结果"));
             return result;
         }
 
@@ -87,6 +125,40 @@ public class TriageAgentWorker implements AgentWorker {
             return true;
         }
         return containsAny(message, "registration", "register", "挂号", "预约", "科室", "诊室", "医生", "号源", "内科", "外科", "骨科", "儿科", "口腔科", "眼科", "耳鼻喉科", "皮肤科", "妇科", "产科", "神经内科", "神经外科", "肿瘤科", "康复科");
+    }
+
+    private boolean isViewMessagesIntent(String action, String message) {
+        if (AgentUiAction.VIEW_MESSAGES.equals(action)) {
+            return true;
+        }
+        return containsAny(message, "消息", "通知", "提醒", "消息中心");
+    }
+
+    private boolean isViewUserCardIntent(String action, String message) {
+        if (AgentUiAction.VIEW_USER_CARD.equals(action)) {
+            return true;
+        }
+        return containsAny(message, "就诊卡", "建卡", "实名", "身份信息");
+    }
+
+    private boolean isViewRegistrationsIntent(String action, String message) {
+        if (AgentUiAction.VIEW_REGISTRATIONS.equals(action)) {
+            return true;
+        }
+        return containsAny(message, "我的挂号", "挂号记录", "预约记录", "查看挂号", "我的预约");
+    }
+
+    private boolean isExplainIntent(String action, String message, Map<String, Object> memory) {
+        if (AgentUiAction.EXPLAIN_RECOMMENDATION.equals(action)) {
+            return true;
+        }
+        if (containsAny(message, "挂号规则", "就诊须知", "医保", "普通挂号", "为什么推荐", "推荐理由", "解释一下", "怎么看出来")) {
+            return true;
+        }
+        if (!(memory.get("pendingOrder") instanceof Map) && memory.get("doctorName") == null && memory.get("deptSubName") == null) {
+            return false;
+        }
+        return containsAny(message, "为什么", "为啥", "推荐理由", "为什么推荐", "解释一下", "怎么看出来");
     }
 
     private boolean isDirectCreate(String action, Map<String, Object> payload) {
@@ -155,11 +227,20 @@ public class TriageAgentWorker implements AgentWorker {
         return false;
     }
 
-    private String firstText(Object first, String second) {
-        if (first instanceof String && StringUtils.hasText((String) first)) {
-            return (String) first;
+    private String firstText(Object... values) {
+        if (values == null) {
+            return null;
         }
-        return second;
+        for (Object value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = String.valueOf(value);
+            if (StringUtils.hasText(text)) {
+                return text;
+            }
+        }
+        return null;
     }
 
     private Map<String, Object> safeMap(Map<String, Object> map) {

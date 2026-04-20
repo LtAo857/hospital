@@ -117,7 +117,11 @@ public class AgentOrchestratorService {
             String action = noModelAgentEngine.resolveAction(safeRequest, memory);
             AgentModelDecision modelDecision = dashScopeAgentService.decide(safeRequest, memory);
             if (modelDecision != null) {
-                appendToolLog(response, "dashscope", "success", "已完成意图识别");
+                applyModelTelemetry(memory, modelDecision);
+                appendToolLog(response,
+                        "dashscope",
+                        Boolean.TRUE.equals(modelDecision.getDegraded()) ? "degraded" : "success",
+                        buildModelLogSummary(modelDecision));
                 modelReply = modelDecision.getReply();
                 String modelAction = normalizeAction(modelDecision.getAction());
                 if (StringUtils.hasText(modelAction) && !"none".equals(modelAction)) {
@@ -981,6 +985,38 @@ public class AgentOrchestratorService {
         response.getToolLogs().add(log);
     }
 
+    private void applyModelTelemetry(Map<String, Object> memory, AgentModelDecision modelDecision) {
+        if (memory == null || modelDecision == null) {
+            return;
+        }
+        memory.put("modelLatencyMs", modelDecision.getLatencyMs());
+        memory.put("modelPromptTokens", modelDecision.getPromptTokens());
+        memory.put("modelCompletionTokens", modelDecision.getCompletionTokens());
+        memory.put("modelTotalTokens", modelDecision.getTotalTokens());
+        memory.put("modelDegraded", modelDecision.getDegraded());
+        memory.put("modelFallbackReason", modelDecision.getFallbackReason());
+        memory.put("modelProvider", modelDecision.getProvider());
+        memory.put("modelHttpStatus", modelDecision.getHttpStatus());
+        memory.put("modelRetryCount", modelDecision.getRetryCount());
+    }
+
+    private String buildModelLogSummary(AgentModelDecision modelDecision) {
+        if (modelDecision == null) {
+            return "模型未返回结果";
+        }
+        if (Boolean.TRUE.equals(modelDecision.getDegraded())) {
+            return "模型调用已降级：" + stringValue(modelDecision.getFallbackReason(), "unknown");
+        }
+        StringBuilder builder = new StringBuilder("已完成意图识别");
+        if (modelDecision.getTotalTokens() != null && modelDecision.getTotalTokens() > 0) {
+            builder.append("，tokens=").append(modelDecision.getTotalTokens());
+        }
+        if (modelDecision.getLatencyMs() != null && modelDecision.getLatencyMs() >= 0) {
+            builder.append("，latencyMs=").append(modelDecision.getLatencyMs());
+        }
+        return builder.toString();
+    }
+
     private void appendNavigateCard(AgentChatResponse response, String title, String description, String url) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("url", url);
@@ -1028,6 +1064,15 @@ public class AgentOrchestratorService {
         result.put("hasPendingOrder", hasPendingOrder(memory));
         result.put("modelAction", memory.get("modelAction"));
         result.put("modelReason", memory.get("modelReason"));
+        result.put("modelLatencyMs", memory.get("modelLatencyMs"));
+        result.put("modelPromptTokens", memory.get("modelPromptTokens"));
+        result.put("modelCompletionTokens", memory.get("modelCompletionTokens"));
+        result.put("modelTotalTokens", memory.get("modelTotalTokens"));
+        result.put("modelDegraded", memory.get("modelDegraded"));
+        result.put("modelFallbackReason", memory.get("modelFallbackReason"));
+        result.put("modelProvider", memory.get("modelProvider"));
+        result.put("modelHttpStatus", memory.get("modelHttpStatus"));
+        result.put("modelRetryCount", memory.get("modelRetryCount"));
         return result;
     }
 

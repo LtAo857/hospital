@@ -10,6 +10,8 @@ public final class AgentUiAction {
     public static final String SELECT_SLOT = "select_slot";
     public static final String VIEW_MESSAGES = "view_messages";
     public static final String VIEW_USER_CARD = "view_user_card";
+    public static final String VIEW_REGISTRATIONS = "view_registrations";
+    public static final String EXPLAIN_RECOMMENDATION = "explain_recommendation";
 
     private AgentUiAction() {
     }

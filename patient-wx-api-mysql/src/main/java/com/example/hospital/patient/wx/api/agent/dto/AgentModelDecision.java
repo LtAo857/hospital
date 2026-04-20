@@ -11,4 +11,13 @@ public class AgentModelDecision {
     private Double confidence;
     private String reason;
     private Map<String, Object> payload;
+    private Integer promptTokens;
+    private Integer completionTokens;
+    private Integer totalTokens;
+    private Long latencyMs;
+    private Boolean degraded;
+    private String fallbackReason;
+    private String provider;
+    private Integer httpStatus;
+    private Integer retryCount;
 }

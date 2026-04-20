@@ -1,5 +1,6 @@
 package com.example.hospital.patient.wx.api.agent.multi.service;
 
+import com.example.hospital.patient.wx.api.agent.config.AgentProperties;
 import com.example.hospital.patient.wx.api.agent.dto.AgentChatRequest;
 import com.example.hospital.patient.wx.api.agent.dto.AgentChatResponse;
 import com.example.hospital.patient.wx.api.agent.multi.config.MultiAgentProperties;
@@ -9,6 +10,8 @@ import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
+import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentKnowledgeBase;
+import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentRagService;
 import com.example.hospital.patient.wx.api.agent.multi.worker.AgentWorker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,7 +51,7 @@ class MultiAgentCoordinatorServiceTest {
                 }})
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, workers);
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-1");
         request.setMessage("挂号");
@@ -86,7 +89,7 @@ class MultiAgentCoordinatorServiceTest {
                 }})
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, workers);
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-2");
         request.setMessage("挂号");
@@ -126,7 +129,7 @@ class MultiAgentCoordinatorServiceTest {
                 }})
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, workers);
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-3");
         request.setMessage("明天口腔科");
@@ -140,6 +143,75 @@ class MultiAgentCoordinatorServiceTest {
         Assertions.assertFalse(response.getAgentFlows().isEmpty());
         Assertions.assertEquals("号源查询 Agent", response.getAgentFlows().get(1).getTitle());
         Assertions.assertTrue(response.getAgentFlows().get(1).getSummary().contains("已选中可挂号源"));
+    }
+
+    @Test
+    void shouldAppendRequestedViewCardsAndExplainCard() {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(2);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        Mockito.when(memoryService.load("session-4")).thenReturn(new HashMap<String, Object>() {{
+            put("requestedView", "view_registrations");
+            put("pendingOrder", new HashMap<String, Object>() {{
+                put("doctorName", "张医生");
+            }});
+        }});
+
+        List<AgentWorker> workers = Arrays.asList(
+                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.FINISH, MultiAgentStage.DONE, "已为你准备入口", null)
+        );
+
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        AgentChatRequest request = new AgentChatRequest();
+        request.setSessionId("session-4");
+        request.setMessage("查看我的挂号");
+
+        AgentChatResponse response = service.chat(request, 1001);
+
+        Assertions.assertFalse(response.getCards().isEmpty());
+        Assertions.assertEquals("查看我的挂号", response.getCards().get(0).getTitle());
+        Assertions.assertTrue(response.getCards().stream().anyMatch(card -> "navigate".equals(card.getAction()) && "/pages/registration_list/registration_list".equals(card.getPayload().get("url"))));
+        Assertions.assertTrue(response.getCards().stream().anyMatch(card -> "explain_recommendation".equals(card.getAction())));
+    }
+
+    @Test
+    void shouldUseRagAnswerForExplanationRequest() {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(2);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        Mockito.when(memoryService.load("session-5")).thenReturn(new HashMap<String, Object>() {{
+            put("requestedView", "explain_recommendation");
+            put("ragQuestion", "为什么推荐这个");
+            put("pendingOrder", new HashMap<String, Object>() {{
+                put("doctorName", "张医生");
+            }});
+        }});
+
+        List<AgentWorker> workers = Arrays.asList(
+                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.FINISH, MultiAgentStage.DONE, "我先结合当前挂号上下文和知识库为你解释一下。", null)
+        );
+
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        AgentChatRequest request = new AgentChatRequest();
+        request.setSessionId("session-5");
+        request.setMessage("为什么推荐这个");
+
+        AgentChatResponse response = service.chat(request, 1001);
+
+        Assertions.assertTrue(response.getReply().contains("真实候选号源") || response.getReply().contains("推荐逻辑") || response.getReply().contains("完整思考链"));
+        Assertions.assertNotNull(response.getMemory().get("ragSources"));
+        Assertions.assertTrue(String.valueOf(response.getMemory().get("ragSources")).contains("Multi-Agent 实现说明"));
+        Assertions.assertTrue(response.getCards().stream().anyMatch(card -> "知识来源".equals(card.getTitle())));
+    }
+
+    private MultiAgentRagService buildTestRagService() {
+        AgentProperties agentProperties = new AgentProperties();
+        agentProperties.setLlmEnabled(false);
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setRagEmbeddingEnabled(false);
+        return new MultiAgentRagService(agentProperties, properties, new MultiAgentKnowledgeBase(properties, null));
     }
 
     private AgentWorker fixedWorker(final MultiAgentStage stage,

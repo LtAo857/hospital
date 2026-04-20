@@ -1,0 +1,14 @@
+[
+  {
+    "question": "为什么推荐这个",
+    "expectedTitle": "Multi-Agent 实现说明"
+  },
+  {
+    "question": "查看我的挂号和消息",
+    "expectedTitle": "Multi-Agent 实现说明"
+  },
+  {
+    "question": "挂号规则是什么",
+    "expectedTitle": "Multi-Agent 实现说明"
+  }
+]

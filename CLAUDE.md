@@ -72,6 +72,9 @@
 - 前端页面仍使用：`patient-wx/agent/chat/chat.vue`
 - 后端接口：`POST /agent/multi/chat`
 - 当前能力范围：仅支持挂号相关操作（查科室、查医生、查号源、条件校验、确认挂号、失败兜底）
+- 当前已补充的轻闭环入口：查看我的挂号、查看消息、查看就诊卡
+- 当前已补充的解释与兜底能力：推荐理由说明卡、普通挂号兜底入口
+- 当前解释型 RAG 仅用于规则说明与推荐理由解释，知识源来自 `docs/agent/*.md`；实时号源、医生排班、就诊卡状态与挂号结果仍以真实工具和 MySQL 事实为准
 - 前端可见区块：当前步骤、Agent 执行流程、可执行卡片、错误态提示
 - 关键编排器：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorService.java`
 - 关键 Worker 目录：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/`

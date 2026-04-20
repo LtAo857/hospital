@@ -72,6 +72,8 @@
 			<view class="quick-btn" @tap="sendAction('start_registration')">开始挂号</view>
 			<view class="quick-btn" @tap="sendAction('view_user_card')">就诊卡</view>
 			<view class="quick-btn" @tap="sendAction('view_messages')">消息</view>
+			<view class="quick-btn" @tap="sendAction('view_registrations')">我的挂号</view>
+			<view class="quick-btn" @tap="sendAction('explain_recommendation')">推荐解释</view>
 		</view>
 
 		<view class="composer">
@@ -436,7 +438,7 @@ export default {
 }
 .quick-actions {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(3, 1fr);
 	gap: 16rpx;
 	margin: 20rpx 0;
 }

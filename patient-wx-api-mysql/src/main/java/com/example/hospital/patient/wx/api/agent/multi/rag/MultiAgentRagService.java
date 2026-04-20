@@ -1,0 +1,449 @@
+package com.example.hospital.patient.wx.api.agent.multi.rag;
+
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
+import com.example.hospital.patient.wx.api.agent.config.AgentProperties;
+import com.example.hospital.patient.wx.api.agent.multi.config.MultiAgentProperties;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class MultiAgentRagService {
+    @Resource
+    private AgentProperties agentProperties;
+
+    @Resource
+    private MultiAgentProperties multiAgentProperties;
+
+    @Resource
+    private MultiAgentKnowledgeBase knowledgeBase;
+
+    @Autowired(required = false)
+    private RedisTemplate<Object, Object> redisTemplate;
+
+    public MultiAgentRagService() {
+    }
+
+    public MultiAgentRagService(AgentProperties agentProperties,
+                                MultiAgentKnowledgeBase knowledgeBase) {
+        this.agentProperties = agentProperties;
+        this.knowledgeBase = knowledgeBase;
+        this.multiAgentProperties = new MultiAgentProperties();
+    }
+
+    public MultiAgentRagService(AgentProperties agentProperties,
+                                MultiAgentProperties multiAgentProperties,
+                                MultiAgentKnowledgeBase knowledgeBase) {
+        this.agentProperties = agentProperties;
+        this.multiAgentProperties = multiAgentProperties;
+        this.knowledgeBase = knowledgeBase;
+    }
+
+    public RagAnswer answer(String question, Map<String, Object> memory) {
+        long startedAt = System.currentTimeMillis();
+        Map<String, Object> safeMemory = sanitizeMemory(memory);
+        String cacheKey = buildCacheKey(question, safeMemory);
+        RagAnswer cached = loadCache(cacheKey);
+        if (cached != null) {
+            cached.setLatencyMs(System.currentTimeMillis() - startedAt);
+            cached.setCacheHit(true);
+            return cached;
+        }
+        MultiAgentKnowledgeBase.SearchResult retrieval = knowledgeBase.retrieve(question, 3);
+        List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets = retrieval.getSnippets();
+        RagAnswer answer;
+        if (snippets.isEmpty()) {
+            answer = new RagAnswer(buildFallbackAnswer(safeMemory), snippets, false);
+            answer.setMode("fallback");
+            answer.setFallbackReason(firstText(retrieval.getFallbackReason(), "no_hit"));
+        } else if (!agentProperties.isLlmEnabled() || !StringUtils.hasText(agentProperties.getApiKey())) {
+            answer = new RagAnswer(buildSnippetAnswer(snippets, safeMemory), snippets, false);
+            answer.setMode(retrieval.getMode());
+            answer.setFallbackReason(retrieval.getFallbackReason());
+        } else {
+            try {
+                LlmCallResult llmResult = callLlm(question, safeMemory, snippets);
+                if (llmResult == null || !StringUtils.hasText(llmResult.answer)) {
+                    answer = new RagAnswer(buildSnippetAnswer(snippets, safeMemory), snippets, false);
+                    answer.setMode(retrieval.getMode());
+                    answer.setFallbackReason("llm_empty");
+                } else {
+                    answer = new RagAnswer(llmResult.answer, snippets, true);
+                    answer.setMode(retrieval.getMode());
+                    answer.setPromptTokens(llmResult.promptTokens);
+                    answer.setCompletionTokens(llmResult.completionTokens);
+                }
+            } catch (Exception e) {
+                answer = new RagAnswer(buildSnippetAnswer(snippets, safeMemory), snippets, false);
+                answer.setMode(retrieval.getMode());
+                answer.setFallbackReason("llm_failed");
+            }
+        }
+        answer.setHitCount(snippets.size());
+        answer.setMaxScore(retrieval.getMaxScore());
+        answer.setSafeMemory(safeMemory);
+        answer.setLatencyMs(System.currentTimeMillis() - startedAt);
+        saveCache(cacheKey, answer);
+        return answer;
+    }
+
+    private LlmCallResult callLlm(String question,
+                                  Map<String, Object> memory,
+                                  List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets) {
+        MultiAgentProperties props = multiAgentProperties == null ? new MultiAgentProperties() : multiAgentProperties;
+        int attempts = Math.max(0, props.getRagHttpRetryCount()) + 1;
+        for (int i = 0; i < attempts; i++) {
+            JSONObject body = new JSONObject();
+            body.set("model", agentProperties.getModel());
+            body.set("temperature", 0.2D);
+            JSONArray messages = new JSONArray();
+            messages.add(new JSONObject().set("role", "system").set("content",
+                    "你是医院挂号多 Agent 的说明助手。你只能依据提供的知识片段和当前 memory 回答，禁止编造号源、医生排班、价格、就诊卡状态或挂号结果。回答用中文，2到4句。"));
+            messages.add(new JSONObject().set("role", "user").set("content", buildPrompt(question, memory, snippets)));
+            body.set("messages", messages);
+            HttpRequest request = HttpRequest.post(agentProperties.getBaseUrl())
+                    .header("Content-Type", "application/json")
+                    .timeout(agentProperties.getTimeoutMillis())
+                    .body(body.toString());
+            if (StringUtils.hasText(agentProperties.getApiKey())) {
+                request.header("Authorization", "Bearer " + agentProperties.getApiKey());
+            }
+            HttpResponse httpResponse = request.execute();
+            if (httpResponse.getStatus() < 200 || httpResponse.getStatus() >= 300) {
+                if (!isRetryableStatus(httpResponse.getStatus()) || i == attempts - 1) {
+                    return null;
+                }
+                continue;
+            }
+            JSONObject root = JSONUtil.parseObj(httpResponse.body());
+            JSONArray choices = root.getJSONArray("choices");
+            if (choices == null || choices.isEmpty()) {
+                return null;
+            }
+            JSONObject message = choices.getJSONObject(0).getJSONObject("message");
+            String answer = message == null ? null : message.getStr("content");
+            JSONObject usage = root.getJSONObject("usage");
+            return new LlmCallResult(answer,
+                    usage == null ? estimateTokens(question) : usage.getInt("prompt_tokens", estimateTokens(question)),
+                    usage == null ? estimateTokens(answer) : usage.getInt("completion_tokens", estimateTokens(answer)));
+        }
+        return null;
+    }
+
+    private String buildPrompt(String question,
+                               Map<String, Object> memory,
+                               List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("用户问题: ").append(question == null ? "" : question).append("\n");
+        builder.append("当前 memory: ").append(JSONUtil.toJsonStr(memory == null ? new HashMap<String, Object>() : memory)).append("\n");
+        builder.append("知识片段:\n");
+        for (int i = 0; i < snippets.size(); i++) {
+            MultiAgentKnowledgeBase.KnowledgeSnippet snippet = snippets.get(i);
+            builder.append(i + 1).append(". ")
+                    .append(snippet.getTitle())
+                    .append("：")
+                    .append(snippet.getContent())
+                    .append("\n");
+        }
+        builder.append("要求: 结合当前 memory 和知识片段，给出压缩解释；如果 memory 中已有 deptSubName、doctorName、date、pendingOrder，可以顺带解释当前推荐路径，但不要虚构实时业务事实。\n");
+        return truncate(builder.toString());
+    }
+
+    private String buildSnippetAnswer(List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets, Map<String, Object> memory) {
+        StringBuilder builder = new StringBuilder();
+        if (memory != null && memory.get("pendingOrder") instanceof Map) {
+            builder.append("当前已经命中过真实候选号源，所以系统才会继续保留这个推荐结果。");
+        } else if (memory != null && StringUtils.hasText(stringValue(memory.get("deptSubName")))) {
+            builder.append("当前会优先沿着你已给出的诊室继续查询，不会直接跨科室乱跳。");
+        }
+        for (int i = 0; i < snippets.size(); i++) {
+            builder.append(snippets.get(i).getContent());
+            if (i == 0) {
+                break;
+            }
+        }
+        return builder.toString();
+    }
+
+    private String buildFallbackAnswer(Map<String, Object> memory) {
+        if (memory != null && memory.get("pendingOrder") instanceof Map) {
+            return "当前之所以继续推荐这个结果，是因为系统已经查到了真实候选号源，并且后续还要经过条件校验和确认提交。";
+        }
+        return "当前解释能力主要覆盖挂号规则、就诊卡要求、普通挂号兜底和推荐路径说明；实时号源和挂号结果仍以真实工具查询为准。";
+    }
+
+    private Map<String, Object> sanitizeMemory(Map<String, Object> memory) {
+        Map<String, Object> safe = new LinkedHashMap<String, Object>();
+        if (memory == null || memory.isEmpty()) {
+            return safe;
+        }
+        putIfHasText(safe, "deptName", memory.get("deptName"));
+        putIfHasText(safe, "deptSubName", memory.get("deptSubName"));
+        putIfHasText(safe, "doctorName", memory.get("doctorName"));
+        putIfHasText(safe, "date", memory.get("date"));
+        putIfHasText(safe, "requestedView", memory.get("requestedView"));
+        if (memory.get("pendingOrder") instanceof Map) {
+            Map<?, ?> pendingOrder = (Map<?, ?>) memory.get("pendingOrder");
+            Map<String, Object> summary = new LinkedHashMap<String, Object>();
+            putIfHasText(summary, "deptSubName", pendingOrder.get("deptSubName"));
+            putIfHasText(summary, "doctorName", pendingOrder.get("doctorName"));
+            putIfHasText(summary, "date", pendingOrder.get("date"));
+            if (pendingOrder.get("slot") != null) {
+                summary.put("slot", pendingOrder.get("slot"));
+            }
+            if (!summary.isEmpty()) {
+                safe.put("pendingOrder", summary);
+            }
+        }
+        return safe;
+    }
+
+    private void putIfHasText(Map<String, Object> map, String key, Object value) {
+        if (StringUtils.hasText(stringValue(value))) {
+            map.put(key, String.valueOf(value));
+        }
+    }
+
+    private String truncate(String text) {
+        if (!StringUtils.hasText(text)) {
+            return text;
+        }
+        int limit = multiAgentProperties == null || multiAgentProperties.getRagMaxContextChars() <= 0
+                ? 600
+                : multiAgentProperties.getRagMaxContextChars();
+        return text.length() <= limit ? text : text.substring(0, limit);
+    }
+
+    private String buildCacheKey(String question, Map<String, Object> safeMemory) {
+        return "multi_agent_rag_cache:" + Integer.toHexString((firstText(question, "") + JSONUtil.toJsonStr(safeMemory)).hashCode());
+    }
+
+    @SuppressWarnings("unchecked")
+    private RagAnswer loadCache(String cacheKey) {
+        if (!StringUtils.hasText(cacheKey) || redisTemplate == null) {
+            return null;
+        }
+        Object value = redisTemplate.opsForValue().get(cacheKey);
+        if (!(value instanceof Map)) {
+            return null;
+        }
+        Map<String, Object> map = (Map<String, Object>) value;
+        RagAnswer answer = new RagAnswer(stringValue(map.get("answer")), new ArrayList<MultiAgentKnowledgeBase.KnowledgeSnippet>(), booleanValue(map.get("llmGenerated")));
+        answer.setMode(stringValue(map.get("mode")));
+        answer.setFallbackReason(stringValue(map.get("fallbackReason")));
+        answer.setHitCount(intValue(map.get("hitCount")));
+        answer.setMaxScore(doubleValue(map.get("maxScore")));
+        answer.setPromptTokens(intValue(map.get("promptTokens")));
+        answer.setCompletionTokens(intValue(map.get("completionTokens")));
+        return answer;
+    }
+
+    private void saveCache(String cacheKey, RagAnswer answer) {
+        if (!StringUtils.hasText(cacheKey) || redisTemplate == null || answer == null || !StringUtils.hasText(answer.getAnswer())) {
+            return;
+        }
+        Map<String, Object> map = new HashMap<String, Object>();
+        map.put("answer", answer.getAnswer());
+        map.put("llmGenerated", answer.isLlmGenerated());
+        map.put("mode", answer.getMode());
+        map.put("fallbackReason", answer.getFallbackReason());
+        map.put("hitCount", answer.getHitCount());
+        map.put("maxScore", answer.getMaxScore());
+        map.put("promptTokens", answer.getPromptTokens());
+        map.put("completionTokens", answer.getCompletionTokens());
+        long ttl = multiAgentProperties == null || multiAgentProperties.getRagQueryCacheMinutes() <= 0
+                ? 15L
+                : multiAgentProperties.getRagQueryCacheMinutes();
+        redisTemplate.opsForValue().set(cacheKey, map, ttl, TimeUnit.MINUTES);
+    }
+
+    private boolean isRetryableStatus(int status) {
+        return status == 429 || status >= 500;
+    }
+
+    private int estimateTokens(String text) {
+        if (!StringUtils.hasText(text)) {
+            return 0;
+        }
+        return Math.max(1, text.length() / 4);
+    }
+
+    private String firstText(Object... values) {
+        if (values == null) {
+            return null;
+        }
+        for (Object value : values) {
+            String text = stringValue(value);
+            if (StringUtils.hasText(text)) {
+                return text;
+            }
+        }
+        return null;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private boolean booleanValue(Object value) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof String) {
+            return Boolean.parseBoolean((String) value);
+        }
+        return false;
+    }
+
+    private int intValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String && StringUtils.hasText((String) value)) {
+            return Integer.parseInt((String) value);
+        }
+        return 0;
+    }
+
+    private double doubleValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        if (value instanceof String && StringUtils.hasText((String) value)) {
+            return Double.parseDouble((String) value);
+        }
+        return 0D;
+    }
+
+    private static class LlmCallResult {
+        private final String answer;
+        private final int promptTokens;
+        private final int completionTokens;
+
+        private LlmCallResult(String answer, int promptTokens, int completionTokens) {
+            this.answer = answer;
+            this.promptTokens = promptTokens;
+            this.completionTokens = completionTokens;
+        }
+    }
+
+    public static class RagAnswer {
+        private final String answer;
+        private final List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets;
+        private final boolean llmGenerated;
+        private String mode;
+        private int hitCount;
+        private double maxScore;
+        private String fallbackReason;
+        private long latencyMs;
+        private int promptTokens;
+        private int completionTokens;
+        private boolean cacheHit;
+        private Map<String, Object> safeMemory;
+
+        public RagAnswer(String answer,
+                         List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets,
+                         boolean llmGenerated) {
+            this.answer = answer;
+            this.snippets = snippets;
+            this.llmGenerated = llmGenerated;
+        }
+
+        public String getAnswer() {
+            return answer;
+        }
+
+        public List<MultiAgentKnowledgeBase.KnowledgeSnippet> getSnippets() {
+            return snippets;
+        }
+
+        public boolean isLlmGenerated() {
+            return llmGenerated;
+        }
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        public int getHitCount() {
+            return hitCount;
+        }
+
+        public void setHitCount(int hitCount) {
+            this.hitCount = hitCount;
+        }
+
+        public double getMaxScore() {
+            return maxScore;
+        }
+
+        public void setMaxScore(double maxScore) {
+            this.maxScore = maxScore;
+        }
+
+        public String getFallbackReason() {
+            return fallbackReason;
+        }
+
+        public void setFallbackReason(String fallbackReason) {
+            this.fallbackReason = fallbackReason;
+        }
+
+        public long getLatencyMs() {
+            return latencyMs;
+        }
+
+        public void setLatencyMs(long latencyMs) {
+            this.latencyMs = latencyMs;
+        }
+
+        public int getPromptTokens() {
+            return promptTokens;
+        }
+
+        public void setPromptTokens(int promptTokens) {
+            this.promptTokens = promptTokens;
+        }
+
+        public int getCompletionTokens() {
+            return completionTokens;
+        }
+
+        public void setCompletionTokens(int completionTokens) {
+            this.completionTokens = completionTokens;
+        }
+
+        public boolean isCacheHit() {
+            return cacheHit;
+        }
+
+        public void setCacheHit(boolean cacheHit) {
+            this.cacheHit = cacheHit;
+        }
+
+        public Map<String, Object> getSafeMemory() {
+            return safeMemory;
+        }
+
+        public void setSafeMemory(Map<String, Object> safeMemory) {
+            this.safeMemory = safeMemory;
+        }
+    }
+}

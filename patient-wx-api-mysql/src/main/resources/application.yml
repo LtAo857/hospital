@@ -96,4 +96,22 @@ agent:
   model: qwen-plus
   temperature: 0.2
   timeout-millis: 15000
+  http-retry-count: 1
+  max-prompt-chars: 1200
+  multi:
+    enabled: true
+    session-ttl-minutes: 30
+    max-hops: 8
+    rag-embedding-enabled: true
+    rag-embedding-provider: local
+    rag-embedding-model: local-hash
+    rag-embedding-dimensions: 64
+    rag-keyword-top-k: 3
+    rag-vector-top-k: 3
+    rag-vector-score-threshold: 0.08
+    rag-query-cache-minutes: 15
+    rag-max-context-chars: 600
+    rag-http-retry-count: 1
+    guard-request-limit-per-minute: 12
+    guard-min-interval-millis: 1000
 

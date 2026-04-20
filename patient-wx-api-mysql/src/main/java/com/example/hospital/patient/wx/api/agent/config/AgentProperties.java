@@ -19,4 +19,6 @@ public class AgentProperties {
     private String model = "qwen-plus";
     private double temperature = 0.2D;
     private int timeoutMillis = 15000;
+    private int httpRetryCount = 1;
+    private int maxPromptChars = 1200;
 }

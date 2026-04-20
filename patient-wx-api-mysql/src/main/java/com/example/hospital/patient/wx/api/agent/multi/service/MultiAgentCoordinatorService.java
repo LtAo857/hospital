@@ -16,8 +16,11 @@ import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.multi.trace.AgentTraceEntry;
 import com.example.hospital.patient.wx.api.agent.multi.worker.AgentWorker;
+import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentRagService;
 import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.agent.support.AgentPlanStep;
+import com.example.hospital.patient.wx.api.agent.support.AgentUiAction;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -35,13 +38,18 @@ public class MultiAgentCoordinatorService {
 
     private final MultiAgentProperties properties;
     private final MultiAgentMemoryService memoryService;
+    private final MultiAgentRagService ragService;
+    @Autowired(required = false)
+    private MultiAgentTelemetryService telemetryService;
     private final Map<MultiAgentStage, AgentWorker> workerByStage = new EnumMap<>(MultiAgentStage.class);
 
     public MultiAgentCoordinatorService(MultiAgentProperties properties,
                                         MultiAgentMemoryService memoryService,
+                                        MultiAgentRagService ragService,
                                         List<AgentWorker> workers) {
         this.properties = properties;
         this.memoryService = memoryService;
+        this.ragService = ragService;
         if (workers != null) {
             for (AgentWorker worker : workers) {
                 workerByStage.put(worker.stage(), worker);
@@ -60,6 +68,7 @@ public class MultiAgentCoordinatorService {
         }
 
         Map<String, Object> payload = composePayload(safeRequest, memory);
+        long chatStartedAt = System.currentTimeMillis();
         AgentContext context = new AgentContext();
         context.setSessionId(sessionId);
         context.setRequestId(IdUtil.simpleUUID());
@@ -114,9 +123,12 @@ public class MultiAgentCoordinatorService {
         if (!StringUtils.hasText(finalReply)) {
             finalReply = fallbackReply(finalStage);
         }
+        finalReply = enrichReplyByRag(finalReply, memory);
         memory.put("stage", finalStage.name());
         memory.put("lastReply", finalReply);
         memory.put("traceSize", context.getTrace() == null ? 0 : context.getTrace().size());
+        memory.put("chatLatencyMs", System.currentTimeMillis() - chatStartedAt);
+        memory.put("finalState", resolveState(finalStage, memory));
         memoryService.save(sessionId, memory);
 
         AgentChatResponse response = new AgentChatResponse();
@@ -144,8 +156,94 @@ public class MultiAgentCoordinatorService {
         if (requiresLogin) {
             appendNavigateCard(response, "去登录", "打开个人中心登录后继续挂号", "/pages/mine/mine", "登录");
         }
+        appendRequestedViewCards(response, memory);
         appendFallbackCards(response, memory);
+        appendSuggestedCards(response, memory);
+        appendRagSourceCard(response, memory);
+        if (telemetryService != null) {
+            telemetryService.recordChat(sessionId, response.getMemory());
+        }
         return response;
+    }
+
+    private void appendRagSourceCard(AgentChatResponse response, Map<String, Object> memory) {
+        String ragSources = stringValue(memory.get("ragSources"));
+        if (!StringUtils.hasText(ragSources)) {
+            return;
+        }
+        appendActionCard(response, "知识来源", "本次解释参考了：" + ragSources, AgentUiAction.EXPLAIN_RECOMMENDATION, null, "RAG");
+    }
+
+    private void appendRequestedViewCards(AgentChatResponse response, Map<String, Object> memory) {
+        String requestedView = stringValue(memory.get("requestedView"));
+        if (!StringUtils.hasText(requestedView)) {
+            return;
+        }
+        if (AgentUiAction.VIEW_MESSAGES.equals(requestedView)) {
+            appendNavigateCard(response, "查看消息", "进入消息中心查看挂号提醒和系统通知", "/pages/message_list/message_list", "消息");
+            return;
+        }
+        if (AgentUiAction.VIEW_USER_CARD.equals(requestedView)) {
+            if (booleanValue(memory.get("hasUserCard"))) {
+                appendNavigateCard(response, "查看就诊卡", "进入就诊卡详情页查看实名信息", "/user/user_info_card_detail", "实名");
+            } else {
+                appendNavigateCard(response, "去建卡", "当前还未建卡，先完善就诊卡信息", "/user/fill_user_info/fill_user_info", "建卡");
+            }
+            return;
+        }
+        if (AgentUiAction.VIEW_REGISTRATIONS.equals(requestedView)) {
+            appendNavigateCard(response, "查看我的挂号", "进入“我的挂号”查看已有预约记录", "/pages/registration_list/registration_list", "结果");
+            return;
+        }
+        if (AgentUiAction.EXPLAIN_RECOMMENDATION.equals(requestedView)) {
+            appendNavigateCard(response, "普通挂号", "如果不想继续当前推荐，也可以改走普通挂号流程", "/registration/notice/notice", "兜底");
+        }
+    }
+
+    private void appendSuggestedCards(AgentChatResponse response, Map<String, Object> memory) {
+        if (booleanValue(memory.get("awaitingConfirmation"))) {
+            appendActionCard(response, "为什么推荐这个号源", "解释当前推荐路径和继续确认的原因", AgentUiAction.EXPLAIN_RECOMMENDATION, null, "解释");
+            appendNavigateCard(response, "普通挂号", "若不想继续当前推荐，可切换到普通挂号流程", "/registration/notice/notice", "兜底");
+            appendNavigateCard(response, "查看我的挂号", "若你已经提交过，也可以直接查看已有挂号记录", "/pages/registration_list/registration_list", "结果");
+            return;
+        }
+        if (memory.get("pendingOrder") instanceof Map) {
+            appendActionCard(response, "为什么推荐当前结果", "查看当前诊室、日期和号源的推荐原因", AgentUiAction.EXPLAIN_RECOMMENDATION, null, "解释");
+        }
+    }
+
+    private String enrichReplyByRag(String reply, Map<String, Object> memory) {
+        String requestedView = stringValue(memory.get("requestedView"));
+        if (!AgentUiAction.EXPLAIN_RECOMMENDATION.equals(requestedView) || ragService == null) {
+            return reply;
+        }
+        String question = firstText(memory.get("ragQuestion"), reply, "为什么推荐当前结果");
+        MultiAgentRagService.RagAnswer ragAnswer = ragService.answer(question, memory);
+        if (ragAnswer == null || !StringUtils.hasText(ragAnswer.getAnswer())) {
+            return reply;
+        }
+        if (ragAnswer.getSnippets() != null && !ragAnswer.getSnippets().isEmpty()) {
+            StringBuilder sourceBuilder = new StringBuilder();
+            for (int i = 0; i < ragAnswer.getSnippets().size(); i++) {
+                if (i > 0) {
+                    sourceBuilder.append("、");
+                }
+                sourceBuilder.append(ragAnswer.getSnippets().get(i).getTitle());
+            }
+            memory.put("ragSources", sourceBuilder.toString());
+        } else {
+            memory.remove("ragSources");
+        }
+        memory.put("ragAnswerGenerated", ragAnswer.isLlmGenerated());
+        memory.put("ragMode", ragAnswer.getMode());
+        memory.put("ragHitCount", ragAnswer.getHitCount());
+        memory.put("ragScoreMax", ragAnswer.getMaxScore());
+        memory.put("ragFallbackReason", ragAnswer.getFallbackReason());
+        memory.put("ragLatencyMs", ragAnswer.getLatencyMs());
+        memory.put("ragPromptTokens", ragAnswer.getPromptTokens());
+        memory.put("ragCompletionTokens", ragAnswer.getCompletionTokens());
+        memory.put("ragCacheHit", ragAnswer.isCacheHit());
+        return ragAnswer.getAnswer();
     }
 
     private void appendFallbackCards(AgentChatResponse response, Map<String, Object> memory) {
@@ -205,6 +303,27 @@ public class MultiAgentCoordinatorService {
         card.setBadge("待确认");
         card.setAction(confirmation.getAction());
         card.setPayload(payload);
+        response.getCards().add(card);
+    }
+
+    private void appendActionCard(AgentChatResponse response, String title, String description, String action, Map<String, Object> payload, String badge) {
+        if (response.getCards() != null) {
+            for (AgentResponseCard existing : response.getCards()) {
+                if (existing == null || existing.getPayload() == null && payload != null) {
+                    continue;
+                }
+                if (title.equals(existing.getTitle()) && action.equals(existing.getAction())) {
+                    return;
+                }
+            }
+        }
+        AgentResponseCard card = new AgentResponseCard();
+        card.setType("action");
+        card.setTitle(title);
+        card.setDescription(description);
+        card.setBadge(badge);
+        card.setAction(action);
+        card.setPayload(payload == null ? new HashMap<String, Object>() : new HashMap<>(payload));
         response.getCards().add(card);
     }
 
@@ -335,6 +454,19 @@ public class MultiAgentCoordinatorService {
         result.put("errorCode", memory.get("errorCode"));
         result.put("retryable", memory.get("retryable"));
         result.put("errorMessage", memory.get("errorMessage"));
+        result.put("requestedView", memory.get("requestedView"));
+        result.put("ragSources", memory.get("ragSources"));
+        result.put("ragAnswerGenerated", memory.get("ragAnswerGenerated"));
+        result.put("ragMode", memory.get("ragMode"));
+        result.put("ragHitCount", memory.get("ragHitCount"));
+        result.put("ragScoreMax", memory.get("ragScoreMax"));
+        result.put("ragFallbackReason", memory.get("ragFallbackReason"));
+        result.put("ragLatencyMs", memory.get("ragLatencyMs"));
+        result.put("ragPromptTokens", memory.get("ragPromptTokens"));
+        result.put("ragCompletionTokens", memory.get("ragCompletionTokens"));
+        result.put("ragCacheHit", memory.get("ragCacheHit"));
+        result.put("chatLatencyMs", memory.get("chatLatencyMs"));
+        result.put("finalState", memory.get("finalState"));
         result.put("traceSize", memory.get("traceSize"));
         return result;
     }
@@ -451,6 +583,14 @@ public class MultiAgentCoordinatorService {
             return "已完成";
         }
         switch (summary) {
+            case "view_messages_requested":
+                return "已切换到消息中心入口";
+            case "view_user_card_requested":
+                return "已切换到就诊卡入口";
+            case "view_registrations_requested":
+                return "已切换到挂号记录入口";
+            case "explanation_requested":
+                return "已说明当前推荐原因";
             case "direct_create_detected":
                 return "已识别确认提交动作";
             case "registration_intent_detected":
