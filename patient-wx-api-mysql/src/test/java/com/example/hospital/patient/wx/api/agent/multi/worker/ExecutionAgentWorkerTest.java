@@ -66,20 +66,7 @@ class ExecutionAgentWorkerTest {
                 }});
         ExecutionAgentWorker worker = new ExecutionAgentWorker(registrationAgentTools);
 
-        Map<String, Object> pendingOrder = new HashMap<>();
-        pendingOrder.put("deptSubId", 10);
-        pendingOrder.put("date", "2026-04-20");
-        pendingOrder.put("doctorName", "张医生");
-        pendingOrder.put("scheduleId", 202);
-        pendingOrder.put("slot", 1);
-
-        AgentContext context = new AgentContext();
-        context.setUserId(1001);
-        context.setSessionId("session-1");
-        context.setMemory(new HashMap<String, Object>() {{
-            put("pendingOrder", pendingOrder);
-        }});
-        context.setPayload(new HashMap<String, Object>());
+        AgentContext context = buildContext();
 
         AgentResult result = worker.execute(context);
         Map<String, Object> patch = result.getMemoryPatch();
@@ -92,6 +79,41 @@ class ExecutionAgentWorkerTest {
         Assertions.assertNull(patch.get("errorCode"));
         Assertions.assertEquals("session-1", captor.getValue().get("sessionId"));
         Assertions.assertNotNull(captor.getValue().get("requestId"));
+    }
+
+    @Test
+    void shouldRejectWhenConfirmationMissing() {
+        RegistrationAgentTools registrationAgentTools = Mockito.mock(RegistrationAgentTools.class);
+        ExecutionAgentWorker worker = new ExecutionAgentWorker(registrationAgentTools);
+
+        AgentContext context = buildContext();
+        context.setPayload(new HashMap<String, Object>());
+
+        AgentResult result = worker.execute(context);
+
+        Assertions.assertEquals(HandoffAction.FAIL, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, result.getMemoryPatch().get("errorCode"));
+        Assertions.assertEquals("confirmation_mismatch", result.getMemoryPatch().get("badCaseType"));
+        Mockito.verify(registrationAgentTools, Mockito.never()).createRegistrationOrder(Mockito.anyInt(), Mockito.anyMap());
+    }
+
+    @Test
+    void shouldRejectWhenConfirmationPayloadDiffersFromPendingOrder() {
+        RegistrationAgentTools registrationAgentTools = Mockito.mock(RegistrationAgentTools.class);
+        ExecutionAgentWorker worker = new ExecutionAgentWorker(registrationAgentTools);
+
+        AgentContext context = buildContext();
+        context.setPayload(new HashMap<String, Object>() {{
+            put("confirmed", true);
+            put("amount", "11");
+        }});
+
+        AgentResult result = worker.execute(context);
+
+        Assertions.assertEquals(HandoffAction.FAIL, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, result.getMemoryPatch().get("errorCode"));
+        Assertions.assertEquals("confirmation_mismatch", result.getMemoryPatch().get("badCaseType"));
+        Mockito.verify(registrationAgentTools, Mockito.never()).createRegistrationOrder(Mockito.anyInt(), Mockito.anyMap());
     }
 
     @Test
@@ -146,11 +168,14 @@ class ExecutionAgentWorkerTest {
 
     private AgentContext buildContext() {
         Map<String, Object> pendingOrder = new HashMap<>();
+        pendingOrder.put("workPlanId", 101);
+        pendingOrder.put("scheduleId", 202);
+        pendingOrder.put("doctorId", 303);
         pendingOrder.put("deptSubId", 10);
         pendingOrder.put("date", "2026-04-20");
-        pendingOrder.put("doctorName", "张医生");
-        pendingOrder.put("scheduleId", 202);
         pendingOrder.put("slot", 1);
+        pendingOrder.put("amount", "10");
+        pendingOrder.put("doctorName", "张医生");
 
         AgentContext context = new AgentContext();
         context.setUserId(1001);
@@ -158,7 +183,9 @@ class ExecutionAgentWorkerTest {
         context.setMemory(new HashMap<String, Object>() {{
             put("pendingOrder", pendingOrder);
         }});
-        context.setPayload(new HashMap<String, Object>());
+        context.setPayload(new HashMap<String, Object>() {{
+            put("confirmed", true);
+        }});
         return context;
     }
 }

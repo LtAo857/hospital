@@ -3,6 +3,7 @@ package com.example.hospital.patient.wx.api.agent.multi.worker;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentContext;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.tool.MedicalDeptAgentTools;
 import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
@@ -153,7 +154,31 @@ class ScheduleAgentWorkerTest {
     }
 
     @Test
-    void shouldSelectCandidateWhenSlotAvailable() {
+    void shouldRetryAndDegradeWhenDoctorSearchFails() {
+        MedicalDeptAgentTools medicalDeptAgentTools = Mockito.mock(MedicalDeptAgentTools.class);
+        RegistrationAgentTools registrationAgentTools = Mockito.mock(RegistrationAgentTools.class);
+        Mockito.when(registrationAgentTools.searchDoctorPlansInDay(10, "2026-04-20"))
+                .thenThrow(new RuntimeException("boom"));
+
+        ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
+        AgentContext context = new AgentContext();
+        context.setPayload(new HashMap<String, Object>() {{
+            put("deptSubId", 10);
+            put("date", "2026-04-20");
+        }});
+        context.setMemory(new HashMap<String, Object>());
+
+        AgentResult result = worker.execute(context);
+
+        Assertions.assertEquals(HandoffAction.ASK_USER, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, result.getMemoryPatch().get("errorCode"));
+        Assertions.assertEquals("schedule_tool_failed", result.getMemoryPatch().get("badCaseType"));
+        Assertions.assertEquals(Boolean.FALSE, result.getMemoryPatch().get("awaitingConfirmation"));
+        Mockito.verify(registrationAgentTools, Mockito.times(2)).searchDoctorPlansInDay(10, "2026-04-20");
+    }
+
+    @Test
+    void shouldRetryAndDegradeWhenSlotSearchFails() {
         MedicalDeptAgentTools medicalDeptAgentTools = Mockito.mock(MedicalDeptAgentTools.class);
         RegistrationAgentTools registrationAgentTools = Mockito.mock(RegistrationAgentTools.class);
         ArrayList<HashMap> doctors = new ArrayList<>();
@@ -162,43 +187,23 @@ class ScheduleAgentWorkerTest {
             put("name", "张医生");
             put("price", "18.00");
         }});
-        ArrayList<HashMap> schedules = new ArrayList<>();
-        schedules.add(new HashMap() {{
-            put("workPlanId", 101);
-            put("scheduleId", 202);
-            put("slot", 1);
-            put("maximum", 20);
-            put("num", 5);
-        }});
-        Mockito.when(registrationAgentTools.searchDoctorPlansInDay(10, "2026-04-20"))
-                .thenReturn(doctors);
+        Mockito.when(registrationAgentTools.searchDoctorPlansInDay(10, "2026-04-20")).thenReturn(doctors);
         Mockito.when(registrationAgentTools.searchScheduleSlots(9, "2026-04-20"))
-                .thenReturn(schedules);
+                .thenThrow(new RuntimeException("boom"));
 
         ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
         AgentContext context = new AgentContext();
         context.setPayload(new HashMap<String, Object>() {{
-            put("deptId", 1);
-            put("deptName", "内科");
             put("deptSubId", 10);
-            put("deptSubName", "呼吸内科");
             put("date", "2026-04-20");
         }});
         context.setMemory(new HashMap<String, Object>());
 
         AgentResult result = worker.execute(context);
-        Map<String, Object> patch = result.getMemoryPatch();
-        Map<String, Object> pendingOrder = (Map<String, Object>) patch.get("pendingOrder");
 
-        Assertions.assertEquals(HandoffAction.HANDOFF, result.getHandoffAction());
-        Assertions.assertEquals(MultiAgentStage.POLICY_CHECK, result.getNextStage());
-        Assertions.assertEquals("slot_selected", result.getSummary());
-        Assertions.assertEquals("张医生", patch.get("doctorName"));
-        Assertions.assertEquals(Boolean.TRUE, patch.get("awaitingConfirmation"));
-        Assertions.assertEquals(9, pendingOrder.get("doctorId"));
-        Assertions.assertEquals(202, pendingOrder.get("scheduleId"));
-        Assertions.assertEquals(101, pendingOrder.get("workPlanId"));
-        Assertions.assertEquals(1, pendingOrder.get("slot"));
-        Assertions.assertEquals("18.00", pendingOrder.get("amount"));
+        Assertions.assertEquals(HandoffAction.ASK_USER, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, result.getMemoryPatch().get("errorCode"));
+        Assertions.assertEquals("searchScheduleSlots", result.getToolName());
+        Mockito.verify(registrationAgentTools, Mockito.times(2)).searchScheduleSlots(9, "2026-04-20");
     }
 }

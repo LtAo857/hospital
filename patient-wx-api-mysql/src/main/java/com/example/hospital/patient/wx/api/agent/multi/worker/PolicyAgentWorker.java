@@ -5,7 +5,6 @@ import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
-import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
 import com.example.hospital.patient.wx.api.agent.tool.UserAgentTools;
 import org.springframework.stereotype.Component;
@@ -94,7 +93,27 @@ public class PolicyAgentWorker implements AgentWorker {
             return result;
         }
 
-        String condition = registrationAgentTools.checkRegistrationCondition(userId, deptSubId, date);
+        String condition;
+        try {
+            condition = callWithRetry(new ReadToolCall<String>() {
+                @Override
+                public String call() {
+                    return registrationAgentTools.checkRegistrationCondition(userId, deptSubId, date);
+                }
+            });
+        } catch (Exception e) {
+            result.setHandoffAction(HandoffAction.FAIL);
+            result.setNextStage(MultiAgentStage.MANUAL_FALLBACK);
+            result.setReply("挂号条件校验失败，请稍后重试。");
+            result.setSummary("policy_check_failed");
+            patch.put("policyChecked", false);
+            patch.put("awaitingConfirmation", false);
+            patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR);
+            patch.put("retryable", true);
+            patch.put("errorMessage", "挂号条件校验失败，请稍后重试。");
+            patch.put("badCaseType", "policy_tool_failed");
+            return result;
+        }
         patch.put("policyChecked", true);
         result.setToolName("checkRegistrationCondition");
         Map<String, Object> toolInput = new HashMap<>();
@@ -118,8 +137,8 @@ public class PolicyAgentWorker implements AgentWorker {
             return result;
         }
 
-        boolean confirmed = booleanValue(order.get("confirmed"))
-                || AgentAction.CREATE_REGISTRATION.equals(context.getUserAction());
+        boolean confirmed = booleanValue(order.get("confirmed"));
+        boolean awaitingConfirmation = booleanValue(memory.get("awaitingConfirmation"));
         patch.put("pendingOrder", order);
         if (!confirmed) {
             result.setHandoffAction(HandoffAction.ASK_USER);
@@ -130,6 +149,19 @@ public class PolicyAgentWorker implements AgentWorker {
             patch.put("errorCode", null);
             patch.put("retryable", null);
             patch.put("errorMessage", null);
+            return result;
+        }
+        if (!awaitingConfirmation) {
+            result.setHandoffAction(HandoffAction.FAIL);
+            result.setNextStage(MultiAgentStage.MANUAL_FALLBACK);
+            result.setReply("当前确认信息已失效，请重新选择号源后再试。");
+            result.setSummary("policy_check_failed");
+            patch.put("awaitingConfirmation", false);
+            patch.put("pendingOrder", null);
+            patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH);
+            patch.put("retryable", true);
+            patch.put("errorMessage", "当前确认信息已失效，请重新选择号源后再试。");
+            patch.put("badCaseType", "confirmation_mismatch");
             return result;
         }
 
@@ -154,6 +186,22 @@ public class PolicyAgentWorker implements AgentWorker {
         return MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH;
     }
 
+    private interface ReadToolCall<T> {
+        T call();
+    }
+
+    private <T> T callWithRetry(ReadToolCall<T> call) {
+        RuntimeException last = null;
+        for (int i = 0; i < 2; i++) {
+            try {
+                return call.call();
+            } catch (RuntimeException e) {
+                last = e;
+            }
+        }
+        throw last == null ? new RuntimeException("policy read tool failed") : last;
+    }
+
     private boolean booleanValue(Object value) {
         if (value instanceof Boolean) {
             return (Boolean) value;
@@ -172,7 +220,11 @@ public class PolicyAgentWorker implements AgentWorker {
             return ((Number) value).intValue();
         }
         if (value instanceof String && StringUtils.hasText((String) value)) {
-            return Integer.parseInt((String) value);
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException e) {
+                return null;
+            }
         }
         return null;
     }

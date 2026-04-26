@@ -5,6 +5,7 @@ import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
+import com.example.hospital.patient.wx.api.agent.multi.support.MultiAgentRegistrationPayloadValidator;
 import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
 import com.example.hospital.patient.wx.api.exception.HospitalException;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import java.util.UUID;
 @Component
 public class ExecutionAgentWorker implements AgentWorker {
     private final RegistrationAgentTools registrationAgentTools;
+    private final MultiAgentRegistrationPayloadValidator payloadValidator = new MultiAgentRegistrationPayloadValidator();
 
     public ExecutionAgentWorker(RegistrationAgentTools registrationAgentTools) {
         this.registrationAgentTools = registrationAgentTools;
@@ -34,11 +36,12 @@ public class ExecutionAgentWorker implements AgentWorker {
         Map<String, Object> memory = safeMap(context.getMemory());
         Map<String, Object> payload = safeMap(context.getPayload());
         Map<String, Object> patch = new HashMap<>();
+        Map<String, Object> pendingOrder = memory.get("pendingOrder") instanceof Map
+                ? new HashMap<>((Map<String, Object>) memory.get("pendingOrder"))
+                : new HashMap<String, Object>();
 
         Map<String, Object> order = new HashMap<>();
-        if (memory.get("pendingOrder") instanceof Map) {
-            order.putAll((Map<String, Object>) memory.get("pendingOrder"));
-        }
+        order.putAll(pendingOrder);
         order.putAll(payload);
         if (StringUtils.hasText(context.getSessionId())) {
             order.put("sessionId", context.getSessionId());
@@ -58,9 +61,30 @@ public class ExecutionAgentWorker implements AgentWorker {
         if (context.getUserId() == null) {
             return fail(result, patch, MultiAgentErrorCode.REGISTRATION_LOGIN_REQUIRED, "未登录，暂时无法提交挂号。", false, false, true);
         }
-        if (intValue(order.get("deptSubId")) == null || !StringUtils.hasText(stringValue(order.get("date")))) {
-            return fail(result, patch, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "挂号参数不完整，请重新选择号源。", true, true, false);
+        if (pendingOrder.isEmpty() || !booleanValue(order.get("confirmed"), false)) {
+            patch.put("badCaseType", "confirmation_mismatch");
+            return fail(result, patch, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "当前确认信息已失效，请重新选择号源后再试。", true, true, false);
         }
+        MultiAgentRegistrationPayloadValidator.ValidationResult validationResult = payloadValidator.validateExecutionOrder(order);
+        if (!validationResult.isValid()) {
+            patch.put("badCaseType", validationResult.getBadCaseType());
+            patch.put("badFields", validationResult.getBadFields());
+            return fail(result, patch, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, validationResult.getMessage(), true, true, false);
+        }
+        order.clear();
+        order.putAll(validationResult.getNormalized());
+        if (!payloadValidator.matchesPendingOrder(order, pendingOrder)) {
+            patch.put("badCaseType", "confirmation_mismatch");
+            return fail(result, patch, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "当前确认信息已变化，请重新选择号源后再试。", true, true, false);
+        }
+        if (StringUtils.hasText(context.getSessionId())) {
+            order.put("sessionId", context.getSessionId());
+        }
+        requestId = buildRequestId(context, order);
+        if (StringUtils.hasText(requestId)) {
+            order.put("requestId", requestId);
+        }
+        result.setToolInput(new HashMap<>(order));
 
         try {
             HashMap createResult = registrationAgentTools.createRegistrationOrder(context.getUserId(), order);
@@ -193,7 +217,11 @@ public class ExecutionAgentWorker implements AgentWorker {
             return ((Number) value).intValue();
         }
         if (value instanceof String && StringUtils.hasText((String) value)) {
-            return Integer.parseInt((String) value);
+            try {
+                return Integer.parseInt((String) value);
+            } catch (NumberFormatException e) {
+                return null;
+            }
         }
         return null;
     }

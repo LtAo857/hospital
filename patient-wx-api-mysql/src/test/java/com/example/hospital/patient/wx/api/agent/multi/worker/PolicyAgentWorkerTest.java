@@ -5,7 +5,6 @@ import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
-import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
 import com.example.hospital.patient.wx.api.agent.tool.UserAgentTools;
 import org.junit.jupiter.api.Assertions;
@@ -116,7 +115,7 @@ class PolicyAgentWorkerTest {
     }
 
     @Test
-    void shouldHandoffToExecutionWhenConfirmed() {
+    void shouldFailWhenConfirmedWithoutAwaitingConfirmation() {
         UserAgentTools userAgentTools = Mockito.mock(UserAgentTools.class);
         RegistrationAgentTools registrationAgentTools = Mockito.mock(RegistrationAgentTools.class);
         Mockito.when(userAgentTools.hasUserCard(1001)).thenReturn(true);
@@ -126,7 +125,6 @@ class PolicyAgentWorkerTest {
 
         AgentContext context = new AgentContext();
         context.setUserId(1001);
-        context.setUserAction(AgentAction.CREATE_REGISTRATION);
         context.setPayload(new HashMap<String, Object>() {{
             put("deptSubId", 10);
             put("date", "2026-04-20");
@@ -137,9 +135,36 @@ class PolicyAgentWorkerTest {
         AgentResult result = worker.execute(context);
         Map<String, Object> patch = result.getMemoryPatch();
 
-        Assertions.assertEquals(HandoffAction.HANDOFF, result.getHandoffAction());
-        Assertions.assertEquals(MultiAgentStage.EXECUTE_APPOINTMENT, result.getNextStage());
-        Assertions.assertEquals(Boolean.FALSE, patch.get("awaitingConfirmation"));
-        Assertions.assertNull(patch.get("errorCode"));
+        Assertions.assertEquals(HandoffAction.FAIL, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentStage.MANUAL_FALLBACK, result.getNextStage());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, patch.get("errorCode"));
+        Assertions.assertEquals("confirmation_mismatch", patch.get("badCaseType"));
+        Assertions.assertNull(patch.get("pendingOrder"));
+    }
+
+    @Test
+    void shouldRetryAndFailClosedWhenConditionToolFails() {
+        UserAgentTools userAgentTools = Mockito.mock(UserAgentTools.class);
+        RegistrationAgentTools registrationAgentTools = Mockito.mock(RegistrationAgentTools.class);
+        Mockito.when(userAgentTools.hasUserCard(1001)).thenReturn(true);
+        Mockito.when(registrationAgentTools.checkRegistrationCondition(1001, 10, "2026-04-20"))
+                .thenThrow(new RuntimeException("boom"));
+        PolicyAgentWorker worker = new PolicyAgentWorker(userAgentTools, registrationAgentTools);
+
+        AgentContext context = new AgentContext();
+        context.setUserId(1001);
+        context.setPayload(new HashMap<String, Object>() {{
+            put("deptSubId", 10);
+            put("date", "2026-04-20");
+        }});
+        context.setMemory(new HashMap<String, Object>());
+
+        AgentResult result = worker.execute(context);
+
+        Assertions.assertEquals(HandoffAction.FAIL, result.getHandoffAction());
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, result.getMemoryPatch().get("errorCode"));
+        Assertions.assertEquals("policy_tool_failed", result.getMemoryPatch().get("badCaseType"));
+        Assertions.assertEquals(Boolean.TRUE, result.getMemoryPatch().get("retryable"));
+        Mockito.verify(registrationAgentTools, Mockito.times(2)).checkRegistrationCondition(1001, 10, "2026-04-20");
     }
 }

@@ -24,6 +24,18 @@ public class MultiAgentTelemetryService {
         if (metrics != null && StringUtils.hasText(stringValue(metrics.get("finalState")))) {
             increment("chat_state:" + metrics.get("finalState"));
         }
+        if (metrics != null && StringUtils.hasText(stringValue(metrics.get("errorCode")))) {
+            increment("chat_error:" + metrics.get("errorCode"));
+        }
+        if (metrics != null && StringUtils.hasText(stringValue(metrics.get("badCaseType")))) {
+            increment("chat_bad_case:" + metrics.get("badCaseType"));
+        }
+        if (metrics != null && metrics.get("retryable") != null) {
+            increment("chat_retryable:" + metrics.get("retryable"));
+        }
+        if (metrics != null && StringUtils.hasText(stringValue(metrics.get("replayDecision")))) {
+            increment("chat_replay:" + metrics.get("replayDecision"));
+        }
         log.info("multi-agent chat metrics, sessionId={}, metrics={}", sessionId, metrics);
     }
 

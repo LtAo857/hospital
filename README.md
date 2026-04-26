@@ -1,12 +1,9 @@
 # Star项目以便获取最新动态
 qq交流群： **1081725203**
-# 待完善：
-        框架升级为SpringBoot3.x，集成LangChain4j。
-        添加AI助手，便于患者预约挂号。
 # 项目描述
         智慧医疗挂号系统，为患者、医生和管理者提供一站式医疗服务平台。
         移动端小程序为患者提供了挂号、视频问诊、消息通知、就诊评价、医生收藏等服务；同时为管理者和医生提供了 MIS 管理平台，用于维护医生、科室、排班、评价、收藏等业务数据。本项目集成了 TRTC 音视频能力，可支持患者端与医生端实时视频问诊。
-
+        添加AI助手，便于患者预约挂号。
 # 最近更新
 - 小程序医生详情页补充了电话、收藏状态、评分汇总等信息
 - 小程序个人中心新增“我的收藏”入口，并支持查看收藏医生列表
@@ -18,6 +15,7 @@ qq交流群： **1081725203**
 - 当前多 Agent 默认走 `POST /agent/multi/chat`，前端页面仍复用 `patient-wx/agent/chat/chat.vue`
 - 当前多 Agent 仅支持挂号相关操作，不作为通用闲聊助手使用；页面会展示“当前步骤 / Agent 执行流程 / 可执行卡片”
 - 多 Agent 挂号链路已补充事务、幂等锁、二次复核、审计表和 Quartz 巡检补偿，数据库升级脚本见 `sql/patient_wx_multi_agent_registration_upgrade.sql`
+- 多 Agent 挂号链路已进一步补齐服务端确认闭环、payload 规范化校验、`requestId` 回放幂等、坏例留痕，以及只读工具“重试一次 + 降级”保护
 - 新增管理端“电子处方”独立页，医生可按挂号单开立/编辑处方，患者侧支持按挂号单查看处方详情
 
 # 项目结构
@@ -263,6 +261,8 @@ hospital
   `docs/agent/cc-agent-issues.md`
 - 多 Agent 说明：
   `docs/agent/multi-agent.md`
+- 多 Agent 加固说明：
+  `docs/agent/multi-agent-hardening.md`
 
 ## CC Agent 最新说明
 
@@ -285,6 +285,8 @@ hospital
   `patient-wx/main.js` 中的 `api.agentChat`
 - 当前能力范围：
   仅支持挂号相关操作，包括查科室、查医生、查号源、条件校验、确认挂号和失败兜底；不支持通用闲聊
+- 确认闭环与参数校验：
+  当前确认写操作已改成服务端闭环，只有命中 `awaitingConfirmation + pendingOrder` 且确认参数与待确认快照一致时，才允许继续进入写路径；聊天 `payload`、确认 `payload` 与执行态挂号参数也都已增加共享规范化与结构化校验
 - 能力边界补充：
   当前 ReAct 试点只发生在 `ScheduleAgentWorker` 内部；前端页面展示的是压缩后的流程结果、步骤和卡片，不展示 Worker 内部每一步完整思考过程
 - 解释型 RAG：
@@ -295,6 +297,8 @@ hospital
   当前 `response.memory` 会暴露 `ragMode`、`ragHitCount`、`ragScoreMax`、`ragLatencyMs`、`ragFallbackReason`、`ragCacheHit`、`traceSize`、`chatLatencyMs` 等字段，便于联调、测试和面试讲解。
 - 请求治理：
   当前 `/agent/multi/chat` 已增加最小请求间隔和每分钟请求数限制，避免 explain/重试请求连续放大。
+- 回放、留痕与降级：
+  当前挂号写路径已把 `requestId` 用作真正的回放/幂等键：成功请求可复用结果，处理中请求会拦截重复提交，参数不一致的重放会被拒绝；审计 `trace_json`、telemetry 与 `response.memory` 也已补充 `badCaseType`、`badFields`、`replayDecision` 等结构化信息。`ScheduleAgentWorker` 与 `PolicyAgentWorker` 的只读工具调用默认最多重试一次，随后进入确定性降级，不会把读工具抖动直接放大成错误写入。
 - 事实边界：
   RAG 只负责规则说明和推荐解释，实时号源、医生排班、就诊卡状态、挂号结果仍以 MySQL 数据和真实工具查询为准。
 - 页面可见信息：
@@ -315,6 +319,8 @@ hospital
   `sql/patient_wx_multi_agent_registration_upgrade.sql`
 - 多 Agent 设计与测试文档：
   `docs/agent/multi-agent.md`
+- 多 Agent 挂号链路加固说明：
+  `docs/agent/multi-agent-hardening.md`
 
 ### 小程序演示建议
 - 演示入口：从首页或“我的”进入 AI 挂号助手，对应页面为 `patient-wx/agent/chat/chat.vue`

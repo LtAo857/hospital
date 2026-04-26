@@ -3,6 +3,7 @@ package com.example.hospital.patient.wx.api.agent.multi.worker;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentContext;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.tool.MedicalDeptAgentTools;
 import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
@@ -54,6 +55,9 @@ public class ScheduleAgentWorker implements AgentWorker {
             }
             if (outcome == TerminalOutcome.ASK_USER) {
                 return buildAskUserResult(state, observation);
+            }
+            if (outcome == TerminalOutcome.TOOL_FAILURE) {
+                return buildToolFailureResult(state, observation);
             }
         }
 
@@ -147,57 +151,90 @@ public class ScheduleAgentWorker implements AgentWorker {
     }
 
     private TerminalOutcome matchDepartment(QueryState state, Map<String, Object> observation) {
-        ArrayList<HashMap> departments = medicalDeptAgentTools.searchDepartments(null, true);
-        state.setDepartments(departments);
-        observation.put("departments", departments);
-        HashMap matchedDepartment = matchDepartmentByName(state.getDeptName(), departments);
-        if (matchedDepartment == null) {
-            return TerminalOutcome.ASK_USER;
+        try {
+            ArrayList<HashMap> departments = callWithRetry("searchDepartments", new ReadToolCall<ArrayList<HashMap>>() {
+                @Override
+                public ArrayList<HashMap> call() {
+                    return medicalDeptAgentTools.searchDepartments(null, true);
+                }
+            });
+            state.setDepartments(departments);
+            observation.put("departments", departments);
+            HashMap matchedDepartment = matchDepartmentByName(state.getDeptName(), departments);
+            if (matchedDepartment == null) {
+                return TerminalOutcome.ASK_USER;
+            }
+            state.setDeptId(intValue(matchedDepartment.get("id")));
+            state.setDeptName(stringValue(matchedDepartment.get("name")));
+            return TerminalOutcome.CONTINUE;
+        } catch (Exception e) {
+            markToolFailure(state, "searchDepartments");
+            return TerminalOutcome.TOOL_FAILURE;
         }
-        state.setDeptId(intValue(matchedDepartment.get("id")));
-        state.setDeptName(stringValue(matchedDepartment.get("name")));
-        return TerminalOutcome.CONTINUE;
     }
 
     private TerminalOutcome searchSubDepartments(QueryState state, Map<String, Object> observation) {
-        ArrayList<HashMap> subDepartments = medicalDeptAgentTools.searchSubDepartments(state.getDeptId());
-        state.setSubDepartments(subDepartments);
-        observation.put("subDepartments", subDepartments);
-        if (subDepartments == null || subDepartments.isEmpty()) {
-            return TerminalOutcome.ASK_USER;
+        try {
+            ArrayList<HashMap> subDepartments = callWithRetry("searchSubDepartments", new ReadToolCall<ArrayList<HashMap>>() {
+                @Override
+                public ArrayList<HashMap> call() {
+                    return medicalDeptAgentTools.searchSubDepartments(state.getDeptId());
+                }
+            });
+            state.setSubDepartments(subDepartments);
+            observation.put("subDepartments", subDepartments);
+            if (subDepartments == null || subDepartments.isEmpty()) {
+                return TerminalOutcome.ASK_USER;
+            }
+            HashMap selectedSub = matchSubDepartment(state.getDeptSubId(), state.getDeptSubName(), subDepartments);
+            if (selectedSub == null) {
+                selectedSub = subDepartments.get(0);
+            }
+            state.setDeptSubId(intValue(selectedSub.get("id")));
+            state.setDeptSubName(stringValue(selectedSub.get("name")));
+            if (!StringUtils.hasText(state.getDeptName())) {
+                state.setDeptName(stringValue(selectedSub.get("deptName")));
+            }
+            return TerminalOutcome.CONTINUE;
+        } catch (Exception e) {
+            markToolFailure(state, "searchSubDepartments");
+            return TerminalOutcome.TOOL_FAILURE;
         }
-        HashMap selectedSub = matchSubDepartment(state.getDeptSubId(), state.getDeptSubName(), subDepartments);
-        if (selectedSub == null) {
-            selectedSub = subDepartments.get(0);
-        }
-        state.setDeptSubId(intValue(selectedSub.get("id")));
-        state.setDeptSubName(stringValue(selectedSub.get("name")));
-        if (!StringUtils.hasText(state.getDeptName())) {
-            state.setDeptName(stringValue(selectedSub.get("deptName")));
-        }
-        return TerminalOutcome.CONTINUE;
     }
 
     private TerminalOutcome searchDoctors(QueryState state, Map<String, Object> observation) {
-        ArrayList<HashMap> doctors = registrationAgentTools.searchDoctorPlansInDay(state.getDeptSubId(), state.getDate());
-        state.setDoctors(doctors);
-        observation.put("doctors", doctors);
-        if (doctors == null || doctors.isEmpty()) {
-            return TerminalOutcome.NO_SLOT;
-        }
-        if (state.getDoctorId() != null || StringUtils.hasText(state.getDoctorName())) {
-            HashMap matchedDoctor = matchDoctor(state.getDoctorId(), state.getDoctorName(), doctors);
-            if (matchedDoctor == null) {
+        try {
+            ArrayList<HashMap> doctors = callWithRetry("searchDoctorPlansInDay", new ReadToolCall<ArrayList<HashMap>>() {
+                @Override
+                public ArrayList<HashMap> call() {
+                    return registrationAgentTools.searchDoctorPlansInDay(state.getDeptSubId(), state.getDate());
+                }
+            });
+            state.setDoctors(doctors);
+            observation.put("doctors", doctors);
+            if (doctors == null || doctors.isEmpty()) {
                 return TerminalOutcome.NO_SLOT;
             }
-            state.setDoctorId(intValue(matchedDoctor.get("id")));
-            state.setDoctorName(stringValue(matchedDoctor.get("name")));
+            if (state.getDoctorId() != null || StringUtils.hasText(state.getDoctorName())) {
+                HashMap matchedDoctor = matchDoctor(state.getDoctorId(), state.getDoctorName(), doctors);
+                if (matchedDoctor == null) {
+                    return TerminalOutcome.NO_SLOT;
+                }
+                state.setDoctorId(intValue(matchedDoctor.get("id")));
+                state.setDoctorName(stringValue(matchedDoctor.get("name")));
+            }
+            return TerminalOutcome.CONTINUE;
+        } catch (Exception e) {
+            markToolFailure(state, "searchDoctorPlansInDay");
+            return TerminalOutcome.TOOL_FAILURE;
         }
-        return TerminalOutcome.CONTINUE;
     }
 
     private TerminalOutcome searchSlots(QueryState state, Map<String, Object> observation) {
-        Candidate candidate = selectCandidate(state.getDoctors(), state.getDoctorId(), state.getDoctorName(), state.getDate());
+        Candidate candidate = selectCandidate(state.getDoctors(), state.getDoctorId(), state.getDoctorName(), state.getDate(), state);
+        if (state.hasToolFailure()) {
+            return TerminalOutcome.TOOL_FAILURE;
+        }
         if (candidate == null) {
             return TerminalOutcome.NO_SLOT;
         }
@@ -208,18 +245,21 @@ public class ScheduleAgentWorker implements AgentWorker {
         return TerminalOutcome.SUCCESS;
     }
 
-    private Candidate selectCandidate(ArrayList<HashMap> doctors, Integer doctorId, String doctorName, String date) {
+    private Candidate selectCandidate(ArrayList<HashMap> doctors, Integer doctorId, String doctorName, String date, QueryState state) {
         if (doctors == null || doctors.isEmpty()) {
             return null;
         }
         if (doctorId != null || StringUtils.hasText(doctorName)) {
             HashMap matchedDoctor = matchDoctor(doctorId, doctorName, doctors);
-            return matchedDoctor == null ? null : findAvailableByDoctor(matchedDoctor, date);
+            return matchedDoctor == null ? null : findAvailableByDoctor(matchedDoctor, date, state);
         }
         for (HashMap doctor : doctors) {
-            Candidate candidate = findAvailableByDoctor(doctor, date);
+            Candidate candidate = findAvailableByDoctor(doctor, date, state);
             if (candidate != null) {
                 return candidate;
+            }
+            if (state.hasToolFailure()) {
+                return null;
             }
         }
         return null;
@@ -303,6 +343,21 @@ public class ScheduleAgentWorker implements AgentWorker {
         return result;
     }
 
+    private AgentResult buildToolFailureResult(QueryState state, Map<String, Object> observation) {
+        AgentResult result = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
+        result.setReply("查询号源时出现波动，请稍后重试或改走普通挂号。");
+        result.setSummary("no_slot_available");
+        result.setToolName(state.getLastFailedTool());
+        result.setObservation(observation);
+        Map<String, Object> patch = buildQueryPatch(state, false);
+        patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR);
+        patch.put("retryable", true);
+        patch.put("errorMessage", "查询号源时出现波动，请稍后重试或改走普通挂号。");
+        patch.put("badCaseType", "schedule_tool_failed");
+        result.setMemoryPatch(patch);
+        return result;
+    }
+
     private AgentResult buildSuccessResult(QueryState state, Map<String, Object> observation) {
         AgentResult result = buildResult("schedule-agent", HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK);
         result.setReply("已为你选中可挂号源，开始校验挂号条件。");
@@ -351,12 +406,23 @@ public class ScheduleAgentWorker implements AgentWorker {
         return order;
     }
 
-    private Candidate findAvailableByDoctor(HashMap doctor, String date) {
+    private Candidate findAvailableByDoctor(HashMap doctor, String date, QueryState state) {
         Integer doctorId = intValue(doctor.get("id"));
         if (doctorId == null) {
             return null;
         }
-        ArrayList<HashMap> schedules = registrationAgentTools.searchScheduleSlots(doctorId, date);
+        ArrayList<HashMap> schedules;
+        try {
+            schedules = callWithRetry("searchScheduleSlots", new ReadToolCall<ArrayList<HashMap>>() {
+                @Override
+                public ArrayList<HashMap> call() {
+                    return registrationAgentTools.searchScheduleSlots(doctorId, date);
+                }
+            });
+        } catch (Exception e) {
+            markToolFailure(state, "searchScheduleSlots");
+            return null;
+        }
         if (schedules == null || schedules.isEmpty()) {
             return null;
         }
@@ -390,12 +456,20 @@ public class ScheduleAgentWorker implements AgentWorker {
         if (!StringUtils.hasText(message)) {
             return null;
         }
-        ArrayList<HashMap> departments = medicalDeptAgentTools.searchDepartments(null, true);
-        for (HashMap department : departments) {
-            String name = stringValue(department.get("name"));
-            if (matchesName(name, message)) {
-                return name;
+        try {
+            ArrayList<HashMap> departments = callWithRetry("searchDepartments", new ReadToolCall<ArrayList<HashMap>>() {
+                @Override
+                public ArrayList<HashMap> call() {
+                    return medicalDeptAgentTools.searchDepartments(null, true);
+                }
+            });
+            for (HashMap department : departments) {
+                String name = stringValue(department.get("name"));
+                if (matchesName(name, message)) {
+                    return name;
+                }
             }
+        } catch (Exception ignored) {
         }
         return null;
     }
@@ -410,6 +484,23 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     private boolean matchesName(String left, String right) {
         return StringUtils.hasText(left) && StringUtils.hasText(right) && (left.contains(right) || right.contains(left));
+    }
+
+    private <T> T callWithRetry(String toolName, ReadToolCall<T> call) {
+        RuntimeException last = null;
+        for (int i = 0; i < 2; i++) {
+            try {
+                return call.call();
+            } catch (RuntimeException e) {
+                last = e;
+            }
+        }
+        throw last == null ? new RuntimeException(toolName + " failed") : last;
+    }
+
+    private void markToolFailure(QueryState state, String toolName) {
+        state.setHasToolFailure(true);
+        state.setLastFailedTool(toolName);
     }
 
     private AgentResult buildResult(String agent, HandoffAction action, MultiAgentStage nextStage) {
@@ -498,7 +589,12 @@ public class ScheduleAgentWorker implements AgentWorker {
         CONTINUE,
         SUCCESS,
         NO_SLOT,
-        ASK_USER
+        ASK_USER,
+        TOOL_FAILURE
+    }
+
+    private interface ReadToolCall<T> {
+        T call();
     }
 
     private static class QueryState {
@@ -513,6 +609,8 @@ public class ScheduleAgentWorker implements AgentWorker {
         private ArrayList<HashMap> subDepartments;
         private ArrayList<HashMap> doctors;
         private Candidate candidate;
+        private boolean hasToolFailure;
+        private String lastFailedTool;
 
         public Integer getDeptId() {
             return deptId;
@@ -600,6 +698,22 @@ public class ScheduleAgentWorker implements AgentWorker {
 
         public void setCandidate(Candidate candidate) {
             this.candidate = candidate;
+        }
+
+        public boolean hasToolFailure() {
+            return hasToolFailure;
+        }
+
+        public void setHasToolFailure(boolean hasToolFailure) {
+            this.hasToolFailure = hasToolFailure;
+        }
+
+        public String getLastFailedTool() {
+            return lastFailedTool;
+        }
+
+        public void setLastFailedTool(String lastFailedTool) {
+            this.lastFailedTool = lastFailedTool;
         }
     }
 

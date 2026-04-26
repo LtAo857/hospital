@@ -74,7 +74,11 @@
 - 当前能力范围：仅支持挂号相关操作（查科室、查医生、查号源、条件校验、确认挂号、失败兜底）
 - 当前已补充的轻闭环入口：查看我的挂号、查看消息、查看就诊卡
 - 当前已补充的解释与兜底能力：推荐理由说明卡、普通挂号兜底入口
+- 当前确认写操作已收紧为服务端闭环：只有命中 `awaitingConfirmation + pendingOrder` 且确认参数与待确认快照一致时，才允许继续进入执行阶段；伪造确认或篡改关键字段会被拦下并清理待确认态
+- 当前多 Agent 聊天入口仍是弱类型 `payload`，但已补共享规范化与结构化校验：非法整数、非法日期、非法金额不会直接抛异常，而会返回结构化错误并补 `badCaseType/badFields`
 - 当前解释型 RAG 仅用于规则说明与推荐理由解释，知识源来自 `docs/agent/*.md`；实时号源、医生排班、就诊卡状态与挂号结果仍以真实工具和 MySQL 事实为准
+- 当前挂号写路径已把 `requestId` 作为真正的回放/幂等键使用；成功可复用结果，处理中会拦截重复提交，参数不一致的重放会被拒绝
+- 当前 `ScheduleAgentWorker` / `PolicyAgentWorker` 的只读工具调用已补“最多重试一次 + 确定性降级”；写工具 `createRegistrationOrder` 不自动重试，避免真实二次下单
 - 前端可见区块：当前步骤、Agent 执行流程、可执行卡片、错误态提示
 - 关键编排器：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorService.java`
 - 关键 Worker 目录：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/`
@@ -82,11 +86,11 @@
 - SQL 升级脚本：`sql/patient_wx_multi_agent_registration_upgrade.sql`
 
 #### 当前多 Agent 分工
-- `MultiAgentCoordinatorService`：负责统一编排、维护 session memory、决定下一跳 stage、组装前端步骤/流程/卡片/错误态。
+- `MultiAgentCoordinatorService`：负责统一编排、维护 session memory、决定下一跳 stage、组装前端步骤/流程/卡片/错误态，并在 Worker 执行前做 payload 规范化与确认态预校验。
 - `TriageAgentWorker`：负责识别用户是否进入挂号流程，提取日期等基础意图信息；非挂号请求会被拦回挂号入口。
-- `ScheduleAgentWorker`：负责补全科室/诊室/日期，查询医生与时段号源，并挑选候选挂号单写入 `pendingOrder`。当前该 Worker 内部已试点轻量 ReAct 式决策：按“决定下一步查询 → 守卫跳步 → 执行工具 → 根据观察继续”的小循环推进，但对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 和原有 handoff 契约不变。
-- `PolicyAgentWorker`：负责校验登录态、就诊卡、当日上限、重复挂号等规则；通过后进入确认或执行，失败则返回结构化错误码。
-- `ExecutionAgentWorker`：负责真正提交挂号，传递 `requestId/sessionId`，并把业务异常转换成结构化失败结果。
+- `ScheduleAgentWorker`：负责补全科室/诊室/日期，查询医生与时段号源，并挑选候选挂号单写入 `pendingOrder`。当前该 Worker 内部已试点轻量 ReAct 式决策：按“决定下一步查询 → 守卫跳步 → 执行工具 → 根据观察继续”的小循环推进，但对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 和原有 handoff 契约不变；其只读工具调用默认最多重试一次，随后降级为可重试错误或普通挂号兜底。
+- `PolicyAgentWorker`：负责校验登录态、就诊卡、当日上限、重复挂号等规则；通过后进入确认或执行，失败则返回结构化错误码。当前不再信任前端单独传入的确认标记，并且 `checkRegistrationCondition` 失败时会 fail-closed，阻止继续进入写路径。
+- `ExecutionAgentWorker`：负责真正提交挂号，传递 `requestId/sessionId`，并把业务异常转换成结构化失败结果；执行前会再次校验确认态、执行参数和 `pendingOrder` 一致性。
 
 ## 推荐阅读顺序
 ### 后端问题

@@ -28,6 +28,20 @@ class MultiAgentRegistrationAuditServiceTest {
         Assertions.assertNull(captor.getValue().get("outTradeNo"));
     }
 
+    @Test
+    void shouldUpdateTraceOnly() {
+        MultiAgentRegistrationAuditDao auditDao = Mockito.mock(MultiAgentRegistrationAuditDao.class);
+        MultiAgentRegistrationAuditService service = new MultiAgentRegistrationAuditService();
+        injectDao(service, auditDao);
+
+        service.updateTrace("REQ-2", "{\"trace\":true}");
+
+        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
+        Mockito.verify(auditDao).updateByRequestId(captor.capture());
+        Assertions.assertEquals("REQ-2", captor.getValue().get("requestId"));
+        Assertions.assertEquals("{\"trace\":true}", captor.getValue().get("traceJson"));
+    }
+
     private void injectDao(MultiAgentRegistrationAuditService service, MultiAgentRegistrationAuditDao auditDao) {
         try {
             java.lang.reflect.Field field = MultiAgentRegistrationAuditService.class.getDeclaredField("auditDao");

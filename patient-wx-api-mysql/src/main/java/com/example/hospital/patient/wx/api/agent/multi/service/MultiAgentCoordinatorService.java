@@ -17,6 +17,7 @@ import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.multi.trace.AgentTraceEntry;
 import com.example.hospital.patient.wx.api.agent.multi.worker.AgentWorker;
 import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentRagService;
+import com.example.hospital.patient.wx.api.agent.multi.support.MultiAgentRegistrationPayloadValidator;
 import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.agent.support.AgentPlanStep;
 import com.example.hospital.patient.wx.api.agent.support.AgentUiAction;
@@ -39,6 +40,7 @@ public class MultiAgentCoordinatorService {
     private final MultiAgentProperties properties;
     private final MultiAgentMemoryService memoryService;
     private final MultiAgentRagService ragService;
+    private final MultiAgentRegistrationPayloadValidator payloadValidator;
     @Autowired(required = false)
     private MultiAgentTelemetryService telemetryService;
     private final Map<MultiAgentStage, AgentWorker> workerByStage = new EnumMap<>(MultiAgentStage.class);
@@ -50,6 +52,7 @@ public class MultiAgentCoordinatorService {
         this.properties = properties;
         this.memoryService = memoryService;
         this.ragService = ragService;
+        this.payloadValidator = new MultiAgentRegistrationPayloadValidator();
         if (workers != null) {
             for (AgentWorker worker : workers) {
                 workerByStage.put(worker.stage(), worker);
@@ -67,8 +70,12 @@ public class MultiAgentCoordinatorService {
             memory.remove("userId");
         }
 
-        Map<String, Object> payload = composePayload(safeRequest, memory);
         long chatStartedAt = System.currentTimeMillis();
+        PreparedPayload preparedPayload = composePayload(safeRequest, memory);
+        if (preparedPayload.isTerminalFailure()) {
+            return buildResponse(sessionId, preparedPayload.getReply(), MultiAgentStage.MANUAL_FALLBACK, memory, Collections.<AgentTraceEntry>emptyList(), chatStartedAt);
+        }
+        Map<String, Object> payload = preparedPayload.getPayload();
         AgentContext context = new AgentContext();
         context.setSessionId(sessionId);
         context.setRequestId(IdUtil.simpleUUID());
@@ -120,13 +127,22 @@ public class MultiAgentCoordinatorService {
             break;
         }
 
+        return buildResponse(sessionId, finalReply, finalStage, memory, context.getTrace(), chatStartedAt);
+    }
+
+    private AgentChatResponse buildResponse(String sessionId,
+                                            String finalReply,
+                                            MultiAgentStage finalStage,
+                                            Map<String, Object> memory,
+                                            List<AgentTraceEntry> trace,
+                                            long chatStartedAt) {
         if (!StringUtils.hasText(finalReply)) {
             finalReply = fallbackReply(finalStage);
         }
         finalReply = enrichReplyByRag(finalReply, memory);
         memory.put("stage", finalStage.name());
         memory.put("lastReply", finalReply);
-        memory.put("traceSize", context.getTrace() == null ? 0 : context.getTrace().size());
+        memory.put("traceSize", trace == null ? 0 : trace.size());
         memory.put("chatLatencyMs", System.currentTimeMillis() - chatStartedAt);
         memory.put("finalState", resolveState(finalStage, memory));
         memoryService.save(sessionId, memory);
@@ -136,8 +152,8 @@ public class MultiAgentCoordinatorService {
         response.setSystemPromptVersion(PROMPT_VERSION);
         response.setReply(finalReply);
         response.setState(resolveState(finalStage, memory));
-        response.setAgentFlows(buildAgentFlows(context.getTrace()));
-        response.setToolLogs(buildToolLogs(context.getTrace()));
+        response.setAgentFlows(buildAgentFlows(trace));
+        response.setToolLogs(buildToolLogs(trace));
         response.setSteps(buildSteps(finalStage, memory));
         response.setMemory(exposeMemory(finalStage, memory));
         response.setErrorCode(stringValue(memory.get("errorCode")));
@@ -164,6 +180,27 @@ public class MultiAgentCoordinatorService {
             telemetryService.recordChat(sessionId, response.getMemory());
         }
         return response;
+    }
+
+    private String applyPreparedFailure(Map<String, Object> memory,
+                                        String message,
+                                        String badCaseType,
+                                        Map<String, String> badFields,
+                                        boolean clearPendingOrder,
+                                        boolean clearAwaitingConfirmation) {
+        memory.put("errorCode", MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH);
+        memory.put("retryable", true);
+        memory.put("errorMessage", message);
+        memory.put("badCaseType", badCaseType);
+        memory.put("badCaseStage", MultiAgentStage.POLICY_CHECK.name());
+        memory.put("badFields", badFields == null ? Collections.emptyMap() : new HashMap<>(badFields));
+        if (clearAwaitingConfirmation) {
+            memory.put("awaitingConfirmation", false);
+        }
+        if (clearPendingOrder) {
+            memory.remove("pendingOrder");
+        }
+        return message;
     }
 
     private void appendRagSourceCard(AgentChatResponse response, Map<String, Object> memory) {
@@ -454,6 +491,10 @@ public class MultiAgentCoordinatorService {
         result.put("errorCode", memory.get("errorCode"));
         result.put("retryable", memory.get("retryable"));
         result.put("errorMessage", memory.get("errorMessage"));
+        result.put("badCaseType", memory.get("badCaseType"));
+        result.put("badCaseStage", memory.get("badCaseStage"));
+        result.put("badFields", memory.get("badFields"));
+        result.put("replayDecision", memory.get("replayDecision"));
         result.put("requestedView", memory.get("requestedView"));
         result.put("ragSources", memory.get("ragSources"));
         result.put("ragAnswerGenerated", memory.get("ragAnswerGenerated"));
@@ -501,13 +542,25 @@ public class MultiAgentCoordinatorService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> composePayload(AgentChatRequest request, Map<String, Object> memory) {
-        Map<String, Object> payload = new HashMap<>();
+    private PreparedPayload composePayload(AgentChatRequest request, Map<String, Object> memory) {
+        Map<String, Object> rawPayload = new HashMap<>();
         if (request != null && request.getPayload() != null) {
-            payload.putAll(request.getPayload());
+            rawPayload.putAll(request.getPayload());
         }
-        if (memory.get("pendingOrder") instanceof Map) {
-            Map<String, Object> pendingOrder = (Map<String, Object>) memory.get("pendingOrder");
+        MultiAgentRegistrationPayloadValidator.ValidationResult normalizedChatPayload = payloadValidator.normalizeChatPayload(rawPayload);
+        if (!normalizedChatPayload.isValid()) {
+            return PreparedPayload.failure(applyPreparedFailure(memory,
+                    normalizedChatPayload.getMessage(),
+                    normalizedChatPayload.getBadCaseType(),
+                    normalizedChatPayload.getBadFields(),
+                    true,
+                    true));
+        }
+        Map<String, Object> payload = new HashMap<>(normalizedChatPayload.getNormalized());
+        Map<String, Object> pendingOrder = memory.get("pendingOrder") instanceof Map
+                ? new HashMap<>((Map<String, Object>) memory.get("pendingOrder"))
+                : null;
+        if (pendingOrder != null) {
             for (Map.Entry<String, Object> entry : pendingOrder.entrySet()) {
                 if (!payload.containsKey(entry.getKey()) || payload.get(entry.getKey()) == null) {
                     payload.put(entry.getKey(), entry.getValue());
@@ -521,10 +574,30 @@ public class MultiAgentCoordinatorService {
         mergeFromMemory(payload, memory, "doctorName");
         mergeFromMemory(payload, memory, "deptName");
         mergeFromMemory(payload, memory, "deptSubName");
-        if (request != null && AgentAction.CREATE_REGISTRATION.equals(request.getAction()) && payload.get("confirmed") == null) {
-            payload.put("confirmed", true);
+        boolean confirmationAction = request != null && AgentAction.CREATE_REGISTRATION.equals(request.getAction());
+        boolean confirmed = booleanValue(payload.get("confirmed"));
+        if (!confirmationAction && !confirmed) {
+            return PreparedPayload.success(payload);
         }
-        return payload;
+        if (!booleanValue(memory.get("awaitingConfirmation")) || pendingOrder == null || pendingOrder.isEmpty()) {
+            return PreparedPayload.failure(applyPreparedFailure(memory,
+                    "当前确认信息已失效，请重新选择号源后再试。",
+                    "confirmation_mismatch",
+                    Collections.singletonMap("confirmed", "当前不处于待确认状态"),
+                    true,
+                    true));
+        }
+        MultiAgentRegistrationPayloadValidator.ValidationResult confirmationPayload = payloadValidator.normalizeConfirmationPayload(payload);
+        if (!confirmationPayload.isValid() || !payloadValidator.matchesPendingOrder(confirmationPayload.getNormalized(), pendingOrder)) {
+            return PreparedPayload.failure(applyPreparedFailure(memory,
+                    "当前确认信息已变化，请重新选择号源后再试。",
+                    "confirmation_mismatch",
+                    confirmationPayload.getBadFields(),
+                    true,
+                    true));
+        }
+        payload.put("confirmed", true);
+        return PreparedPayload.success(payload);
     }
 
     private void mergeFromMemory(Map<String, Object> payload, Map<String, Object> memory, String key) {
@@ -757,5 +830,37 @@ public class MultiAgentCoordinatorService {
             return Boolean.parseBoolean((String) value);
         }
         return false;
+    }
+
+    private static class PreparedPayload {
+        private final Map<String, Object> payload;
+        private final boolean terminalFailure;
+        private final String reply;
+
+        private PreparedPayload(Map<String, Object> payload, boolean terminalFailure, String reply) {
+            this.payload = payload;
+            this.terminalFailure = terminalFailure;
+            this.reply = reply;
+        }
+
+        private static PreparedPayload success(Map<String, Object> payload) {
+            return new PreparedPayload(payload, false, null);
+        }
+
+        private static PreparedPayload failure(String reply) {
+            return new PreparedPayload(new HashMap<String, Object>(), true, reply);
+        }
+
+        public Map<String, Object> getPayload() {
+            return payload;
+        }
+
+        public boolean isTerminalFailure() {
+            return terminalFailure;
+        }
+
+        public String getReply() {
+            return reply;
+        }
     }
 }

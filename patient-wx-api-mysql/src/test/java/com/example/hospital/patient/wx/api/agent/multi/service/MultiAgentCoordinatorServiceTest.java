@@ -206,6 +206,67 @@ class MultiAgentCoordinatorServiceTest {
         Assertions.assertTrue(response.getCards().stream().anyMatch(card -> "知识来源".equals(card.getTitle())));
     }
 
+    @Test
+    void shouldRejectForgedConfirmationBeforeCallingWorker() {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(2);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        Mockito.when(memoryService.load("session-6")).thenReturn(new HashMap<String, Object>());
+
+        AgentWorker worker = Mockito.mock(AgentWorker.class);
+        Mockito.when(worker.stage()).thenReturn(MultiAgentStage.INTENT_PARSE);
+
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), Arrays.asList(worker));
+        AgentChatRequest request = new AgentChatRequest();
+        request.setSessionId("session-6");
+        request.setAction("create_registration");
+        request.setPayload(new HashMap<String, Object>() {{
+            put("confirmed", true);
+            put("deptSubId", 10);
+            put("date", "2026-04-20");
+            put("workPlanId", 101);
+            put("scheduleId", 202);
+            put("doctorId", 303);
+            put("slot", 1);
+            put("amount", "10");
+        }});
+
+        AgentChatResponse response = service.chat(request, 1001);
+
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, response.getErrorCode());
+        Assertions.assertEquals("confirmation_mismatch", response.getMemory().get("badCaseType"));
+        Assertions.assertTrue(String.valueOf(response.getErrorMessage()).contains("确认信息已失效"));
+        Mockito.verify(worker, Mockito.never()).execute(Mockito.any(AgentContext.class));
+    }
+
+    @Test
+    void shouldRejectInvalidChatPayloadBeforeCallingWorker() {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(2);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        Mockito.when(memoryService.load("session-7")).thenReturn(new HashMap<String, Object>());
+
+        AgentWorker worker = Mockito.mock(AgentWorker.class);
+        Mockito.when(worker.stage()).thenReturn(MultiAgentStage.INTENT_PARSE);
+
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), Arrays.asList(worker));
+        AgentChatRequest request = new AgentChatRequest();
+        request.setSessionId("session-7");
+        request.setPayload(new HashMap<String, Object>() {{
+            put("deptSubId", "abc");
+            put("date", "2026-02-30");
+        }});
+
+        AgentChatResponse response = service.chat(request, 1001);
+
+        Assertions.assertEquals(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, response.getErrorCode());
+        Assertions.assertEquals("payload_invalid", response.getMemory().get("badCaseType"));
+        Assertions.assertNotNull(response.getMemory().get("badFields"));
+        Mockito.verify(worker, Mockito.never()).execute(Mockito.any(AgentContext.class));
+    }
+
     private MultiAgentRagService buildTestRagService() {
         AgentProperties agentProperties = new AgentProperties();
         agentProperties.setLlmEnabled(false);

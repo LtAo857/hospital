@@ -79,6 +79,17 @@ public class MultiAgentRegistrationAuditService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateTrace(String requestId, String traceJson) {
+        if (!StringUtils.hasText(requestId)) {
+            return;
+        }
+        HashMap<String, Object> update = new HashMap<>();
+        update.put("requestId", requestId);
+        update.put("traceJson", traceJson);
+        auditDao.updateByRequestId(update);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markRepairPending(String requestId, String errorCode, String errorMessage, String traceJson) {
         update(requestId, MultiAgentAuditStatus.RESERVED, errorCode, errorMessage, null, null, traceJson);
     }

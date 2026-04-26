@@ -6,7 +6,9 @@ import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.IdUtil;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentAuditStatus;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode;
+import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.multi.service.MultiAgentRegistrationAuditService;
 import com.example.hospital.patient.wx.api.common.PageUtils;
 import com.example.hospital.patient.wx.api.db.dao.DoctorWorkPlanDao;
@@ -150,17 +152,38 @@ public class RegistrationServiceImpl implements RegistrationService {
         String lockOwner = StringUtils.hasText(requestId) ? requestId : IdUtil.simpleUUID();
         String submitLockKey = buildSubmitLockKey(userId, scheduleId, date, slot);
         String scheduleKey = scheduleId == null ? null : "doctor_schedule_" + scheduleId;
-        String traceJson = auditEnabled ? multiAgentRegistrationAuditService.toTraceJson(buildAuditSnapshot(param)) : null;
+        Map<String, Object> auditSnapshot = buildAuditSnapshot(param);
+        String replayDecision = null;
+        String replayPriorStatus = null;
+        String traceJson = auditEnabled ? multiAgentRegistrationAuditService.toTraceJson(buildTraceSnapshot(auditSnapshot, null, null, null, null, null)) : null;
         if (auditEnabled) {
+            HashMap replay = decideReplay(requestId, auditSnapshot);
+            if (replay != null) {
+                replayDecision = stringValue(replay.get("decision"));
+                replayPriorStatus = stringValue(replay.get("status"));
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot,
+                        replayDecision,
+                        replayPriorStatus,
+                        stringValue(replay.get("errorCode")),
+                        stringValue(replay.get("message")),
+                        null);
+                if (Boolean.TRUE.equals(replay.get("terminal"))) {
+                    return (HashMap) replay.get("result");
+                }
+            }
             multiAgentRegistrationAuditService.prepare(requestId, sessionId, userId, param, traceJson);
         }
 
         if (userId == null || workPlanId == null || scheduleId == null || doctorId == null || deptSubId == null
                 || slot == null || !StringUtils.hasText(date) || inputAmount == null) {
+            traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                    MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "挂号参数不完整，请重新选择号源。", null);
             return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "挂号参数不完整，请重新选择号源。", true, traceJson);
         }
 
         if (!tryAcquireSubmitLock(submitLockKey, lockOwner)) {
+            traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, "duplicate_submit", replayPriorStatus,
+                    MultiAgentErrorCode.REGISTRATION_DUPLICATE_SUBMIT, "挂号请求正在处理中，请勿重复提交。", null);
             return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_DUPLICATE_SUBMIT, "挂号请求正在处理中，请勿重复提交。", true, traceJson);
         }
 
@@ -170,6 +193,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             HashMap userMap = userDao.searchOpenId(userId);
             Integer patientCardId = userMap == null ? null : MapUtil.getInt(userMap, "patientCardId");
             if (patientCardId == null) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_USER_CARD_REQUIRED, "挂号前需要先创建就诊卡。", null);
                 return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_USER_CARD_REQUIRED, "挂号前需要先创建就诊卡。", false, traceJson);
             }
 
@@ -179,6 +204,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 put("date", date);
             }});
             if (!PASS_RESULT.equals(condition)) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus, null, condition, null);
                 return failByCondition(auditEnabled, requestId, condition, traceJson);
             }
 
@@ -191,18 +217,25 @@ public class RegistrationServiceImpl implements RegistrationService {
                 String errorCode = MapUtil.getStr(snapshotFailure, "errorCode");
                 String message = MapUtil.getStr(snapshotFailure, "message");
                 Boolean retryable = MapUtil.getBool(snapshotFailure, "retryable", true);
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus, errorCode, message, null);
                 return failResult(auditEnabled, requestId, errorCode, message, retryable, traceJson);
             }
 
             if (!redisTemplate.hasKey(scheduleKey)) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_SLOT_EXHAUSTED, "该时段号源已满，请重新选择。", null);
                 return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_SLOT_EXHAUSTED, "该时段号源已满，请重新选择。", true, traceJson);
             }
             redisReserved = reserveScheduleSlot(scheduleKey);
             if (!redisReserved) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_SLOT_EXHAUSTED, "该时段号源已满，请重新选择。", null);
                 return failResult(auditEnabled, requestId, MultiAgentErrorCode.REGISTRATION_SLOT_EXHAUSTED, "该时段号源已满，请重新选择。", true, traceJson);
             }
 
             outTradeNo = IdUtil.simpleUUID().toUpperCase();
+            traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                    null, null, outTradeNo);
             if (auditEnabled) {
                 multiAgentRegistrationAuditService.markReserved(requestId, outTradeNo, traceJson);
             }
@@ -237,14 +270,20 @@ public class RegistrationServiceImpl implements RegistrationService {
             }
 
             if (auditEnabled) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        null, null, outTradeNo);
                 multiAgentRegistrationAuditService.markSuccess(requestId, entity.getId(), outTradeNo, traceJson);
             }
             return successResult(entity.getId(), outTradeNo);
         } catch (HospitalException e) {
             if (redisReserved && scheduleKey != null) {
                 boolean compensated = releaseScheduleReservation(scheduleKey);
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, e.getMsg(), outTradeNo);
                 markCompensation(auditEnabled, requestId, traceJson, e.getMsg(), compensated, MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR);
             } else if (auditEnabled) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, e.getMsg(), outTradeNo);
                 multiAgentRegistrationAuditService.markFail(requestId, MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, e.getMsg(), traceJson);
             }
             throw e;
@@ -252,8 +291,12 @@ public class RegistrationServiceImpl implements RegistrationService {
             log.error("register medical appointment failed", e);
             if (redisReserved && scheduleKey != null) {
                 boolean compensated = releaseScheduleReservation(scheduleKey);
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_DB_WRITE_FAILED, "挂号提交失败，请稍后重试。", outTradeNo);
                 markCompensation(auditEnabled, requestId, traceJson, "挂号提交失败，请稍后重试。", compensated, MultiAgentErrorCode.REGISTRATION_DB_WRITE_FAILED);
             } else if (auditEnabled) {
+                traceJson = updateTrace(auditEnabled, requestId, auditSnapshot, replayDecision, replayPriorStatus,
+                        MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, "挂号提交失败，请稍后重试。", outTradeNo);
                 multiAgentRegistrationAuditService.markFail(requestId, MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR, "挂号提交失败，请稍后重试。", traceJson);
             }
             throw new HospitalException("挂号提交失败，请稍后重试。", e);
@@ -421,6 +464,114 @@ public class RegistrationServiceImpl implements RegistrationService {
         multiAgentRegistrationAuditService.markRepairPending(requestId, errorCode, message, traceJson);
     }
 
+    private HashMap decideReplay(String requestId, Map<String, Object> auditSnapshot) {
+        HashMap existing = multiAgentRegistrationAuditService.searchByRequestId(requestId);
+        if (existing == null || existing.isEmpty()) {
+            return null;
+        }
+        String status = stringValue(existing.get("status"));
+        if (!StringUtils.hasText(status) || MultiAgentAuditStatus.INIT.equals(status)) {
+            return null;
+        }
+        if (!matchesAuditSnapshot(existing, auditSnapshot)) {
+            HashMap<String, Object> result = buildErrorResult(MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH, "当前请求与原挂号信息不一致，请重新选择号源。", true);
+            result.put("replayDecision", "reject_mismatch");
+            return new HashMap<String, Object>() {{
+                put("terminal", true);
+                put("decision", "reject_mismatch");
+                put("status", status);
+                put("errorCode", MultiAgentErrorCode.REGISTRATION_PARAM_MISMATCH);
+                put("message", "当前请求与原挂号信息不一致，请重新选择号源。");
+                put("result", result);
+            }};
+        }
+        if (MultiAgentAuditStatus.SUCCESS.equals(status)) {
+            HashMap<String, Object> result = successResult(intValue(existing.get("registrationId")), stringValue(existing.get("outTradeNo")));
+            result.put("replayDecision", "reuse_success");
+            return new HashMap<String, Object>() {{
+                put("terminal", true);
+                put("decision", "reuse_success");
+                put("status", status);
+                put("result", result);
+            }};
+        }
+        if (MultiAgentAuditStatus.RESERVED.equals(status)) {
+            HashMap<String, Object> result = buildErrorResult(MultiAgentErrorCode.REGISTRATION_DUPLICATE_SUBMIT, "挂号请求正在处理中，请勿重复提交。", true);
+            result.put("replayDecision", "reserved_pending");
+            return new HashMap<String, Object>() {{
+                put("terminal", true);
+                put("decision", "reserved_pending");
+                put("status", status);
+                put("errorCode", MultiAgentErrorCode.REGISTRATION_DUPLICATE_SUBMIT);
+                put("message", "挂号请求正在处理中，请勿重复提交。");
+                put("result", result);
+            }};
+        }
+        if (MultiAgentAuditStatus.FAIL.equals(status) || MultiAgentAuditStatus.COMPENSATED.equals(status)) {
+            return new HashMap<String, Object>() {{
+                put("terminal", false);
+                put("decision", "retry_after_failure");
+                put("status", status);
+            }};
+        }
+        return null;
+    }
+
+    private String updateTrace(boolean auditEnabled,
+                               String requestId,
+                               Map<String, Object> requestSnapshot,
+                               String replayDecision,
+                               String priorStatus,
+                               String errorCode,
+                               String message,
+                               String outTradeNo) {
+        if (!auditEnabled) {
+            return null;
+        }
+        String traceJson = multiAgentRegistrationAuditService.toTraceJson(buildTraceSnapshot(requestSnapshot,
+                replayDecision,
+                priorStatus,
+                errorCode,
+                message,
+                outTradeNo));
+        multiAgentRegistrationAuditService.updateTrace(requestId, traceJson);
+        return traceJson;
+    }
+
+    private Map<String, Object> buildTraceSnapshot(Map<String, Object> requestSnapshot,
+                                                   String replayDecision,
+                                                   String priorStatus,
+                                                   String errorCode,
+                                                   String message,
+                                                   String outTradeNo) {
+        HashMap<String, Object> trace = new HashMap<>();
+        trace.put("request", requestSnapshot == null ? new HashMap<String, Object>() : new HashMap<String, Object>(requestSnapshot));
+        trace.put("confirmation", new HashMap<String, Object>());
+        trace.put("failure", new HashMap<String, Object>() {{
+            put("stage", MultiAgentStage.EXECUTE_APPOINTMENT.name());
+            put("errorCode", errorCode);
+            put("message", message);
+        }});
+        trace.put("replay", new HashMap<String, Object>() {{
+            put("requestId", requestSnapshot == null ? null : requestSnapshot.get("requestId"));
+            put("priorStatus", priorStatus);
+            put("replayDecision", replayDecision);
+            put("outTradeNo", outTradeNo);
+        }});
+        return trace;
+    }
+
+    private boolean matchesAuditSnapshot(Map<String, Object> auditRecord, Map<String, Object> requestSnapshot) {
+        return equalsNumber(auditRecord.get("userId"), intValue(requestSnapshot.get("userId")))
+                && equalsNumber(auditRecord.get("workPlanId"), intValue(requestSnapshot.get("workPlanId")))
+                && equalsNumber(auditRecord.get("scheduleId"), intValue(requestSnapshot.get("scheduleId")))
+                && equalsNumber(auditRecord.get("doctorId"), intValue(requestSnapshot.get("doctorId")))
+                && equalsNumber(auditRecord.get("deptSubId"), intValue(requestSnapshot.get("deptSubId")))
+                && equalsText(auditRecord.get("date"), stringValue(requestSnapshot.get("date")))
+                && equalsNumber(auditRecord.get("slot"), intValue(requestSnapshot.get("slot")))
+                && equalsDecimal(auditRecord.get("amount"), decimalValue(requestSnapshot.get("amount")));
+    }
+
     private Map<String, Object> buildAuditSnapshot(Map param) {
         HashMap<String, Object> snapshot = new HashMap<>();
         snapshot.put("requestId", stringValue(param.get("requestId")));
@@ -501,5 +652,10 @@ public class RegistrationServiceImpl implements RegistrationService {
     private boolean equalsText(Object left, String right) {
         String leftText = stringValue(left);
         return StringUtils.hasText(leftText) && leftText.equals(right);
+    }
+
+    private boolean equalsDecimal(Object left, BigDecimal right) {
+        BigDecimal leftDecimal = decimalValue(left);
+        return leftDecimal != null && right != null && leftDecimal.compareTo(right) == 0;
     }
 }
