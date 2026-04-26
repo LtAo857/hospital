@@ -128,3 +128,10 @@
 - 在 Claude Code 中可直接使用 `/karpathy`。
 - 也可带参数调用，例如：`/karpathy patient-wx 挂号流程`、`/karpathy hospital-vue 页面重构`
 - 该命令用于在当前任务中强化“先想再写、简单优先、手术式修改、目标驱动”的执行方式。
+- 当前仓库还补充了 5 个仅面向项目实现细节的本地 Skills：
+  - `/multi-agent-map`：梳理当前多 Agent 挂号架构、Worker 分工、阶段流转与局部 ReAct 使用位置
+  - `/rag-boundary-check`：核对当前 RAG 的知识源、混合检索方式、解释型边界与非职责范围
+  - `/registration-trace`：追踪真实挂号链路，从确认到校验、提交、幂等锁、审计和补偿的完整路径
+  - `/agent-guardrail-check`：检查 AI 挂号流程中的阶段守卫、写操作确认、请求治理、会话记忆与兜底机制
+  - `/doc-code-drift`：检查 README、`docs/agent/*.md` 与当前多 Agent / RAG 实现之间是否存在文档漂移
+- 这 5 个 Skills 只服务于当前医院项目实现细节，不用于简历、面经或通用表达类任务。
