@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys, json; d = json.load(sys.stdin); f = (((d.get('tool_input') or {}).get('file_path')) or ((d.get('tool_response') or {}).get('filePath')) or '').replace('\\\\', '/'); targets = ('/hospital-api-mysql/src/main/resources/application.yml', '/patient-wx-api-mysql/src/main/resources/application.yml');\nif any(f.endswith(t) for t in targets):\n    print(json.dumps({'systemMessage': 'Sensitive config reminder: edit keys and locations only; do not copy real database, Redis, WeChat, or TRTC secrets into docs, comments, or examples.'}))\"",
+            "timeout": 5,
+            "statusMessage": "Checking sensitive config edits"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys, json; d = json.load(sys.stdin); f = (((d.get('tool_input') or {}).get('file_path')) or ((d.get('tool_response') or {}).get('filePath')) or '').replace('\\\\', '/'); prefixes = ('/patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/', '/patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/react/', '/patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/cc/');\nif any(p in f for p in prefixes):\n    print(json.dumps({'systemMessage': 'AI registration implementation changed: check README.md, CLAUDE.md, and docs/agent/*.md for drift, especially ReAct scope, RAG boundaries, and endpoint entrypoints.'}))\"",
+            "timeout": 5,
+            "statusMessage": "Checking AI doc drift"
+          },
+          {
+            "type": "command",
+            "command": "python -c \"import sys, json; d = json.load(sys.stdin); f = (((d.get('tool_input') or {}).get('file_path')) or ((d.get('tool_response') or {}).get('filePath')) or '').replace('\\\\', '/');\nprint('run' if '/patient-wx-api-mysql/src/main/java/' in f else '')\" | { read -r flag; if [ \"$flag\" = \"run\" ]; then mvn -f \"patient-wx-api-mysql/pom.xml\" -q -DskipTests compile; fi; } 2>/dev/null || true",
+            "timeout": 120,
+            "statusMessage": "Compiling patient-wx-api-mysql"
+          },
+          {
+            "type": "command",
+            "command": "python -c \"import sys, json; d = json.load(sys.stdin); f = (((d.get('tool_input') or {}).get('file_path')) or ((d.get('tool_response') or {}).get('filePath')) or '').replace('\\\\', '/');\nif f.endswith('/README.md') or f.endswith('/CLAUDE.md'):\n    print(json.dumps({'systemMessage': 'Documentation scope reminder: confirm multi-agent capability, RAG explanation boundary, and current endpoint entrypoints still match the implementation.'}))\"",
+            "timeout": 5,
+            "statusMessage": "Checking documentation scope"
+          }
+        ]
+      }
+    ]
+  }
+}
