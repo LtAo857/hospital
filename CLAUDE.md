@@ -109,6 +109,22 @@
 2. 再看 `pages.json` 找页面所属主包/分包。
 3. 最后看对应页面目录，例如 `registration/`、`video_diagnose/`、`display/`、`user/`。
 
+## 测试与压测
+
+### 微信登录 dev 旁路
+- 患者端 `loginOrRegister` 在 `getOpenId()` 中已补 dev 旁路：code 以 `test_` 开头时，直接将 code 值作为 openId 使用，不走微信 API。
+- 改动位置：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/service/impl/UserServiceImpl.java:73`
+- 首次调用自动注册新用户，重复调用同一 code 返回同一用户。压测时可用 `test_pressure`、`test_001` 等。
+
+### JMeter 压测
+- 压测方案与基线数据：`docs/pressure-testing.md`
+- JMeter 测试计划：`docs/jmeter/hospital-pressure-test.jmx`（GUI 打开直接可用）
+- CLI 执行脚本：`docs/jmeter/run-pressure-test.ps1`
+- 详细说明：`docs/jmeter/README.md`
+- 测试计划包含 4 个线程组：只读基线、鉴权读、挂号写链路、阶梯加压
+- setUp 线程组负责获取患者/MIS token 并写入全局属性，后续线程组复用
+- 所有 HTTP Request 默认已配置 `use_keepalive=true` + `implementation=HttpClient4`
+
 ## 协作约束
 - 先读现有 README 和关键入口文件，再改代码。
 - 除非用户特别要求，否则优先修改 MySQL 版本相关目录，不默认改 HBase 版本。

@@ -42,12 +42,12 @@ mybatis:
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: com.example.hospital.patient.wx.api.db.pojo
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     map-underscore-to-camel-case: true
 
 logging:
   level:
-    root: info
+    root: warn
     com.example.hospital.api.db.dao: warn
   pattern:
     console: "%d{yyyy/MM/dd HH:mm:ss}  %-5level  %msg%n"

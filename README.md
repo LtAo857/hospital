@@ -245,6 +245,28 @@ hospital
 - 未落地或无有效跳转价值的历史入口已从可见 UI 隐藏，并在源码中以内联注释保留。
 - 页面补齐了收藏医生预览、就医服务分组、使用提示与底部说明区块。
 
+## 压测方案
+
+压测相关文件位于 `docs/jmeter/` 和 `docs/pressure-testing.md`。
+
+| 文件 | 说明 |
+|------|------|
+| `docs/pressure-testing.md` | wrk 压测脚本、阶梯加压步骤、监控命令、瓶颈应对 |
+| `docs/jmeter/hospital-pressure-test.jmx` | JMeter 测试计划（含只读基线、鉴权读、挂号写、阶梯加压 4 个线程组） |
+| `docs/jmeter/run-pressure-test.ps1` | PowerShell CLI 一键执行脚本 |
+| `docs/jmeter/README.md` | JMeter 详细说明（变量配置、阶梯表、基线数据、常见问题） |
+| `docs/wrk-scripts/` | wrk Lua 脚本（mis_login、search_dept、search_user、阶梯加压 shell） |
+
+### 快速开始
+```powershell
+cd docs/jmeter
+.\run-pressure-test.ps1 -Concurrency 100 -Duration 120
+```
+
+### 测试账号
+- MIS 登录：`admin / admin123`
+- 患者登录：code 以 `test_` 开头（如 `test_pressure`）可绕过微信 API，详见 `UserServiceImpl.java:getOpenId()` dev 旁路
+
 ## Agent 文档索引
 
 - 一期架构总览：

@@ -70,6 +70,9 @@ public class UserServiceImpl implements UserService {
 
     //获取患者微信的open_id字符串
     private String getOpenId(String code) {
+        if (code.startsWith("test_")) {
+            return code;
+        }
         String url = "https://api.weixin.qq.com/sns/jscode2session";
         HashMap map = new HashMap();
         map.put("appid", appId);
