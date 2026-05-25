@@ -48,7 +48,9 @@
       "Bash(printf '%s' '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\patient-wx-api-mysql\\\\\\\\src\\\\\\\\main\\\\\\\\resources\\\\\\\\application.yml\"}}')",
       "Bash(printf '%s' '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\patient-wx-api-mysql\\\\\\\\src\\\\\\\\main\\\\\\\\java\\\\\\\\com\\\\\\\\example\\\\\\\\hospital\\\\\\\\patient\\\\\\\\wx\\\\\\\\api\\\\\\\\agent\\\\\\\\multi\\\\\\\\worker\\\\\\\\ScheduleAgentWorker.java\"}}')",
       "Bash(netstat -ano)",
-      "Bash(cmd.exe *)"
+      "Bash(cmd.exe *)",
+      "Bash(pdftotext *)",
+      "Bash(PYTHONIOENCODING=utf-8 python *)"
     ]
   }
 }
