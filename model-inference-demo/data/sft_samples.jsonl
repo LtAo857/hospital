@@ -1,0 +1,11 @@
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"明天牙疼，帮我挂个号","output":"{\"intent\":\"registration\",\"slots\":{\"symptom\":\"牙疼\",\"department\":\"口腔科\",\"doctorName\":null,\"date\":\"明天\",\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"后天上午想挂呼吸内科","output":"{\"intent\":\"registration\",\"slots\":{\"symptom\":null,\"department\":\"呼吸内科\",\"doctorName\":null,\"date\":\"后天\",\"timePreference\":\"上午\"}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"帮我查一下张医生明天有没有号","output":"{\"intent\":\"registration\",\"slots\":{\"symptom\":null,\"department\":null,\"doctorName\":\"张\",\"date\":\"明天\",\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"我咳嗽发烧，明天能挂哪个科","output":"{\"intent\":\"registration\",\"slots\":{\"symptom\":\"咳嗽\",\"department\":\"呼吸内科\",\"doctorName\":null,\"date\":\"明天\",\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"今天下午胃疼，想看消化内科","output":"{\"intent\":\"registration\",\"slots\":{\"symptom\":\"胃疼\",\"department\":\"消化内科\",\"doctorName\":null,\"date\":\"今天\",\"timePreference\":\"下午\"}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"看看我的消息","output":"{\"intent\":\"query_message\",\"slots\":{\"symptom\":null,\"department\":null,\"doctorName\":null,\"date\":null,\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"查一下我的就诊卡","output":"{\"intent\":\"query_user_card\",\"slots\":{\"symptom\":null,\"department\":null,\"doctorName\":null,\"date\":null,\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"为什么推荐这个时间段","output":"{\"intent\":\"explain_recommendation\",\"slots\":{\"symptom\":null,\"department\":null,\"doctorName\":null,\"date\":null,\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"我要取消昨天的挂号","output":"{\"intent\":\"unsupported\",\"slots\":{\"symptom\":null,\"department\":null,\"doctorName\":null,\"date\":null,\"timePreference\":null}}"}
+{"instruction":"从用户输入中提取挂号意图和槽位，输出严格JSON。","input":"下周皮疹想挂皮肤科，最好早点","output":"{\"intent\":\"registration\",\"slots\":{\"symptom\":\"皮疹\",\"department\":\"皮肤科\",\"doctorName\":null,\"date\":\"下周\",\"timePreference\":\"早点\"}}"}
+

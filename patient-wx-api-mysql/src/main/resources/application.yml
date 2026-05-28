@@ -114,4 +114,7 @@ agent:
     rag-http-retry-count: 1
     guard-request-limit-per-minute: 12
     guard-min-interval-millis: 1000
-
+    model-parser-enabled: false
+    model-parser-endpoint: http://127.0.0.1:8001/infer
+    model-parser-timeout-millis: 800
+    model-parser-min-confidence: 0.75

@@ -30,6 +30,7 @@ hospital
 ├── patient-wx               # 患者端小程序（UniApp）
 ├── sql                      # 数据库建表SQL
 ├── docs                     # 部署文档
+├── model-inference-demo     # 模型微调与推理加速演示（面试用）
 ├── Minio                    # 静态资源（图片等）
 └── video                    # 视频相关资源
 ```
@@ -286,6 +287,31 @@ cd docs/jmeter
   `docs/agent/multi-agent.md`
 - 多 Agent 加固说明：
   `docs/agent/multi-agent-hardening.md`
+
+## Model Inference Demo（模型微调与推理加速演示）
+
+- 独立的面试验证 Demo，展示如何在不修改主挂号流程的前提下引入 NLU 模型能力
+- 设计原则：模型只做意图识别与槽位提取，不接入真实排班、挂号写操作与就诊卡校验
+- 入口：
+  - FastAPI 版：`uvicorn app:app --host 127.0.0.1 --port 8001`
+  - 零依赖版：`python server_stdlib.py --host 127.0.0.1 --port 8001`
+- 接口：`POST /infer`，输入用户文本，输出结构化 JSON（intent / slots / confidence / accelerations）
+- 核心解析器：`model-inference-demo/inference_demo/parser.py`（规则驱动，不依赖真实 LLM）
+- 评估与压测（均不依赖外部 API）：
+  ```powershell
+  python scripts/eval.py
+  python scripts/benchmark.py --mode local --requests 200
+  python server_stdlib.py --self-test
+  ```
+- 文档：
+  - `model-inference-demo/docs/fine-tune-plan.md` — Qwen + LoRA/QLoRA 微调方案
+  - `model-inference-demo/docs/inference-acceleration.md` — vLLM / Ollama / 量化 推理加速方案
+  - `model-inference-demo/docs/integration-with-hospital.md` — 与 Java 多 Agent 系统的集成方案（超时兜底、置信度阈值、规则引擎回退）
+- 面试要点：
+  - 微调：中文小模型 + SFT + LoRA/QLoRA + LLaMA-Factory，训练数据从挂号会话日志抽取
+  - 推理加速：vLLM serving 层（KV-cache / continuous batching），暴露 OpenAI 兼容 API
+  - 生产边界：模型输出是参考性的，真实业务数据与写操作由 Java 系统控制
+  - 兜底策略：HTTP 超时 / 非法 JSON / 低置信度 / 不支持意图 → 回退规则引擎
 
 ## CC Agent 最新说明
 

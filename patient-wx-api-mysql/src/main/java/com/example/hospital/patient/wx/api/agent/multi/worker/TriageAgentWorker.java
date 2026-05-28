@@ -4,8 +4,11 @@ import com.example.hospital.patient.wx.api.agent.multi.model.AgentContext;
 import com.example.hospital.patient.wx.api.agent.multi.model.AgentResult;
 import com.example.hospital.patient.wx.api.agent.multi.model.HandoffAction;
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
+import com.example.hospital.patient.wx.api.agent.multi.nlu.ModelIntentParser;
+import com.example.hospital.patient.wx.api.agent.multi.nlu.ModelIntentResult;
 import com.example.hospital.patient.wx.api.agent.support.AgentAction;
 import com.example.hospital.patient.wx.api.agent.support.AgentUiAction;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -13,6 +16,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,6 +24,9 @@ import java.util.regex.Pattern;
 public class TriageAgentWorker implements AgentWorker {
     private static final Pattern DATE_HINT_PATTERN = Pattern.compile("(\\u4eca\\u5929|\\u660e\\u5929|\\u540e\\u5929|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}\\u6708\\d{1,2}\\u65e5)");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    @Autowired(required = false)
+    private ModelIntentParser modelIntentParser;
 
     @Override
     public MultiAgentStage stage() {
@@ -38,6 +45,7 @@ public class TriageAgentWorker implements AgentWorker {
         if (StringUtils.hasText(date)) {
             patch.put("date", date);
         }
+        Optional<ModelIntentResult> modelIntent = parseModelIntent(message, context.getSessionId(), patch);
         patch.put("errorCode", null);
         patch.put("retryable", null);
         patch.put("errorMessage", null);
@@ -56,7 +64,7 @@ public class TriageAgentWorker implements AgentWorker {
             return result;
         }
 
-        if (isViewMessagesIntent(action, message)) {
+        if (isViewMessagesIntent(action, message, modelIntent)) {
             result.setHandoffAction(HandoffAction.FINISH);
             result.setNextStage(MultiAgentStage.DONE);
             result.setReply("可以直接去消息中心查看挂号提醒和系统通知。若你想继续挂号，也可以告诉我科室和日期。");
@@ -65,7 +73,7 @@ public class TriageAgentWorker implements AgentWorker {
             return result;
         }
 
-        if (isViewUserCardIntent(action, message)) {
+        if (isViewUserCardIntent(action, message, modelIntent)) {
             result.setHandoffAction(HandoffAction.FINISH);
             result.setNextStage(MultiAgentStage.DONE);
             result.setReply("可以先查看就诊卡状态；如果还没建卡，我也会给你补建卡入口。");
@@ -83,7 +91,7 @@ public class TriageAgentWorker implements AgentWorker {
             return result;
         }
 
-        if (isExplainIntent(action, message, memory)) {
+        if (isExplainIntent(action, message, memory, modelIntent)) {
             result.setHandoffAction(HandoffAction.FINISH);
             result.setNextStage(MultiAgentStage.DONE);
             result.setReply("我先结合当前挂号上下文和知识库为你解释一下。");
@@ -93,7 +101,7 @@ public class TriageAgentWorker implements AgentWorker {
             return result;
         }
 
-        if (isRegistrationIntent(action, message, payload, memory)) {
+        if (isRegistrationIntent(action, message, payload, memory, modelIntent)) {
             result.setHandoffAction(HandoffAction.HANDOFF);
             result.setNextStage(MultiAgentStage.SLOT_QUERY);
             result.setReply("已识别挂号需求，开始为你查询号源。");
@@ -109,7 +117,10 @@ public class TriageAgentWorker implements AgentWorker {
         return result;
     }
 
-    private boolean isRegistrationIntent(String action, String message, Map<String, Object> payload, Map<String, Object> memory) {
+    private boolean isRegistrationIntent(String action, String message, Map<String, Object> payload, Map<String, Object> memory, Optional<ModelIntentResult> modelIntent) {
+        if (hasModelIntent(modelIntent, "registration", "query_doctor")) {
+            return true;
+        }
         if (AgentAction.CREATE_REGISTRATION.equals(action)
                 || AgentUiAction.START_REGISTRATION.equals(action)
                 || AgentUiAction.SELECT_SUB_DEPT.equals(action)
@@ -127,15 +138,21 @@ public class TriageAgentWorker implements AgentWorker {
         return containsAny(message, "registration", "register", "挂号", "预约", "科室", "诊室", "医生", "号源", "内科", "外科", "骨科", "儿科", "口腔科", "眼科", "耳鼻喉科", "皮肤科", "妇科", "产科", "神经内科", "神经外科", "肿瘤科", "康复科");
     }
 
-    private boolean isViewMessagesIntent(String action, String message) {
+    private boolean isViewMessagesIntent(String action, String message, Optional<ModelIntentResult> modelIntent) {
         if (AgentUiAction.VIEW_MESSAGES.equals(action)) {
+            return true;
+        }
+        if (hasModelIntent(modelIntent, "query_message")) {
             return true;
         }
         return containsAny(message, "消息", "通知", "提醒", "消息中心");
     }
 
-    private boolean isViewUserCardIntent(String action, String message) {
+    private boolean isViewUserCardIntent(String action, String message, Optional<ModelIntentResult> modelIntent) {
         if (AgentUiAction.VIEW_USER_CARD.equals(action)) {
+            return true;
+        }
+        if (hasModelIntent(modelIntent, "query_user_card")) {
             return true;
         }
         return containsAny(message, "就诊卡", "建卡", "实名", "身份信息");
@@ -148,8 +165,11 @@ public class TriageAgentWorker implements AgentWorker {
         return containsAny(message, "我的挂号", "挂号记录", "预约记录", "查看挂号", "我的预约");
     }
 
-    private boolean isExplainIntent(String action, String message, Map<String, Object> memory) {
+    private boolean isExplainIntent(String action, String message, Map<String, Object> memory, Optional<ModelIntentResult> modelIntent) {
         if (AgentUiAction.EXPLAIN_RECOMMENDATION.equals(action)) {
+            return true;
+        }
+        if (hasModelIntent(modelIntent, "explain_recommendation")) {
             return true;
         }
         if (containsAny(message, "挂号规则", "就诊须知", "医保", "普通挂号", "为什么推荐", "推荐理由", "解释一下", "怎么看出来")) {
@@ -173,6 +193,64 @@ public class TriageAgentWorker implements AgentWorker {
                 && payload.get("doctorId") != null
                 && payload.get("deptSubId") != null
                 && payload.get("date") != null;
+    }
+
+    private Optional<ModelIntentResult> parseModelIntent(String message, String sessionId, Map<String, Object> patch) {
+        if (modelIntentParser == null || !StringUtils.hasText(message)) {
+            return Optional.empty();
+        }
+        Optional<ModelIntentResult> parsed = modelIntentParser.parse(message, sessionId);
+        if (!parsed.isPresent()) {
+            return Optional.empty();
+        }
+        ModelIntentResult result = parsed.get();
+        patch.put("nluIntent", result.getIntent());
+        patch.put("nluConfidence", result.getConfidence());
+        patch.put("nluSource", firstText(result.getSource(), result.getEngine(), "model"));
+        patch.put("nluModel", result.getModel());
+        patch.put("nluLatencyMs", result.getLatencyMs());
+
+        Map<String, Object> slots = safeMap(result.getSlots());
+        putTextIfAbsent(patch, "symptom", slots.get("symptom"));
+        putTextIfAbsent(patch, "deptSubName", slots.get("department"));
+        putTextIfAbsent(patch, "doctorName", slots.get("doctorName"));
+        putTextIfAbsent(patch, "date", normalizeDate(firstText(slots.get("date"))));
+        putTextIfAbsent(patch, "timePreference", slots.get("timePreference"));
+        return parsed;
+    }
+
+    private boolean hasModelIntent(Optional<ModelIntentResult> modelIntent, String... intents) {
+        if (!modelIntent.isPresent() || intents == null) {
+            return false;
+        }
+        String intent = modelIntent.get().getIntent();
+        if (!StringUtils.hasText(intent)) {
+            return false;
+        }
+        for (String expected : intents) {
+            if (intent.equals(expected)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void putTextIfAbsent(Map<String, Object> patch, String key, Object value) {
+        if (patch.get(key) != null) {
+            return;
+        }
+        String text = firstText(value);
+        if (StringUtils.hasText(text)) {
+            patch.put(key, text);
+        }
+    }
+
+    private String normalizeDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String parsed = parseDateHint(value);
+        return StringUtils.hasText(parsed) ? parsed : value;
     }
 
     private String parseDateHint(String message) {

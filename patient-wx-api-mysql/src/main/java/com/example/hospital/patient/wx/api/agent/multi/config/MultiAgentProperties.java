@@ -25,4 +25,8 @@ public class MultiAgentProperties {
     private int ragHttpRetryCount = 1;
     private int guardRequestLimitPerMinute = 12;
     private long guardMinIntervalMillis = 1000L;
+    private boolean modelParserEnabled = false;
+    private String modelParserEndpoint = "http://127.0.0.1:8001/infer";
+    private int modelParserTimeoutMillis = 800;
+    private double modelParserMinConfidence = 0.75D;
 }
