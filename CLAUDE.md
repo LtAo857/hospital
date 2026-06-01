@@ -138,6 +138,15 @@
 - LLM 超时或低置信度自动回退关键词匹配，业务不受影响
 - Python 侧支持规则引擎 / 真 LLM 双模式，`parser.py` 中改 `self.llm_enabled` 即可切换
 - Java 侧通过 `@Autowired(required = false)` 可选注入，Python 没起也不报错
+- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Java TriageAgentWorker 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
+- **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（11 个标准症状、80+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子"也能映射到正确科室
+
+- 完整模型链路四步走（面试框架）：
+  - **微调**：LoRA/QLoRA + LLaMA-Factory → 挂号意图识别模型
+  - **加速**：vLLM PagedAttention / Ollama / INT4 量化
+  - **部署**：Docker + 独立 `/infer` 服务，HTTP 解耦 Java
+  - **推理**：线上 NLU 解析，模型只出 intent + slots，写操作由 Java 控制
+  - 当前项目现状：**部署和推理已落地**（Python `/infer` + Java HTTP + DashScope）；**微调和加速为面试扩展方向**（提示词工程已覆盖当前准确率需求）
 
 ## 推荐阅读顺序
 ### 后端问题

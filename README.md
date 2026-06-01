@@ -330,6 +330,12 @@ cd docs/jmeter
   - 推理加速：vLLM serving 层（KV-cache / continuous batching），暴露 OpenAI 兼容 API
   - 生产边界：模型输出是参考性的，真实业务数据与写操作由 Java 系统控制
   - 兜底策略：HTTP 超时 / 非法 JSON / 低置信度 / 不支持意图 → 回退规则引擎
+- 完整模型链路四步走（面试框架）：
+  - **微调**：LoRA/QLoRA + LLaMA-Factory，挂号对话数据 → 意图识别模型
+  - **加速**：vLLM（PagedAttention + continuous batching）/ Ollama / INT4 量化
+  - **部署**：Docker 打包，独立 `/infer` 服务，HTTP 解耦 Java
+  - **推理**：线上 NLU 解析，模型只出 intent + slots，写操作仍由 Java 控制
+  - 当前项目现状：**部署和推理已落地**（Python `/infer` + Java HTTP + DashScope qwen-plus）；**微调和加速为面试扩展方向**（提示词工程已覆盖当前准确率需求，暂不上本地模型）
 
 ### NLU 接入方案
 
@@ -361,6 +367,8 @@ agent:
 - LLM 超时或低置信度自动回退关键词匹配，业务链路不受影响
 - Python 侧支持规则引擎 / 真 LLM 双模式，改一行代码即可切换
 - Java 侧通过 `@Autowired(required = false)` 可选注入，服务没起也不报错
+- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Java TriageAgentWorker 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
+- **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（11 个标准症状、80+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子"也能映射到正确科室，弥补纯关键词匹配的盲区
 
 ## CC Agent 最新说明
 

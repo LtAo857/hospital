@@ -55,6 +55,16 @@ public class TriageAgentWorker implements AgentWorker {
         result.setAgent("triage-agent");
         result.setMemoryPatch(patch);
         result.setConfidence(0.78d);
+
+        if (hasModelIntent(modelIntent, "dangerous")) {
+            result.setHandoffAction(HandoffAction.FINISH);
+            result.setNextStage(MultiAgentStage.DONE);
+            result.setReply("无法处理该请求，请重新输入。");
+            result.setSummary("dangerous_intent_blocked");
+            result.setConfidence(0.99d);
+            return result;
+        }
+
         if (isDirectCreate(action, payload)) {
             patch.put("confirmed", true);
             result.setHandoffAction(HandoffAction.HANDOFF);

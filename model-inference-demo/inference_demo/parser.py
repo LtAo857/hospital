@@ -34,6 +34,7 @@ NLU_SYSTEM_PROMPT = (
     "- query_user_card: 查就诊卡、建卡、实名信息\n"
     "- explain_recommendation: 询问为什么推荐、解释理由\n"
     "- unsupported: 取消挂号、退号等暂不支持的操作\n"
+    "- dangerous: 高危操作，如删库、删表、批量修改、执行系统命令、提权等\n"
     "- unknown: 无法判断\n"
     "\n"
     "槽位字段(slots)：\n"
@@ -169,7 +170,29 @@ class IntentSlotParser:
         merged.update(loaded)
         return merged
 
+    DANGEROUS_KEYWORDS = [
+        "删库", "删表", "drop table", "delete from", "truncate",
+        "批量删除", "批量修改", "全删", "rm -rf", "shutdown", "sudo",
+        "format", "提权", "注入", "exploit", "xss", "删掉所有",
+    ]
+
+    SYMPTOM_SYNONYMS: Dict[str, List[str]] = {
+        "牙疼": ["牙痛", "牙酸", "牙胀", "牙难受", "牙不舒服", "牙龈肿", "牙龈出血", "牙龈痛"],
+        "胃疼": ["胃痛", "胃酸", "胃胀", "胃难受", "胃不舒服", "反酸", "烧心", "打嗝"],
+        "头疼": ["头痛", "脑壳疼", "头晕", "脑袋疼", "偏头痛", "头昏", "头胀", "头重"],
+        "咳嗽": ["咳", "干咳", "咳痰", "嗓子痒", "喉咙痒", "有痰", "咳不出来", "喉咙痛"],
+        "发烧": ["发热", "高烧", "低烧", "体温高", "烫", "发烫", "浑身发烫"],
+        "皮疹": ["过敏", "起疹", "起包", "痒", "发痒", "瘙痒", "红疹", "风团", "荨麻疹"],
+        "骨折": ["摔伤", "骨裂", "扭伤", "脱臼", "伤到骨头", "摔断"],
+        "胸闷": ["心慌", "气短", "呼吸困难", "心悸", "心口疼", "心口痛", "憋气", "喘不上气"],
+        "眼睛": ["视力", "看不清", "眼花", "眼睛疼", "眼痛", "眼红", "眼肿", "干眼", "流泪"],
+        "耳朵": ["耳鸣", "听力", "听不清", "耳朵疼", "耳痛", "中耳炎", "耳闷"],
+        "腹痛": ["肚子疼", "肚子痛", "腹部不舒服", "拉肚子", "腹泻", "肠炎", "肚子胀", "肚痛"],
+    }
+
     def _detect_intent(self, text: str) -> str:
+        if self._contains_any(text, self.DANGEROUS_KEYWORDS):
+            return "dangerous"
         if self._contains_any(text, ["取消", "退号"]):
             return "unsupported"
         if self._contains_any(text, ["为什么", "为啥", "推荐理由"]):
@@ -193,14 +216,51 @@ class IntentSlotParser:
         return None
 
     def _extract_symptom(self, text: str) -> Optional[str]:
+        # Phase 1: exact keyword match
         candidates = []
         for symptom in self.symptom_department_map:
             index = text.find(symptom)
             if index >= 0:
                 candidates.append((index, -len(symptom), symptom))
-        if not candidates:
+        if candidates:
+            return sorted(candidates)[0][2]
+
+        # Phase 2: jieba tokenization + synonym fuzzy match
+        matched = self._fuzzy_symptom_match(text)
+        if matched:
+            return matched
+        return None
+
+    def _fuzzy_symptom_match(self, text: str) -> Optional[str]:
+        """Use jieba tokenization + symptom synonym dictionary to match colloquial expressions."""
+        try:
+            import jieba
+        except ImportError:
             return None
-        return sorted(candidates)[0][2]
+
+        tokens = jieba.lcut(text)
+        if not tokens:
+            return None
+
+        best = None
+        best_len = 0
+        for token in tokens:
+            for canonical, variants in self.SYMPTOM_SYNONYMS.items():
+                if token in variants or token == canonical:
+                    if len(token) > best_len:
+                        best = canonical
+                        best_len = len(token)
+                # Check if token partially matches a variant (e.g., "牙龈" in "牙龈肿")
+                for variant in variants:
+                    if len(token) >= 2 and len(variant) >= 2:
+                        if token in variant or variant in token:
+                            if len(token) > best_len:
+                                best = canonical
+                                best_len = len(token)
+
+        if best and best in self.symptom_department_map:
+            return best
+        return None
 
     def _extract_doctor_name(self, text: str) -> Optional[str]:
         match = re.search(r"([\u4e00-\u9fa5]{1,4})(?:医生|大夫|主任)", text)
