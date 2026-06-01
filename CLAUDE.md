@@ -98,16 +98,46 @@
 | --- | --- | --- | --- |
 | 核心定位 | 项目一期、概念验证快速落地 | 单 Agent 成熟过渡架构 | 线上生产核心链路 |
 | 核心思路 | 规则编排为主，LLM 仅辅助识别用户意图 | LLM 自主完成工具选择，基于 ReAct 循环运行 | 拆分多专业 Worker，协调器统一路由流转 |
-| 核心决策逻辑 | LLM 只能选择固定动作，后端二次校正 | LLM 自主决定调用工具 / 结束流程 | 协调器管控整体流程，Worker 流水线处理，主流程不靠 LLM |
-| LLM 定位 | 意图识别辅助角色 | 系统工具调度核心 | 仅边缘辅助，业务主流程不依赖 |
-| 故障降级能力 | 降级本地规则，系统能力大幅下降 | 完整降级链路，依托记忆恢复流程 | 模型、RAG 故障互不影响主业务链路 |
+| 核心决策逻辑 | LLM 只能选择固定动作，后端二次校正 | LLM 自主决定调用工具 / 结束流程 | 协调器管控整体流程，Worker 流水线推进，入口 LLM 识别意图 |
+| LLM 定位 | 意图识别辅助角色 | 系统工具调度核心 | NLU 入口 + RAG 解释，失败不影响主链路 |
+| 故障降级能力 | 降级本地规则，系统能力大幅下降 | 完整降级链路，依托记忆恢复流程 | LLM 超时/低置信度自动回退规则引擎，主业务不受影响 |
 | 安全体系 | 提示词约束 + 后端校验 + 操作确认 | 提示词管控 + 工具资源隔离 + 故障兜底 | 分权管控、操作确认、幂等设计、日志审计、多层降级 |
 | 数据写操作管控 | 模型仅提交操作意向，最终执行由后端校验 | 提示词强制二次确认，工具层完成写入 | 统一交由专属执行 Worker 执行，服务端强制审核 |
 | 新增功能成本 | 修改动作枚举、调整编排代码 | 注册新工具、补充兜底规则 | 新增 / 调整 Worker 或配套工具即可 |
 | 代码开发复杂度 | 低，逻辑简单 | 中等，ReAct 逻辑有一定开发量 | 架构复杂，但工程体系完整规范 |
-| 面试讲解亮点 | 讲解提示词工程约束模型输出的实践 | 拆解 ReAct 架构，区分决策逻辑与工具执行逻辑 | 阐述企业级 AI 系统生产环境安全保障方案 |
+| 面试讲解亮点 | 讲解提示词工程约束模型输出的实践 | 拆解 ReAct 架构，区分决策逻辑与工具执行逻辑 | LLM 做 NLU + Worker 流水线做执行，演示企业级 AI 安全边界 |
 
 > 三期 CC Agent 本质是二期的 prompt 风格变体，代码结构相同，不单独列为独立阶段。
+
+### NLU 接入方案
+
+多 Agent 已接入真实 LLM NLU 管道，架构如下：
+
+```
+用户说"明天牙疼挂骨科"
+  → Java TriageAgentWorker
+    → HttpModelIntentParser HTTP 调用 Python /infer (127.0.0.1:8001)
+      → parser._llm_parse() 调 DashScope qwen-plus
+        → 返回 {intent:"registration", slots:{department:"骨科", date:"明天"}, confidence:0.95}
+    → 命中 isRegistrationIntent → 进入 Schedule 查询号源
+```
+
+关键文件：
+
+- Python NLU 服务：`model-inference-demo/inference_demo/parser.py`
+- Python 启动：`model-inference-demo/server_stdlib.py`
+- Java NLU 接口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentParser.java`
+- Java HTTP 实现：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/HttpModelIntentParser.java`
+- Java 调用入口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/TriageAgentWorker.java`
+- 配置：`patient-wx-api-mysql/src/main/resources/application.yml` 的 `agent.multi.model-parser-*`
+- 对外暴露：`MultiAgentCoordinatorService.exposeMemory` 白名单含 `nluIntent/nluSource/nluModel/nluConfidence/nluLatencyMs`
+
+设计要点：
+
+- Java 管业务，Python 管理解，HTTP + JSON 解耦
+- LLM 超时或低置信度自动回退关键词匹配，业务不受影响
+- Python 侧支持规则引擎 / 真 LLM 双模式，`parser.py` 中改 `self.llm_enabled` 即可切换
+- Java 侧通过 `@Autowired(required = false)` 可选注入，Python 没起也不报错
 
 ## 推荐阅读顺序
 ### 后端问题

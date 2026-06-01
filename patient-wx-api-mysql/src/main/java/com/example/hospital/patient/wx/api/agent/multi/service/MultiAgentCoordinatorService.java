@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -507,6 +508,11 @@ public class MultiAgentCoordinatorService {
         result.put("ragCompletionTokens", memory.get("ragCompletionTokens"));
         result.put("ragCacheHit", memory.get("ragCacheHit"));
         result.put("chatLatencyMs", memory.get("chatLatencyMs"));
+        result.put("nluIntent", memory.get("nluIntent"));
+        result.put("nluSource", memory.get("nluSource"));
+        result.put("nluModel", memory.get("nluModel"));
+        result.put("nluConfidence", memory.get("nluConfidence"));
+        result.put("nluLatencyMs", memory.get("nluLatencyMs"));
         result.put("finalState", memory.get("finalState"));
         result.put("traceSize", memory.get("traceSize"));
         return result;
@@ -589,10 +595,14 @@ public class MultiAgentCoordinatorService {
         }
         MultiAgentRegistrationPayloadValidator.ValidationResult confirmationPayload = payloadValidator.normalizeConfirmationPayload(payload);
         if (!confirmationPayload.isValid() || !payloadValidator.matchesPendingOrder(confirmationPayload.getNormalized(), pendingOrder)) {
+            Map<String, String> badFields = new LinkedHashMap<>(confirmationPayload.getBadFields());
+            if (confirmationPayload.isValid()) {
+                payloadValidator.buildMismatchFields(confirmationPayload.getNormalized(), pendingOrder, badFields);
+            }
             return PreparedPayload.failure(applyPreparedFailure(memory,
                     "当前确认信息已变化，请重新选择号源后再试。",
                     "confirmation_mismatch",
-                    confirmationPayload.getBadFields(),
+                    badFields,
                     true,
                     true));
         }

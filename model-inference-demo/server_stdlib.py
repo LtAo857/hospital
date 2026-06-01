@@ -26,12 +26,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
             body = self.rfile.read(length).decode("utf-8")
+            print(f"[infer] body={body}")
             payload = json.loads(body) if body else {}
             text = str(payload.get("text", "")).strip()
             if not text:
                 self._send_json({"error": "text is required"}, status=400)
                 return
-            self._send_json(parser.parse(text))
+            result = parser.parse(text)
+            print(f"[infer] result={json.dumps(result, ensure_ascii=False)}")
+            self._send_json(result)
         except json.JSONDecodeError:
             self._send_json({"error": "invalid_json"}, status=400)
 

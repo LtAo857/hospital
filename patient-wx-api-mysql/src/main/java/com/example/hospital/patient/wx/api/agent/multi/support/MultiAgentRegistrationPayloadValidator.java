@@ -77,7 +77,21 @@ public class MultiAgentRegistrationPayloadValidator {
                 && sameValue(left, right, "deptSubId")
                 && sameValue(left, right, "date")
                 && sameValue(left, right, "slot")
-                && sameValue(left, right, "amount");
+                && sameAmount(left, right, "amount");
+    }
+
+    public void buildMismatchFields(Map<String, Object> payload, Map<String, Object> pendingOrder, Map<String, String> out) {
+        Map<String, Object> left = safeMap(payload);
+        Map<String, Object> right = safeMap(pendingOrder);
+        String[] plainKeys = {"workPlanId", "scheduleId", "doctorId", "deptSubId", "date", "slot"};
+        for (String key : plainKeys) {
+            if (!sameValue(left, right, key)) {
+                out.put(key, "期望=" + stringValue(right.get(key)) + " 实际=" + stringValue(left.get(key)));
+            }
+        }
+        if (!sameAmount(left, right, "amount")) {
+            out.put("amount", "期望=" + stringValue(right.get("amount")) + " 实际=" + stringValue(left.get("amount")));
+        }
     }
 
     private ValidationResult buildResult(Map<String, Object> normalized,
@@ -217,6 +231,22 @@ public class MultiAgentRegistrationPayloadValidator {
             return false;
         }
         return String.valueOf(leftValue).equals(String.valueOf(rightValue));
+    }
+
+    private boolean sameAmount(Map<String, Object> left, Map<String, Object> right, String key) {
+        Object leftValue = left.get(key);
+        Object rightValue = right.get(key);
+        if (leftValue == null && rightValue == null) {
+            return true;
+        }
+        if (leftValue == null || rightValue == null) {
+            return false;
+        }
+        try {
+            return new BigDecimal(String.valueOf(leftValue)).compareTo(new BigDecimal(String.valueOf(rightValue))) == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private String stringValue(Object value) {

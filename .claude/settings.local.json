@@ -50,7 +50,8 @@
       "Bash(netstat -ano)",
       "Bash(cmd.exe *)",
       "Bash(pdftotext *)",
-      "Bash(PYTHONIOENCODING=utf-8 python *)"
+      "Bash(PYTHONIOENCODING=utf-8 python *)",
+      "Bash(curl *)"
     ]
   }
 }

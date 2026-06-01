@@ -92,6 +92,43 @@ Response:
 }
 ```
 
+## LLM Mode
+
+Set environment variables to replace the rule engine with a real LLM:
+
+```powershell
+$env:LLM_ENABLED="true"
+$env:LLM_API_KEY="your-dashscope-api-key"
+$env:LLM_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+$env:LLM_MODEL="qwen-plus"
+$env:LLM_TIMEOUT="5"
+$env:LLM_MIN_CONFIDENCE="0.7"
+```
+
+Then start as usual:
+
+```powershell
+python server_stdlib.py --host 127.0.0.1 --port 8001
+```
+
+How it works:
+
+- First call the LLM (OpenAI-compatible API) with a structured NLU prompt
+- If LLM returns valid JSON and confidence ≥ `LLM_MIN_CONFIDENCE`, use the LLM result
+- If LLM fails, times out, or returns low confidence → **automatically fall back to the rule engine**
+- The API response format is identical either way — callers don't need to know which engine ran
+
+Response metadata:
+
+```json
+{
+  "source": "llm",           // or "demo_rules" when fallback
+  "engine": "llm-remote",    // or "local-rule-demo" when fallback
+  "model": "qwen-plus",      // the actual model used
+  "confidence": 0.95
+}
+```
+
 ## Evaluate Without API Dependencies
 
 The parser, evaluator, local benchmark, and `server_stdlib.py` use only the
