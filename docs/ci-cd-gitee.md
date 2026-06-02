@@ -11,12 +11,20 @@
 流水线文件：
 
 ```text
-.workflow/backend-ci.yml
+.workflow/master-pipeline.yml
+.workflow/branch-pipeline.yml
+.workflow/pr-pipeline.yml
 ```
 
 ## 当前流水线
 
-当前 CI 触发条件是向 `master` 分支 push 代码。若仓库默认分支是 `main` 或其他分支，需要把 `.workflow/backend-ci.yml` 中的 `branch` 改成实际分支名。
+当前 CI 触发条件分三类：
+
+- `master-pipeline.yml`：push 到 `master` 时触发
+- `branch-pipeline.yml`：push 到非 `master` 分支时触发
+- `pr-pipeline.yml`：向 `master` 发起 PR 时触发
+
+若仓库默认分支是 `main` 或其他分支，需要把这些文件里的 `master` 改成实际默认分支名。
 
 当前执行命令：
 
@@ -36,9 +44,10 @@ mvn -f patient-wx-api-mysql/pom.xml -B "-Dtest=DashScopeAgentServiceTest,AgentOr
 ## 启用方式
 
 1. 在 Gitee 仓库中开通 Gitee Go。
-2. 确认 `.workflow/backend-ci.yml` 已提交到仓库默认分支。
-3. 根据仓库默认分支调整 `triggers.push.branch`。
-4. push 代码后，在 Gitee Go 页面查看流水线执行日志。
+2. 确认 `.workflow/master-pipeline.yml`、`.workflow/branch-pipeline.yml`、`.workflow/pr-pipeline.yml` 已提交到仓库默认分支。
+3. 根据仓库默认分支调整 `triggers` 中的 `master`。
+4. 如果 Gitee Go 页面仍显示“暂无流水线”，在 Gitee Go 页面点击“新建流水线”，选择 YAML/已有配置创建，并选择 `.workflow/master-pipeline.yml`。
+5. push 代码后，在 Gitee Go 页面查看流水线执行日志。
 
 ## 后续扩展
 
