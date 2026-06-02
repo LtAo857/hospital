@@ -1,0 +1,22 @@
+name: hospital-backend-ci
+displayName: 'Hospital Backend CI'
+triggers:
+  push:
+    - matchType: PRECISE
+      branch: master
+commitMessage: ''
+stages:
+  - stage:
+      name: backend-test-stage
+      displayName: 'Backend Agent Tests'
+      failFast: false
+      steps:
+        - step: mavenbuild@1
+          name: patient-wx-api-mysql-agent-test
+          displayName: 'patient-wx-api-mysql Agent Tests'
+          inputs:
+            mavenPomFile: 'patient-wx-api-mysql/pom.xml'
+            jdkVersion: 8
+            mavenVersion: 3.6
+            goals: |
+              mvn -f patient-wx-api-mysql/pom.xml -B "-Dtest=DashScopeAgentServiceTest,AgentOrchestratorServiceTelemetryTest,MultiAgentKnowledgeBaseTest,MultiAgentRagServiceTest,MultiAgentCoordinatorServiceTest,MultiAgentRequestGuardServiceTest,TriageAgentWorkerTest,ScheduleAgentWorkerTest,PolicyAgentWorkerTest,ExecutionAgentWorkerTest" test
