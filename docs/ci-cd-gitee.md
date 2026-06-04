@@ -46,8 +46,11 @@ mvn -f patient-wx-api-mysql/pom.xml -B "-Dtest=DashScopeAgentServiceTest,AgentOr
 1. 在 Gitee 仓库中开通 Gitee Go。
 2. 确认 `.workflow/master-pipeline.yml`、`.workflow/branch-pipeline.yml`、`.workflow/pr-pipeline.yml` 已提交到仓库默认分支。
 3. 根据仓库默认分支调整 `triggers` 中的 `master`。
-4. 如果 Gitee Go 页面仍显示“暂无流水线”，在 Gitee Go 页面点击“新建流水线”，选择 YAML/已有配置创建，并选择 `.workflow/master-pipeline.yml`。
-5. push 代码后，在 Gitee Go 页面查看流水线执行日志。
+4. 如果 Gitee Go 页面仍显示“暂无流水线”，在 Gitee Go 页面点击“新建流水线”。
+5. 页面如果没有“选择已有 YAML”入口，就选择 Java/Maven 模板或空白流水线。
+6. 在 Maven 构建步骤里，把构建命令改成本文档中的 Maven 测试命令。
+7. 保存流水线后，Gitee Go 通常会在 `.workflow/` 下生成或更新流水线 YAML；如果生成了新文件，需要检查触发分支和 Maven 命令是否与当前配置一致。
+8. push 代码后，在 Gitee Go 页面查看流水线执行日志。
 
 ## 后续扩展
 
