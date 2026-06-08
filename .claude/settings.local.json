@@ -52,7 +52,9 @@
       "Bash(pdftotext *)",
       "Bash(PYTHONIOENCODING=utf-8 python *)",
       "Bash(curl *)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "WebFetch(domain:www.nowcoder.com)",
+      "Bash(python3 *)"
     ]
   }
 }

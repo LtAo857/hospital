@@ -314,7 +314,12 @@ cd docs/jmeter
   - FastAPI 版：`uvicorn app:app --host 127.0.0.1 --port 8001`
   - 零依赖版：`python server_stdlib.py --host 127.0.0.1 --port 8001`
 - 接口：`POST /infer`，输入用户文本，输出结构化 JSON（intent / slots / confidence / accelerations）
-- 核心解析器：`model-inference-demo/inference_demo/parser.py`（规则驱动，不依赖真实 LLM）
+- 核心解析器：`model-inference-demo/inference_demo/parser.py`（规则驱动 + 可选 DashScope LLM，双模式一键切换）
+- 探索性 Demo：
+  - `model-inference-demo/inference_demo/langgraph_demo.py` — LangGraph 图编排 Demo（StateGraph + 条件边 + checkpointer）
+  - `model-inference-demo/inference_demo/langchain_demo.py` — LangChain Agent Demo（@tool 装饰器 + ReAct 循环）
+  - 运行方式：`python -m inference_demo.langgraph_demo` / `python -m inference_demo.langchain_demo`
+  - 目的：理解 LangGraph 显式图编排 vs LangChain Agent 自主工具调用的区别，面试时有对比体感
 - 评估与压测（均不依赖外部 API）：
   ```powershell
   python scripts/eval.py
@@ -368,7 +373,9 @@ agent:
 - Python 侧支持规则引擎 / 真 LLM 双模式，改一行代码即可切换
 - Java 侧通过 `@Autowired(required = false)` 可选注入，服务没起也不报错
 - **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Java TriageAgentWorker 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
-- **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（11 个标准症状、80+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子"也能映射到正确科室，弥补纯关键词匹配的盲区
+- **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（13 个标准症状、100+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子""胳膊疼""嘴巴疼"也能映射到正确科室。另有三阶段提取策略——Phase 1 词典精确匹配、Phase 2 jieba + 同义词模糊匹配、Phase 3 正则通用提取（`膝盖疼` `脖子酸` `肩膀不舒服` 等词典未收录的症状保留原文透传下游，不丢数据）
+- **LLM 空科室修正**：LLM 返回 `department: null` 时不再直接透传，先通过症状名精确/子串匹配补全科室（如 LLM 返回 `symptom:"口腔疼"` 但 `department:null`，自动补全为口腔科）
+- **Triage→Schedule 字段映射**：NLU 返回的 `department` 统一映射为 `deptName`，确保 ScheduleAgentWorker 的 ReAct 循环能正确走 MATCH_DEPARTMENT 工具查科室 ID
 
 ### 与大厂 Agent 架构对比
 

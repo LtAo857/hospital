@@ -17,10 +17,10 @@ DEFAULT_MODEL: Dict[str, Any] = {
         "眼科", "耳鼻喉科", "儿科", "骨科", "妇科", "神经内科",
     ],
     "symptomDepartmentMap": {
-        "牙疼": "口腔科", "牙痛": "口腔科", "牙龈": "口腔科", "口腔": "口腔科",
+        "牙疼": "口腔科", "牙痛": "口腔科", "牙龈": "口腔科", "口腔": "口腔科", "嘴疼": "口腔科",
         "咳嗽": "呼吸内科", "发烧": "呼吸内科", "胸闷": "心内科",
         "胃疼": "消化内科", "腹痛": "消化内科", "皮疹": "皮肤科",
-        "眼睛": "眼科", "耳朵": "耳鼻喉科", "头疼": "神经内科", "骨折": "骨科",
+        "眼睛": "眼科", "耳朵": "耳鼻喉科", "头疼": "神经内科", "骨折": "骨科", "胳膊疼": "骨科",
     },
 }
 
@@ -94,9 +94,21 @@ class IntentSlotParser:
                 "date": self._extract_date(normalized),
                 "timePreference": self._extract_time_preference(normalized),
             }
-            if not slots["department"] and slots["symptom"]:
-                slots["department"] = self.symptom_department_map.get(slots["symptom"])
             confidence = self._confidence(intent, slots, normalized)
+
+        # 公共兜底：无论 LLM 还是规则引擎，用症状补全缺失的科室
+        if not slots.get("department") and slots.get("symptom"):
+            mapped = self.symptom_department_map.get(slots.get("symptom", ""))
+            if not mapped:
+                # 子串模糊匹配：LLM 可能返回"口腔疼"而 map 里是"口腔"
+                sym = slots.get("symptom", "")
+                for key in self.symptom_department_map:
+                    if key in sym or sym in key:
+                        mapped = self.symptom_department_map[key]
+                        slots["symptom"] = key
+                        break
+            if mapped:
+                slots["department"] = mapped
 
         latency_ms = max(1, int((time.perf_counter() - started_at) * 1000))
 
@@ -150,9 +162,17 @@ class IntentSlotParser:
                 result["confidence"] = 0.5
             # 校验 department 是否在已知科室列表中
             dept = result.get("slots", {}).get("department")
-            if dept and dept not in self.departments:
-                symptom = result.get("slots", {}).get("symptom") or ""
+            symptom = result.get("slots", {}).get("symptom") or ""
+            if (not dept) or (dept not in self.departments):
+                # 先精确匹配症状名
                 mapped = self.symptom_department_map.get(symptom)
+                if not mapped and symptom:
+                    # 再子串匹配：LLM 可能返回"口腔疼"而 map 里是"口腔"
+                    for key in self.symptom_department_map:
+                        if key in symptom or symptom in key:
+                            mapped = self.symptom_department_map[key]
+                            result["slots"]["symptom"] = key  # 标准化症状名
+                            break
                 if mapped:
                     result["slots"]["department"] = mapped
             return result
@@ -188,6 +208,8 @@ class IntentSlotParser:
         "眼睛": ["视力", "看不清", "眼花", "眼睛疼", "眼痛", "眼红", "眼肿", "干眼", "流泪"],
         "耳朵": ["耳鸣", "听力", "听不清", "耳朵疼", "耳痛", "中耳炎", "耳闷"],
         "腹痛": ["肚子疼", "肚子痛", "腹部不舒服", "拉肚子", "腹泻", "肠炎", "肚子胀", "肚痛"],
+        "嘴疼": ["嘴痛", "嘴巴疼", "嘴巴痛", "嘴唇疼", "嘴唇痛", "口腔疼", "口痛"],
+        "胳膊疼": ["胳膊痛", "手臂疼", "手臂痛", "胳膊酸", "胳膊肿", "手疼", "手痛"],
     }
 
     def _detect_intent(self, text: str) -> str:
@@ -229,6 +251,18 @@ class IntentSlotParser:
         matched = self._fuzzy_symptom_match(text)
         if matched:
             return matched
+
+        # Phase 3: generic pattern — 不认识但长得像症状的词也提取出来
+        # 匹配: X疼/X痛/X酸/X胀/X肿/X不舒服/X难受/X出血 等
+        m = re.search(r'([\u4e00-\u9fa5]{1,4})(?:疼|痛|酸|胀|肿|不舒服|难受|出血|发炎)', text)
+        if m:
+            raw = m.group(0)
+            # 去掉常见非症状前缀（"我想去看膝盖疼" → "膝盖疼"）
+            for prefix in ['我想去看', '我想去', '我想', '我要去', '我要', '我去', '我', '想', '去', '有点', '有些', '的']:
+                if raw.startswith(prefix) and len(raw) > len(prefix) + 1:
+                    raw = raw[len(prefix):]
+                    break
+            return raw
         return None
 
     def _fuzzy_symptom_match(self, text: str) -> Optional[str]:
@@ -251,8 +285,9 @@ class IntentSlotParser:
                         best = canonical
                         best_len = len(token)
                 # Check if token partially matches a variant (e.g., "牙龈" in "牙龈肿")
+                # 阈值 >=3 防止短通用词（"舒服""难受"）误命中"牙不舒服""胃不舒服"等变体
                 for variant in variants:
-                    if len(token) >= 2 and len(variant) >= 2:
+                    if len(token) >= 3 and len(variant) >= 3:
                         if token in variant or variant in token:
                             if len(token) > best_len:
                                 best = canonical

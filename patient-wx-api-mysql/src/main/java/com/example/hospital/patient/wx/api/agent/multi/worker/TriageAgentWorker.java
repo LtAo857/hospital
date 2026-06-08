@@ -222,7 +222,7 @@ public class TriageAgentWorker implements AgentWorker {
 
         Map<String, Object> slots = safeMap(result.getSlots());
         putTextIfAbsent(patch, "symptom", slots.get("symptom"));
-        putTextIfAbsent(patch, "deptSubName", slots.get("department"));
+        putTextIfAbsent(patch, "deptName", slots.get("department"));
         putTextIfAbsent(patch, "doctorName", slots.get("doctorName"));
         putTextIfAbsent(patch, "date", normalizeDate(firstText(slots.get("date"))));
         putTextIfAbsent(patch, "timePreference", slots.get("timePreference"));
