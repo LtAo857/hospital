@@ -113,9 +113,10 @@ python server_stdlib.py --host 127.0.0.1 --port 8001
 
 How it works:
 
-- First call the LLM (OpenAI-compatible API) with a structured NLU prompt
-- If LLM returns valid JSON and confidence ≥ `LLM_MIN_CONFIDENCE`, use the LLM result
-- If LLM fails, times out, or returns low confidence → **automatically fall back to the rule engine**
+- First call the LLM (OpenAI-compatible API) with a dynamic system prompt that injects the current department list
+- If LLM returns valid JSON and confidence ≥ `LLM_MIN_CONFIDENCE`, use the LLM result directly
+- If LLM fails, times out, or returns low confidence → **automatically fall back to the rule engine** (confidence=0.0)
+- If rule engine also can't confidently identify intent → `confidence: 0.0` is returned, Java Coordinator returns "NLU 服务暂不可用" with a manual registration redirect
 - The API response format is identical either way — callers don't need to know which engine ran
 
 Response metadata:

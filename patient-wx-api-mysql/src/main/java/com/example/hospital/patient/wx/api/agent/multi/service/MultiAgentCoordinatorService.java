@@ -16,6 +16,8 @@ import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.multi.trace.AgentTraceEntry;
 import com.example.hospital.patient.wx.api.agent.multi.worker.AgentWorker;
+import com.example.hospital.patient.wx.api.agent.multi.nlu.ModelIntentParser;
+import com.example.hospital.patient.wx.api.agent.multi.nlu.ModelIntentResult;
 import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentRagService;
 import com.example.hospital.patient.wx.api.agent.multi.support.MultiAgentRegistrationPayloadValidator;
 import com.example.hospital.patient.wx.api.agent.support.AgentAction;
@@ -33,6 +35,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class MultiAgentCoordinatorService {
@@ -44,6 +47,8 @@ public class MultiAgentCoordinatorService {
     private final MultiAgentRegistrationPayloadValidator payloadValidator;
     @Autowired(required = false)
     private MultiAgentTelemetryService telemetryService;
+    @Autowired(required = false)
+    private ModelIntentParser modelIntentParser;
     private final Map<MultiAgentStage, AgentWorker> workerByStage = new EnumMap<>(MultiAgentStage.class);
 
     public MultiAgentCoordinatorService(MultiAgentProperties properties,
@@ -86,7 +91,29 @@ public class MultiAgentCoordinatorService {
         context.setPayload(payload);
         context.setMemory(memory);
         context.setTrace(new ArrayList<AgentTraceEntry>());
-        context.setStage(resolveStage(memory.get("stage")));
+        // NLU: parse intent and slots from user message
+        Map<String, Object> nluPatch = new HashMap<>();
+        Optional<ModelIntentResult> modelIntent = parseNlu(safeRequest.getMessage(), sessionId, nluPatch);
+        applyMemoryPatch(memory, nluPatch);
+
+        // Non-registration intents are handled directly without entering the worker pipeline
+        String nluDirectReply = handleNluDirectIntent(modelIntent, safeRequest, payload, memory);
+        if (nluDirectReply != null) {
+            MultiAgentStage directStage = MultiAgentStage.DONE;
+            if (booleanValue(memory.get("requestedView")) && !AgentUiAction.EXPLAIN_RECOMMENDATION.equals(stringValue(memory.get("requestedView")))) {
+                directStage = MultiAgentStage.DONE;
+            }
+            return buildResponse(sessionId, nluDirectReply, directStage, memory, context.getTrace(), chatStartedAt);
+        }
+
+        // Registration intent — enter worker pipeline
+        MultiAgentStage resolved = resolveStage(memory.get("stage"));
+        MultiAgentStage startStage = (resolved == MultiAgentStage.INTENT_PARSE) ? MultiAgentStage.SLOT_QUERY : resolved;
+        // Direct create with all params + confirmation skips slot query
+        if (booleanValue(memory.get("confirmed")) && memory.get("pendingOrder") instanceof Map) {
+            startStage = MultiAgentStage.POLICY_CHECK;
+        }
+        context.setStage(startStage);
 
         String finalReply = null;
         MultiAgentStage finalStage = context.getStage();
@@ -285,6 +312,10 @@ public class MultiAgentCoordinatorService {
     }
 
     private void appendFallbackCards(AgentChatResponse response, Map<String, Object> memory) {
+        if (booleanValue(memory.get("nluUnavailable"))) {
+            appendNavigateCard(response, "普通挂号", "NLU 服务暂不可用，请改走普通挂号流程", "/registration/notice/notice", "兜底");
+            return;
+        }
         String errorCode = stringValue(memory.get("errorCode"));
         if (!StringUtils.hasText(errorCode)) {
             return;
@@ -472,7 +503,7 @@ public class MultiAgentCoordinatorService {
         boolean hasPendingOrder = memory.get("pendingOrder") instanceof Map && !((Map<?, ?>) memory.get("pendingOrder")).isEmpty();
         boolean policyChecked = booleanValue(memory.get("policyChecked"));
         boolean done = stage == MultiAgentStage.DONE;
-        steps.add(new AgentPlanStep("triage", "识别需求", stage == MultiAgentStage.INTENT_PARSE ? "in_progress" : "completed"));
+        steps.add(new AgentPlanStep("triage", "识别需求", "completed"));
         steps.add(new AgentPlanStep("slot", "查询号源", hasPendingOrder || done ? "completed" : "pending"));
         steps.add(new AgentPlanStep("policy", "校验条件", policyChecked || done ? "completed" : "pending"));
         steps.add(new AgentPlanStep("execute", "提交挂号", done ? "completed" : "pending"));
@@ -619,23 +650,112 @@ public class MultiAgentCoordinatorService {
     private MultiAgentStage resolveStage(Object value) {
         String stage = value == null ? null : String.valueOf(value);
         if (!StringUtils.hasText(stage)) {
-            return MultiAgentStage.INTENT_PARSE;
+            return MultiAgentStage.SLOT_QUERY;
         }
         try {
             MultiAgentStage resolved = MultiAgentStage.valueOf(stage);
             if (resolved == MultiAgentStage.CONFIRM_WAIT) {
                 return MultiAgentStage.POLICY_CHECK;
             }
-            if (resolved == MultiAgentStage.DONE || resolved == MultiAgentStage.MANUAL_FALLBACK) {
-                return MultiAgentStage.INTENT_PARSE;
+            if (resolved == MultiAgentStage.DONE || resolved == MultiAgentStage.MANUAL_FALLBACK || resolved == MultiAgentStage.INTENT_PARSE) {
+                return MultiAgentStage.SLOT_QUERY;
             }
             return resolved;
         } catch (IllegalArgumentException ignored) {
             if ("awaiting_confirmation".equals(stage) || "await_confirm".equals(stage)) {
                 return MultiAgentStage.POLICY_CHECK;
             }
-            return MultiAgentStage.INTENT_PARSE;
+            return MultiAgentStage.SLOT_QUERY;
         }
+    }
+
+    // ── NLU ────────────────────────────────────────────────
+
+    private Optional<ModelIntentResult> parseNlu(String message, String sessionId, Map<String, Object> patch) {
+        if (modelIntentParser == null || !StringUtils.hasText(message)) {
+            return Optional.empty();
+        }
+        Optional<ModelIntentResult> parsed = modelIntentParser.parse(message, sessionId);
+        if (!parsed.isPresent()) {
+            return Optional.empty();
+        }
+        ModelIntentResult result = parsed.get();
+        patch.put("nluIntent", result.getIntent());
+        patch.put("nluConfidence", result.getConfidence());
+        patch.put("nluSource", firstText(result.getSource(), result.getEngine(), "model"));
+        patch.put("nluModel", result.getModel());
+        patch.put("nluLatencyMs", result.getLatencyMs());
+        Map<String, Object> slots = result.getSlots() != null ? new HashMap<>(result.getSlots()) : new HashMap<>();
+        putTextIfAbsent(patch, "symptom", slots.get("symptom"));
+        putTextIfAbsent(patch, "deptName", slots.get("department"));
+        putTextIfAbsent(patch, "doctorName", slots.get("doctorName"));
+        putTextIfAbsent(patch, "date", slots.get("date"));
+        putTextIfAbsent(patch, "timePreference", slots.get("timePreference"));
+        return parsed;
+    }
+
+    private String handleNluDirectIntent(Optional<ModelIntentResult> modelIntent, AgentChatRequest request,
+                                          Map<String, Object> payload, Map<String, Object> memory) {
+        Map<String, Object> r = new HashMap<>(payload);
+        r.put("confirmed", memory.get("awaitingConfirmation") != null && booleanValue(memory.get("awaitingConfirmation")));
+
+        // Direct create: all registration params present with confirmation
+        if (isDirectCreate(request.getAction(), r)) {
+            memory.put("confirmed", true);
+            return null; // proceed to worker pipeline (will go to POLICY_CHECK)
+        }
+
+        if (!modelIntent.isPresent()) {
+            memory.put("errorCode", null);
+            memory.put("nluUnavailable", true);
+            return "NLU 服务暂不可用，请改走普通挂号流程。";
+        }
+
+        String intent = modelIntent.get().getIntent();
+
+        // Dangerous intent — block immediately
+        if ("dangerous".equals(intent)) {
+            memory.put("errorCode", null);
+            return "无法处理该请求，请重新输入。";
+        }
+
+        // Direct non-registration intents
+        if ("query_message".equals(intent)) {
+            memory.put("requestedView", AgentUiAction.VIEW_MESSAGES);
+            return "可以直接去消息中心查看挂号提醒和系统通知。若你想继续挂号，也可以告诉我科室和日期。";
+        }
+        if ("query_user_card".equals(intent)) {
+            memory.put("requestedView", AgentUiAction.VIEW_USER_CARD);
+            return "可以先查看就诊卡状态；如果还没建卡，我也会给你补建卡入口。";
+        }
+        if ("explain_recommendation".equals(intent)) {
+            memory.put("requestedView", AgentUiAction.EXPLAIN_RECOMMENDATION);
+            memory.put("ragQuestion", firstText(request.getMessage(), "为什么推荐当前结果"));
+            return "我先结合当前挂号上下文和知识库为你解释一下。";
+        }
+        if ("unsupported".equals(intent) || "unknown".equals(intent)) {
+            memory.put("errorCode", null);
+            return "当前多 Agent 仅支持挂号相关操作，请告诉我科室和日期。";
+        }
+
+        // registration / query_doctor → proceed to worker pipeline
+        return null;
+    }
+
+    private boolean isDirectCreate(String action, Map<String, Object> payload) {
+        if (AgentAction.CREATE_REGISTRATION.equals(action)) return true;
+        if (booleanValue(payload.get("confirmed"))) return true;
+        return payload.get("workPlanId") != null
+                && payload.get("scheduleId") != null
+                && payload.get("doctorId") != null
+                && payload.get("deptSubId") != null
+                && payload.get("date") != null;
+    }
+
+    private void putTextIfAbsent(Map<String, Object> patch, String key, Object value) {
+        if (patch.get(key) != null) return;
+        String text = firstText(value);
+        if (StringUtils.hasText(text)) patch.put(key, text);
     }
 
     private String fallbackReply(MultiAgentStage stage) {

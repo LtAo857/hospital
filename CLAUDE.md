@@ -86,9 +86,8 @@
 - SQL 升级脚本：`sql/patient_wx_multi_agent_registration_upgrade.sql`
 
 #### 当前多 Agent 分工
-- `MultiAgentCoordinatorService`：负责统一编排、维护 session memory、决定下一跳 stage、组装前端步骤/流程/卡片/错误态，并在 Worker 执行前做 payload 规范化与确认态预校验。
-- `TriageAgentWorker`：负责识别用户是否进入挂号流程，提取日期等基础意图信息；非挂号请求会被拦回挂号入口。
-- `ScheduleAgentWorker`：负责补全科室/诊室/日期，查询医生与时段号源，并挑选候选挂号单写入 `pendingOrder`。当前该 Worker 内部已试点轻量 ReAct 式决策：按“决定下一步查询 → 守卫跳步 → 执行工具 → 根据观察继续”的小循环推进，但对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 和原有 handoff 契约不变；其只读工具调用默认最多重试一次，随后降级为可重试错误或普通挂号兜底。
+- `MultiAgentCoordinatorService`：负责统一编排、维护 session memory、决定下一跳 stage、组装前端步骤/流程/卡片/错误态。现已合并原 TriageAgentWorker 的 NLU+路由职责：直接调用 `ModelIntentParser` 做意图识别与槽位提取，按意图路由（挂号→流水线 / 高危→阻断 / 查询→卡片 / NLU 不可用→兜底提示）。Worker 执行前做 payload 规范化与确认态预校验。
+- `ScheduleAgentWorker`：顺序流水线 5 步（科室匹配→子科室→日期→医生排班→号源时段），Java 侧不再做文本理解，所有参数从 NLU slots + session memory 取。只读工具默认最多重试一次，随后降级为错误提示或普通挂号兜底。
 - `PolicyAgentWorker`：负责校验登录态、就诊卡、当日上限、重复挂号等规则；通过后进入确认或执行，失败则返回结构化错误码。当前不再信任前端单独传入的确认标记，并且 `checkRegistrationCondition` 失败时会 fail-closed，阻止继续进入写路径。
 - `ExecutionAgentWorker`：负责真正提交挂号，传递 `requestId/sessionId`，并把业务异常转换成结构化失败结果；执行前会再次校验确认态、执行参数和 `pendingOrder` 一致性。
 
@@ -115,11 +114,11 @@
 
 ```
 用户说"明天牙疼挂骨科"
-  → Java TriageAgentWorker
+  → MultiAgentCoordinatorService.parseNlu()
     → HttpModelIntentParser HTTP 调用 Python /infer (127.0.0.1:8001)
       → parser._llm_parse() 调 DashScope qwen-plus
         → 返回 {intent:"registration", slots:{department:"骨科", date:"明天"}, confidence:0.95}
-    → 命中 isRegistrationIntent → 进入 Schedule 查询号源
+    → handleNluDirectIntent() 路由 → registration → 进入 Schedule 流水线
 ```
 
 关键文件：
@@ -128,17 +127,17 @@
 - Python 启动：`model-inference-demo/server_stdlib.py`
 - Java NLU 接口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentParser.java`
 - Java HTTP 实现：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/HttpModelIntentParser.java`
-- Java 调用入口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/TriageAgentWorker.java`
+- Java 调用入口：`MultiAgentCoordinatorService.parseNlu()` → `HttpModelIntentParser.parse()`
 - 配置：`patient-wx-api-mysql/src/main/resources/application.yml` 的 `agent.multi.model-parser-*`
 - 对外暴露：`MultiAgentCoordinatorService.exposeMemory` 白名单含 `nluIntent/nluSource/nluModel/nluConfidence/nluLatencyMs`
 
 设计要点：
 
 - Java 管业务，Python 管理解，HTTP + JSON 解耦
-- LLM 超时或低置信度自动回退关键词匹配，业务不受影响
+- LLM 超时或低置信度自动回退 Python 规则引擎，规则引擎也无法识别时返回"NLU 服务暂不可用，请改走普通挂号流程"并附带手动挂号跳转卡片
 - Python 侧支持规则引擎 / 真 LLM 双模式，`parser.py` 中改 `self.llm_enabled` 即可切换
 - Java 侧通过 `@Autowired(required = false)` 可选注入，Python 没起也不报错
-- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Java TriageAgentWorker 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
+- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Coordinator 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
 - **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（11 个标准症状、80+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子"也能映射到正确科室
 
 - 完整模型链路四步走（面试框架）：

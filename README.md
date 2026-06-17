@@ -18,7 +18,7 @@ qq交流群： **1081725203**
 - 多 Agent 挂号链路已进一步补齐服务端确认闭环、payload 规范化校验、`requestId` 回放幂等、坏例留痕，以及只读工具“重试一次 + 降级”保护
 - 新增管理端“电子处方”独立页，医生可按挂号单开立/编辑处方，患者侧支持按挂号单查看处方详情
 - 补充 AI 挂号助手面试说明与项目讲解材料，见 docs
-- 多 Agent 已接入真实 LLM NLU 管道：Python 服务调通义千问做意图识别与槽位提取，Java 通过 HTTP 调用并支持一键降级规则引擎
+- 多 Agent 已接入真实 LLM NLU 管道：Coordinator 直接调用 Python NLU 服务（通义千问）做意图识别与槽位提取，LLM 为主路径，Python 规则引擎为兜底，NLU 不可用时返回手动挂号兜底提示，Java 侧 0 行关键词匹配代码
 
 # 项目结构
 ```
@@ -57,7 +57,7 @@ hospital
 - 示例：`/karpathy patient-wx 挂号流程`、`/karpathy hospital-vue 页面重构`
 - 该能力会强化四个协作原则：先想再写、简单优先、手术式修改、目标驱动。
 - 当前仓库还补充了 5 个仅面向项目实现细节的私有 Skills：
-  - `/multi-agent-map`：快速梳理当前多 Agent 挂号架构、阶段流转与局部 ReAct 落点
+  - `/multi-agent-map`：快速梳理当前多 Agent 挂号架构、阶段流转与 Worker 分工
   - `/rag-boundary-check`：核对当前 RAG 的知识源、检索方式、职责边界与非职责范围
   - `/registration-trace`：顺着真实挂号链路定位校验、提交、幂等锁、审计与补偿代码
   - `/agent-guardrail-check`：检查 AI 挂号流程中的阶段守卫、确认机制、请求治理与兜底设计
@@ -348,11 +348,11 @@ cd docs/jmeter
 
 ```
 用户说"明天牙疼挂骨科"
-  → Java TriageAgentWorker
+  → MultiAgentCoordinatorService.parseNlu()
     → HttpModelIntentParser HTTP 调用 Python /infer (127.0.0.1:8001)
       → Python parser._llm_parse() 调 DashScope qwen-plus
         → 返回 {intent:"registration", slots:{department:"骨科", date:"明天"}, confidence:0.95}
-    → 命中 isRegistrationIntent → 进入 Schedule 查询号源
+    → handleNluDirectIntent() 路由 → registration → 进入 Schedule 流水线
 ```
 
 接入配置（`application.yml`）：
@@ -369,13 +369,13 @@ agent:
 设计要点：
 
 - Java 管业务（查号源、验规则、写库），Python 管理解（意图识别、槽位提取），HTTP + JSON 解耦
-- LLM 超时或低置信度自动回退关键词匹配，业务链路不受影响
+- LLM 超时或低置信度自动回退 Python 规则引擎，规则引擎也无法识别时返回"NLU 服务暂不可用，请改走普通挂号流程"并附带手动挂号跳转卡片
 - Python 侧支持规则引擎 / 真 LLM 双模式，改一行代码即可切换
 - Java 侧通过 `@Autowired(required = false)` 可选注入，服务没起也不报错
-- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Java TriageAgentWorker 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
+- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Coordinator 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
 - **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（13 个标准症状、100+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子""胳膊疼""嘴巴疼"也能映射到正确科室。另有三阶段提取策略——Phase 1 词典精确匹配、Phase 2 jieba + 同义词模糊匹配、Phase 3 正则通用提取（`膝盖疼` `脖子酸` `肩膀不舒服` 等词典未收录的症状保留原文透传下游，不丢数据）
 - **LLM 空科室修正**：LLM 返回 `department: null` 时不再直接透传，先通过症状名精确/子串匹配补全科室（如 LLM 返回 `symptom:"口腔疼"` 但 `department:null`，自动补全为口腔科）
-- **Triage→Schedule 字段映射**：NLU 返回的 `department` 统一映射为 `deptName`，确保 ScheduleAgentWorker 的 ReAct 循环能正确走 MATCH_DEPARTMENT 工具查科室 ID
+- **NLU→Schedule 字段映射**：NLU 返回的 `department` 统一映射为 `deptName`，Coordinator 将其写入 session memory，ScheduleAgentWorker 直接从 memory 取科室名查科室 ID
 
 ### 与大厂 Agent 架构对比
 
@@ -384,7 +384,7 @@ agent:
 | | 大厂生产 Agent（如外卖客服） | 当前项目 | 差异原因 |
 |---|---|---|---|
 | **入口分流** | Java 网关 ONNX 分类器，简单请求直接规则处理，70%+ 不进 LLM | 所有请求调 NLU（LLM 或规则引擎） | 大厂 QPS 高，每次调 LLM 成本不划算；当前日调用量不过百，无此压力 |
-| **Agent 编排** | LangGraph 图节点流转，LLM 自主决策路径 | 4 Worker 固定流水线（Triage→Schedule→Policy→Execution） | 外卖投诉有几十种分叉（退款/补送/补偿券/人工），挂号就一条主线 |
+| **Agent 编排** | LangGraph 图节点流转，LLM 自主决策路径 | Coordinator + 3 Worker 固定流水线（Schedule→Policy→Execution），NLU 路由在 Coordinator 层完成 | 外卖投诉有几十种分叉（退款/补送/补偿券/人工），挂号就一条主线 |
 | **服务通信** | Dubbo/tRPC，5ms 级延迟 | HTTP + JSON，局域网 1-3ms | 百万级调用才需要 RPC 连接池和二进制序列化 |
 | **知识检索** | 向量数据库（Milvus）+ ES BM25 双路融合重排 | 内存 ConcurrentHashMap 余弦相似度 | 大厂知识文档数千篇且持续更新，当前不到 10 篇 md 直接扫 |
 | **离线评估** | Kafka → Flink → Hive，日处理数万条会话，自动发现 Bad Case 回补 prompt/知识库 | 无离线评估链路 | 日处理会话量不在一个量级，人工抽查即可覆盖 |
@@ -417,7 +417,7 @@ agent:
 - 确认闭环与参数校验：
   当前确认写操作已改成服务端闭环，只有命中 `awaitingConfirmation + pendingOrder` 且确认参数与待确认快照一致时，才允许继续进入写路径；聊天 `payload`、确认 `payload` 与执行态挂号参数也都已增加共享规范化与结构化校验
 - 能力边界补充：
-  当前 ReAct 试点只发生在 `ScheduleAgentWorker` 内部；前端页面展示的是压缩后的流程结果、步骤和卡片，不展示 Worker 内部每一步完整思考过程
+  ScheduleAgentWorker 内部已重构为顺序流水线 5 步（科室匹配→子科室→日期→医生排班→号源时段），无循环决策；前端页面展示的是流程结果、步骤和卡片
 - 解释型 RAG：
   当用户询问“为什么推荐这个”等解释类问题时，后端会从 `docs/agent/*.md` 检索说明片段，并补充“知识来源”卡片；当前知识源已不再使用硬编码片段。
 - 混合检索与降级：
@@ -439,9 +439,9 @@ agent:
 - 多 Agent 后端代码目录：
   `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/`
 - 当前编排阶段：
-  `INTENT_PARSE -> SLOT_QUERY -> POLICY_CHECK -> EXECUTE_APPOINTMENT`
-- Schedule Agent 的 ReAct 试点体现：
-  当前在 `patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/ScheduleAgentWorker.java` 内部引入了轻量 ReAct 式决策循环，按“决定下一步查询 → 守卫跳步 → 执行工具 → 根据观察继续”的方式补齐科室、诊室、日期、医生信息；对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 三类稳定结果，以及 `ASK_USER -> SLOT_QUERY`、`HANDOFF -> POLICY_CHECK` 的既有协议，不改前端页面协议。
+  NLU 路由（Coordinator 层） → `SLOT_QUERY -> POLICY_CHECK -> EXECUTE_APPOINTMENT`（INTENT_PARSE 已合并到 Coordinator，session 兼容旧枚举值）
+- Schedule Agent 当前实现：
+  `ScheduleAgentWorker.java` 内部为顺序流水线（科室匹配→子科室→日期→医生排班→号源时段），不再使用 ReAct 决策循环；对外仍保持 `missing_slots_input / no_slot_available / slot_selected` 三类稳定结果，以及 `ASK_USER -> SLOT_QUERY`、`HANDOFF -> POLICY_CHECK` 的既有协议，不改前端页面协议。
 - 上线加固点：
   事务保护、重复提交幂等锁、最终二次复核、审计落库、Quartz 巡检补偿
 - 数据库升级脚本：
@@ -465,9 +465,9 @@ agent:
   - 未登录：跳 `/pages/mine/mine`
   - 未建卡：跳 `/user/fill_user_info/fill_user_info`
   - 无号源或参数失效：提示重新选号
-- ReAct 演示点：
-  - 说“口腔科挂号”但不说日期时，系统会先补科室/诊室，再追问日期
-  - 说“挂张医生的号”但没日期时，系统不会直接乱查时段，而是先停在补日期
+- 多轮补全演示点：
+  - 说”口腔科挂号”但不说日期时，系统会先补科室/诊室，再追问日期
+  - 说”挂张医生的号”但没日期时，系统不会直接乱查时段，而是先停在补日期
 
 ### 当前水平与差距
 - 如果只看患者侧多 Agent 挂号助手这条链路，当前大致可到“大型医院试点上线”水平，而不是全院正式生产级

@@ -24,33 +24,38 @@ DEFAULT_MODEL: Dict[str, Any] = {
     },
 }
 
-NLU_SYSTEM_PROMPT = (
-    "你是医院挂号NLU引擎。从用户输入中提取意图和槽位，输出严格JSON。\n"
-    "\n"
-    "意图类型：\n"
-    "- registration: 挂号、预约、看诊、查号源\n"
-    "- query_doctor: 查医生信息\n"
-    "- query_message: 查消息、通知、提醒\n"
-    "- query_user_card: 查就诊卡、建卡、实名信息\n"
-    "- explain_recommendation: 询问为什么推荐、解释理由\n"
-    "- unsupported: 取消挂号、退号等暂不支持的操作\n"
-    "- dangerous: 高危操作，如删库、删表、批量修改、执行系统命令、提权等\n"
-    "- unknown: 无法判断\n"
-    "\n"
-    "槽位字段(slots)：\n"
-    "- symptom: 症状描述，如牙疼、咳嗽\n"
-    "- department: 科室名，可从症状推断，如牙疼映射到口腔科\n"
-    "- doctorName: 医生姓名\n"
-    "- date: 日期，保持原文，例如 今天/明天/2026-06-01\n"
-    "- timePreference: 时段偏好，如上午、下午、最早\n"
-    "\n"
-    "规则：\n"
-    "1. 日期保持用户原文，不要转换成其他格式\n"
-    "2. 能从症状推断科室时填入department，不确定填null\n"
-    "3. 没有把握的字段填null，不要编造\n"
-    "4. confidence取值0.0~1.0，基于你对该结果的确定程度\n"
-    "5. 只输出JSON，不要任何额外文字\n"
-)
+def _build_system_prompt(self) -> str:
+    dept_list = "、".join(self.departments)
+    return (
+        "你是医院挂号NLU引擎。从用户输入中提取意图和槽位，输出严格JSON。\n"
+        "\n"
+        f"当前可用科室：{dept_list}\n"
+        "\n"
+        "意图类型：\n"
+        "- registration: 挂号、预约、看诊、查号源\n"
+        "- query_doctor: 查医生信息\n"
+        "- query_message: 查消息、通知、提醒\n"
+        "- query_user_card: 查就诊卡、建卡、实名信息\n"
+        "- explain_recommendation: 询问为什么推荐、解释理由\n"
+        "- unsupported: 取消挂号、退号等暂不支持的操作\n"
+        "- dangerous: 高危操作，如删库、删表、批量修改、执行系统命令、提权等\n"
+        "- unknown: 无法判断\n"
+        "\n"
+        "槽位字段(slots)：\n"
+        "- symptom: 症状描述，如牙疼、咳嗽\n"
+        "- department: 科室名，必须从可用科室列表中选择，可从症状推断\n"
+        "- doctorName: 医生姓名\n"
+        "- date: 日期，保持原文，例如 今天/明天/2026-06-01\n"
+        "- timePreference: 时段偏好，如上午、下午、最早\n"
+        "\n"
+        "规则：\n"
+        "1. department必须是可用科室列表中的科室，不要编造不存在的科室\n"
+        "2. 日期保持用户原文，不要转换成其他格式\n"
+        "3. 能从症状推断科室时填入department，不确定填null\n"
+        "4. 没有把握的字段填null，不要编造\n"
+        "5. confidence取值0.0~1.0，基于你对该结果的确定程度\n"
+        "6. 只输出JSON，不要任何额外文字\n"
+    )
 
 
 class IntentSlotParser:
@@ -94,7 +99,7 @@ class IntentSlotParser:
                 "date": self._extract_date(normalized),
                 "timePreference": self._extract_time_preference(normalized),
             }
-            confidence = self._confidence(intent, slots, normalized)
+            confidence = 0.0  # 规则引擎兜底路径，不伪造置信度
 
         # 公共兜底：无论 LLM 还是规则引擎，用症状补全缺失的科室
         if not slots.get("department") and slots.get("symptom"):
@@ -133,7 +138,7 @@ class IntentSlotParser:
             "model": self.llm_model,
             "temperature": 0.1,
             "messages": [
-                {"role": "system", "content": NLU_SYSTEM_PROMPT},
+                {"role": "system", "content": self._build_system_prompt()},
                 {"role": "user", "content": text},
             ],
             "response_format": {"type": "json_object"},
@@ -332,21 +337,6 @@ class IntentSlotParser:
             if item in text:
                 return item
         return None
-
-    def _confidence(self, intent: str, slots: Dict[str, Optional[str]], text: str) -> float:
-        if intent == "unknown":
-            return 0.35
-        score = 0.55
-        if intent in {"registration", "query_doctor"}:
-            score += 0.1
-        if self._contains_any(text, ["挂", "预约", "查", "看", "推荐"]):
-            score += 0.08
-        for key in ("department", "symptom", "doctorName", "date", "timePreference"):
-            if slots.get(key):
-                score += 0.06
-        if intent == "unsupported":
-            score = max(score, 0.82)
-        return round(min(score, 0.96), 2)
 
     def _normalize(self, text: str) -> str:
         return re.sub(r"\s+", "", text.strip())

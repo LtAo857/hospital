@@ -10,21 +10,12 @@ import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
 public class ScheduleAgentWorker implements AgentWorker {
-    private static final int MAX_REACT_STEPS = 4;
-    private static final Pattern DATE_HINT_PATTERN = Pattern.compile("(\\u4eca\\u5929|\\u660e\\u5929|\\u540e\\u5929|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}\\u6708\\d{1,2}\\u65e5)");
-    private static final Pattern DOCTOR_HINT_PATTERN = Pattern.compile("([\\u4e00-\\u9fa5]{2,4})(主任医师|医生|医师)");
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
     private final MedicalDeptAgentTools medicalDeptAgentTools;
     private final RegistrationAgentTools registrationAgentTools;
 
@@ -41,113 +32,81 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     @Override
     public AgentResult execute(AgentContext context) {
-        QueryState state = buildTrustedState(safeMap(context.getPayload()), safeMap(context.getMemory()), context.getUserMessage());
+        QueryState state = buildTrustedState(safeMap(context.getPayload()), safeMap(context.getMemory()));
         Map<String, Object> observation = new HashMap<>();
 
-        for (int step = 0; step < MAX_REACT_STEPS; step++) {
-            ToolDecision decision = guardDecision(decideNextTool(state), state);
-            TerminalOutcome outcome = runToolStep(decision, state, observation);
-            if (outcome == TerminalOutcome.SUCCESS) {
-                return buildSuccessResult(state, observation);
+        // 1. Match department by name → get deptId
+        if (state.getDeptId() == null) {
+            if (!StringUtils.hasText(state.getDeptName())) {
+                return buildAskUserResult(state, observation, "请告诉我想挂哪个科室，例如：明天口腔科。");
             }
-            if (outcome == TerminalOutcome.NO_SLOT) {
-                return buildNoSlotResult(state, observation);
-            }
+            TerminalOutcome outcome = matchDepartment(state, observation);
             if (outcome == TerminalOutcome.ASK_USER) {
-                return buildAskUserResult(state, observation);
+                return buildAskUserResult(state, observation,
+                        "没有找到" + state.getDeptName() + "这个科室，当前可选：口腔科、呼吸内科、消化内科、心内科、皮肤科、眼科、耳鼻喉科、儿科、骨科、妇科、神经内科。");
             }
             if (outcome == TerminalOutcome.TOOL_FAILURE) {
                 return buildToolFailureResult(state, observation);
             }
         }
 
-        if (state.getCandidate() != null) {
+        // 2. Search sub-departments → get deptSubId
+        if (state.getDeptSubId() == null) {
+            TerminalOutcome outcome = searchSubDepartments(state, observation);
+            if (outcome == TerminalOutcome.ASK_USER) {
+                return buildAskUserResult(state, observation,
+                        StringUtils.hasText(state.getDeptName())
+                                ? state.getDeptName() + "下暂无可选诊室，请换一个科室试试。"
+                                : "暂无可选诊室，请先指定科室。");
+            }
+            if (outcome == TerminalOutcome.TOOL_FAILURE) {
+                return buildToolFailureResult(state, observation);
+            }
+        }
+
+        // 3. Date is required to continue
+        if (!StringUtils.hasText(state.getDate())) {
+            return buildAskUserResult(state, observation, "请告诉我你想挂哪天的号，例如：明天、下周一、2026-06-20。");
+        }
+
+        // 4. Search doctor plans for the day
+        if (state.getDoctors() == null) {
+            TerminalOutcome outcome = searchDoctors(state, observation);
+            if (outcome == TerminalOutcome.NO_SLOT) {
+                return buildNoSlotResult(state, observation);
+            }
+            if (outcome == TerminalOutcome.ASK_USER) {
+                return buildAskUserResult(state, observation, "未查询到该诊室当天的医生排班，请换个日期试试。");
+            }
+            if (outcome == TerminalOutcome.TOOL_FAILURE) {
+                return buildToolFailureResult(state, observation);
+            }
+        }
+
+        // 5. Search available schedule slots
+        TerminalOutcome outcome = searchSlots(state, observation);
+        if (outcome == TerminalOutcome.SUCCESS) {
             return buildSuccessResult(state, observation);
         }
-        if (state.getDeptSubId() == null || !StringUtils.hasText(state.getDate())) {
-            return buildAskUserResult(state, observation);
+        if (outcome == TerminalOutcome.NO_SLOT) {
+            return buildNoSlotResult(state, observation);
+        }
+        if (outcome == TerminalOutcome.TOOL_FAILURE) {
+            return buildToolFailureResult(state, observation);
         }
         return buildNoSlotResult(state, observation);
     }
 
-    private QueryState buildTrustedState(Map<String, Object> payload, Map<String, Object> memory, String userMessage) {
+    private QueryState buildTrustedState(Map<String, Object> payload, Map<String, Object> memory) {
         QueryState state = new QueryState();
         state.setDeptId(firstInt(payload.get("deptId"), memory.get("deptId")));
         state.setDeptSubId(firstInt(payload.get("deptSubId"), memory.get("deptSubId")));
         state.setDoctorId(firstInt(payload.get("doctorId"), memory.get("doctorId")));
         state.setDeptName(firstText(payload.get("deptName"), memory.get("deptName")));
-        if (!StringUtils.hasText(state.getDeptName())) {
-            state.setDeptName(extractDeptName(userMessage));
-        }
         state.setDeptSubName(firstText(payload.get("deptSubName"), memory.get("deptSubName")));
         state.setDoctorName(firstText(payload.get("doctorName"), memory.get("doctorName")));
-        if (!StringUtils.hasText(state.getDoctorName())) {
-            state.setDoctorName(extractDoctorName(userMessage));
-        }
         state.setDate(firstText(payload.get("date"), memory.get("date")));
-        if (!StringUtils.hasText(state.getDate())) {
-            state.setDate(parseDateHint(userMessage));
-        }
         return state;
-    }
-
-    private ToolDecision decideNextTool(QueryState state) {
-        if (state.getCandidate() != null) {
-            return ToolDecision.FINISH;
-        }
-        if (state.getDeptSubId() == null) {
-            if (state.getDeptId() == null) {
-                return StringUtils.hasText(state.getDeptName()) ? ToolDecision.MATCH_DEPARTMENT : ToolDecision.ASK_USER;
-            }
-            return ToolDecision.SEARCH_SUB_DEPARTMENTS;
-        }
-        if (!StringUtils.hasText(state.getDate())) {
-            return ToolDecision.ASK_USER;
-        }
-        if (state.getDoctors() == null) {
-            return ToolDecision.SEARCH_DOCTORS;
-        }
-        return ToolDecision.SEARCH_SLOTS;
-    }
-
-    private ToolDecision guardDecision(ToolDecision decision, QueryState state) {
-        if (decision == ToolDecision.SEARCH_SLOTS && state.getDoctors() == null) {
-            return ToolDecision.SEARCH_DOCTORS;
-        }
-        if ((decision == ToolDecision.SEARCH_DOCTORS || decision == ToolDecision.SEARCH_SLOTS) && !StringUtils.hasText(state.getDate())) {
-            return ToolDecision.ASK_USER;
-        }
-        if ((decision == ToolDecision.SEARCH_DOCTORS || decision == ToolDecision.SEARCH_SLOTS) && state.getDeptSubId() == null) {
-            if (state.getDeptId() != null) {
-                return ToolDecision.SEARCH_SUB_DEPARTMENTS;
-            }
-            if (StringUtils.hasText(state.getDeptName())) {
-                return ToolDecision.MATCH_DEPARTMENT;
-            }
-            return ToolDecision.ASK_USER;
-        }
-        if (decision == ToolDecision.SEARCH_SUB_DEPARTMENTS && state.getDeptId() == null) {
-            return StringUtils.hasText(state.getDeptName()) ? ToolDecision.MATCH_DEPARTMENT : ToolDecision.ASK_USER;
-        }
-        return decision;
-    }
-
-    private TerminalOutcome runToolStep(ToolDecision decision, QueryState state, Map<String, Object> observation) {
-        switch (decision) {
-            case MATCH_DEPARTMENT:
-                return matchDepartment(state, observation);
-            case SEARCH_SUB_DEPARTMENTS:
-                return searchSubDepartments(state, observation);
-            case SEARCH_DOCTORS:
-                return searchDoctors(state, observation);
-            case SEARCH_SLOTS:
-                return searchSlots(state, observation);
-            case FINISH:
-                return TerminalOutcome.SUCCESS;
-            case ASK_USER:
-            default:
-                return TerminalOutcome.ASK_USER;
-        }
     }
 
     private TerminalOutcome matchDepartment(QueryState state, Map<String, Object> observation) {
@@ -325,8 +284,12 @@ public class ScheduleAgentWorker implements AgentWorker {
     }
 
     private AgentResult buildAskUserResult(QueryState state, Map<String, Object> observation) {
+        return buildAskUserResult(state, observation, "请告诉我想挂哪个科室、哪天，例如：明天口腔科。");
+    }
+
+    private AgentResult buildAskUserResult(QueryState state, Map<String, Object> observation, String reply) {
         AgentResult result = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
-        result.setReply("请先告诉我诊室和日期，例如：明天口腔科。");
+        result.setReply(reply);
         result.setSummary("missing_slots_input");
         result.setObservation(observation);
         result.setMemoryPatch(buildQueryPatch(state, false));
@@ -452,36 +415,6 @@ public class ScheduleAgentWorker implements AgentWorker {
         return maximum - num;
     }
 
-    private String extractDeptName(String message) {
-        if (!StringUtils.hasText(message)) {
-            return null;
-        }
-        try {
-            ArrayList<HashMap> departments = callWithRetry("searchDepartments", new ReadToolCall<ArrayList<HashMap>>() {
-                @Override
-                public ArrayList<HashMap> call() {
-                    return medicalDeptAgentTools.searchDepartments(null, true);
-                }
-            });
-            for (HashMap department : departments) {
-                String name = stringValue(department.get("name"));
-                if (matchesName(name, message)) {
-                    return name;
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
-    }
-
-    private String extractDoctorName(String message) {
-        if (!StringUtils.hasText(message)) {
-            return null;
-        }
-        Matcher matcher = DOCTOR_HINT_PATTERN.matcher(message);
-        return matcher.find() ? matcher.group(1) : null;
-    }
-
     private boolean matchesName(String left, String right) {
         return StringUtils.hasText(left) && StringUtils.hasText(right) && (left.contains(right) || right.contains(left));
     }
@@ -510,36 +443,6 @@ public class ScheduleAgentWorker implements AgentWorker {
         result.setNextStage(nextStage);
         result.setConfidence(0.8d);
         return result;
-    }
-
-    private String parseDateHint(String message) {
-        if (!StringUtils.hasText(message)) {
-            return null;
-        }
-        Matcher matcher = DATE_HINT_PATTERN.matcher(message);
-        if (!matcher.find()) {
-            return null;
-        }
-        String token = matcher.group(1);
-        if ("\u4eca\u5929".equals(token)) {
-            return LocalDate.now().format(DATE_FORMATTER);
-        }
-        if ("\u660e\u5929".equals(token)) {
-            return LocalDate.now().plusDays(1).format(DATE_FORMATTER);
-        }
-        if ("\u540e\u5929".equals(token)) {
-            return LocalDate.now().plusDays(2).format(DATE_FORMATTER);
-        }
-        if (token.matches("\\d{4}-\\d{2}-\\d{2}")) {
-            return token;
-        }
-        String[] parts = token.replace("\u65e5", "").split("\u6708");
-        if (parts.length != 2) {
-            return null;
-        }
-        int month = Integer.parseInt(parts[0]);
-        int day = Integer.parseInt(parts[1]);
-        return LocalDate.of(LocalDate.now().getYear(), month, day).format(DATE_FORMATTER);
     }
 
     private Integer firstInt(Object first, Object second) {
@@ -574,15 +477,6 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     private Map<String, Object> safeMap(Map<String, Object> map) {
         return map == null ? new HashMap<String, Object>() : map;
-    }
-
-    private enum ToolDecision {
-        MATCH_DEPARTMENT,
-        SEARCH_SUB_DEPARTMENTS,
-        SEARCH_DOCTORS,
-        SEARCH_SLOTS,
-        ASK_USER,
-        FINISH
     }
 
     private enum TerminalOutcome {
