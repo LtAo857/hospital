@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from inference_demo.parser import IntentSlotParser  # noqa: E402
+from hospital_nlu.parser import IntentSlotParser  # noqa: E402
 
 
 EVAL_PATH = ROOT / "data" / "eval.jsonl"

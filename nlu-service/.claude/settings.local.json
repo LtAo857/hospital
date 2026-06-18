@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(python -m pip install neo4j)",
+      "Bash(python *)",
+      "Bash(echo \"Server PID: $!\")",
+      "Bash(curl -s -X POST http://127.0.0.1:8001/infer -H 'Content-Type: application/json' -d '{\"text\":\"小孩咳嗽发烧，帮我挂个号\",\"departments\":[\"口腔科\",\"呼吸内科\",\"消化内科\",\"心内科\",\"皮肤科\",\"眼科\",\"耳鼻喉科\",\"儿科\",\"骨科\",\"妇科\",\"神经内科\",\"急诊科\",\"乳腺外科\",\"胸外科\"]}')",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(mvn test *)",
+      "Bash(taskkill /F /IM java.exe)",
+      "Bash(taskkill /F /IM javac.exe)",
+      "Bash(MAVEN_OPTS=\"-Xmx512m\" mvn test -pl . -Dtest=MultiAgentRegistrationFlowIntegrationTest -DfailIfNoTests=false)",
+      "Bash(MAVEN_OPTS=\"-Xmx512m\" mvn test -pl . -Dtest=MultiAgentRegistrationFlowIntegrationTest -DfailIfNoTests=false -DargLine=\"-Xmx256m -XX:MaxMetaspaceSize=128m\")",
+      "Bash(MAVEN_OPTS=\"-Xmx256m\" mvn test-compile -pl .)",
+      "Bash(MAVEN_OPTS=\"-Xmx256m\" mvn clean test-compile -pl .)",
+      "Bash(taskkill /F /IM javaw.exe)"
+    ]
+  }
+}

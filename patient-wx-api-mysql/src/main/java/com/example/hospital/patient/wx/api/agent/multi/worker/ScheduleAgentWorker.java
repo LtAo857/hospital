@@ -10,7 +10,16 @@ import com.example.hospital.patient.wx.api.agent.tool.RegistrationAgentTools;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.Year;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.regex.Pattern;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,6 +42,13 @@ public class ScheduleAgentWorker implements AgentWorker {
     @Override
     public AgentResult execute(AgentContext context) {
         QueryState state = buildTrustedState(safeMap(context.getPayload()), safeMap(context.getMemory()));
+        // Resolve relative date to actual yyyy-MM-dd
+        if (StringUtils.hasText(state.getDate())) {
+            String resolved = resolveDate(state.getDate());
+            if (resolved != null) {
+                state.setDate(resolved);
+            }
+        }
         Map<String, Object> observation = new HashMap<>();
 
         // 1. Match department by name → get deptId
@@ -97,6 +113,65 @@ public class ScheduleAgentWorker implements AgentWorker {
         return buildNoSlotResult(state, observation);
     }
 
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final Pattern DIGIT_DATE = Pattern.compile("^(\\d{4}-\\d{2}-\\d{2})$");
+
+    private String resolveDate(String raw) {
+        if (raw == null) return null;
+        // Already in yyyy-MM-dd format
+        if (DIGIT_DATE.matcher(raw).matches()) return raw;
+        LocalDate today = LocalDate.now();
+        // Relative days
+        switch (raw) {
+            case "今天": return today.format(DATE_FMT);
+            case "明天": return today.plusDays(1).format(DATE_FMT);
+            case "后天": return today.plusDays(2).format(DATE_FMT);
+            case "大后天": return today.plusDays(3).format(DATE_FMT);
+        }
+        // "下周X" / "本周X"
+        String weekPrefix = null;
+        if (raw.startsWith("下周")) weekPrefix = "下周";
+        else if (raw.startsWith("本周")) weekPrefix = "本周";
+        if (weekPrefix != null) {
+            String dayName = raw.substring(2);
+            DayOfWeek target = dayOfWeek(dayName);
+            if (target == null) return null;
+            LocalDate base = "下周".equals(weekPrefix) ? today.plusWeeks(1) : today;
+            return base.with(TemporalAdjusters.nextOrSame(target)).format(DATE_FMT);
+        }
+        // "周一"/"周二"/...
+        DayOfWeek target = dayOfWeek(raw);
+        if (target != null) {
+            return today.with(TemporalAdjusters.nextOrSame(target)).format(DATE_FMT);
+        }
+        // "X月X日" / "X月X号"
+        java.util.regex.Matcher m = Pattern.compile("(\\d{1,2})[月/-](\\d{1,2})[日号]?").matcher(raw);
+        if (m.find()) {
+            int month = Integer.parseInt(m.group(1));
+            int day = Integer.parseInt(m.group(2));
+            try {
+                LocalDate d = LocalDate.of(today.getYear(), month, day);
+                if (d.isBefore(today)) d = d.plusYears(1);
+                return d.format(DATE_FMT);
+            } catch (Exception e) { return null; }
+        }
+        return null;
+    }
+
+    private DayOfWeek dayOfWeek(String name) {
+        if (name == null) return null;
+        switch (name) {
+            case "周一": case "星期一": return DayOfWeek.MONDAY;
+            case "周二": case "星期二": return DayOfWeek.TUESDAY;
+            case "周三": case "星期三": return DayOfWeek.WEDNESDAY;
+            case "周四": case "星期四": return DayOfWeek.THURSDAY;
+            case "周五": case "星期五": return DayOfWeek.FRIDAY;
+            case "周六": case "星期六": return DayOfWeek.SATURDAY;
+            case "周日": case "星期日": return DayOfWeek.SUNDAY;
+            default: return null;
+        }
+    }
+
     private QueryState buildTrustedState(Map<String, Object> payload, Map<String, Object> memory) {
         QueryState state = new QueryState();
         state.setDeptId(firstInt(payload.get("deptId"), memory.get("deptId")));
@@ -106,6 +181,9 @@ public class ScheduleAgentWorker implements AgentWorker {
         state.setDeptSubName(firstText(payload.get("deptSubName"), memory.get("deptSubName")));
         state.setDoctorName(firstText(payload.get("doctorName"), memory.get("doctorName")));
         state.setDate(firstText(payload.get("date"), memory.get("date")));
+        state.setDoctorGender(firstText(payload.get("doctorGender"), memory.get("doctorGender")));
+        state.setDoctorAgePreference(firstText(payload.get("doctorAgePreference"), memory.get("doctorAgePreference")));
+        state.setPatientGender(firstText(payload.get("patientGender"), memory.get("patientGender")));
         return state;
     }
 
@@ -189,39 +267,108 @@ public class ScheduleAgentWorker implements AgentWorker {
         }
     }
 
+    private static final Map<String, Integer> JOB_RANK = new java.util.LinkedHashMap<>();
+
+    static {
+        JOB_RANK.put("主任医师", 5);
+        JOB_RANK.put("副主任医师", 4);
+        JOB_RANK.put("主治医师", 3);
+        JOB_RANK.put("住院医师", 2);
+    }
+
     private TerminalOutcome searchSlots(QueryState state, Map<String, Object> observation) {
-        Candidate candidate = selectCandidate(state.getDoctors(), state.getDoctorId(), state.getDoctorName(), state.getDate(), state);
+        // Collect ALL candidates with available slots
+        List<Candidate> allCandidates = selectAllCandidates(state.getDoctors(), state.getDoctorId(), state.getDoctorName(), state.getDate(), state);
         if (state.hasToolFailure()) {
             return TerminalOutcome.TOOL_FAILURE;
         }
-        if (candidate == null) {
+        if (allCandidates.isEmpty()) {
             return TerminalOutcome.NO_SLOT;
         }
-        state.setCandidate(candidate);
-        state.setDoctorId(candidate.getDoctorId());
-        state.setDoctorName(candidate.getDoctorName());
+        state.setAllCandidates(allCandidates);
+        // Default pick: first (best-match) candidate
+        Candidate best = allCandidates.get(0);
+        state.setCandidate(best);
+        state.setDoctorId(best.getDoctorId());
+        state.setDoctorName(best.getDoctorName());
+        observation.put("allCandidates", buildCandidatesObservations(allCandidates));
         observation.put("selectedOrder", buildOrderPayload(state));
         return TerminalOutcome.SUCCESS;
     }
 
-    private Candidate selectCandidate(ArrayList<HashMap> doctors, Integer doctorId, String doctorName, String date, QueryState state) {
+    private List<Candidate> selectAllCandidates(ArrayList<HashMap> doctors, Integer doctorId, String doctorName, String date, QueryState state) {
         if (doctors == null || doctors.isEmpty()) {
-            return null;
+            return Collections.emptyList();
         }
+        // If user specified a doctor, find only that one
         if (doctorId != null || StringUtils.hasText(doctorName)) {
             HashMap matchedDoctor = matchDoctor(doctorId, doctorName, doctors);
-            return matchedDoctor == null ? null : findAvailableByDoctor(matchedDoctor, date, state);
+            if (matchedDoctor == null) return Collections.emptyList();
+            Candidate candidate = findAvailableByDoctor(matchedDoctor, date, state);
+            return candidate != null ? Collections.singletonList(candidate) : Collections.emptyList();
         }
+        // Collect all doctors with available slots
+        List<Candidate> available = new ArrayList<>();
         for (HashMap doctor : doctors) {
             Candidate candidate = findAvailableByDoctor(doctor, date, state);
             if (candidate != null) {
-                return candidate;
+                candidate.setJob(stringValue(doctor.get("job")));
+                candidate.setSex(stringValue(doctor.get("sex")));
+                available.add(candidate);
             }
-            if (state.hasToolFailure()) {
-                return null;
-            }
+            if (state.hasToolFailure()) return Collections.emptyList();
         }
-        return null;
+        // Sort: gender preference → job rank desc → remaining slots desc
+        sortCandidates(available, state.getDoctorGender(), state.getPatientGender());
+        return available;
+    }
+
+    private void sortCandidates(List<Candidate> list, String doctorGenderPref, String patientGender) {
+        if (list.size() <= 1) return;
+        // Resolve target gender: explicit doctorGender > implied from patientGender
+        String targetGender = StringUtils.hasText(doctorGenderPref) ? doctorGenderPref
+                : ("女".equals(patientGender) ? "女" : null);
+        if (!StringUtils.hasText(targetGender)) {
+            // No gender preference: sort by job rank desc then slots desc
+            list.sort((a, b) -> {
+                int cmp = Integer.compare(jobRank(b.getJob()), jobRank(a.getJob()));
+                if (cmp != 0) return cmp;
+                return Integer.compare(b.getSlotsRemaining(), a.getSlotsRemaining());
+            });
+            return;
+        }
+        list.sort((a, b) -> {
+            // Level 1: gender match — target first, unknown middle, non-target last
+            int genderCmp = Integer.compare(genderScore(b.getSex(), targetGender), genderScore(a.getSex(), targetGender));
+            if (genderCmp != 0) return genderCmp;
+            // Level 2: job rank desc
+            int jobCmp = Integer.compare(jobRank(b.getJob()), jobRank(a.getJob()));
+            if (jobCmp != 0) return jobCmp;
+            // Level 3: remaining slots desc
+            return Integer.compare(b.getSlotsRemaining(), a.getSlotsRemaining());
+        });
+    }
+
+    private int genderScore(String sex, String target) {
+        if (target.equals(sex)) return 2;       // match
+        if (sex == null || sex.isEmpty()) return 1; // unknown
+        return 0;                               // non-match
+    }
+
+    private int jobRank(String job) {
+        if (job == null) return 1;
+        return JOB_RANK.getOrDefault(job, 1);
+    }
+
+    private List<Map<String, Object>> buildCandidatesObservations(List<Candidate> candidates) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Candidate c : candidates) {
+            Map<String, Object> item = new HashMap<>(c.toOrderPayload());
+            item.put("job", c.getJob());
+            item.put("sex", c.getSex());
+            result.add(item);
+        }
+        return result;
     }
 
     private HashMap matchDepartmentByName(String deptName, ArrayList<HashMap> departments) {
@@ -298,7 +445,9 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     private AgentResult buildNoSlotResult(QueryState state, Map<String, Object> observation) {
         AgentResult result = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
-        result.setReply("暂时没有找到可用号源，请换个日期或诊室再试。");
+        String dept = StringUtils.hasText(state.getDeptName()) ? state.getDeptName() : "该科室";
+        String date = StringUtils.hasText(state.getDate()) ? state.getDate() : "指定日期";
+        result.setReply(date + " " + dept + " 暂无可挂号医生，建议换个日期或尝试其他相关科室。");
         result.setSummary("no_slot_available");
         result.setToolName("searchScheduleSlots");
         result.setObservation(observation);
@@ -308,14 +457,14 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     private AgentResult buildToolFailureResult(QueryState state, Map<String, Object> observation) {
         AgentResult result = buildResult("schedule-agent", HandoffAction.ASK_USER, MultiAgentStage.SLOT_QUERY);
-        result.setReply("查询号源时出现波动，请稍后重试或改走普通挂号。");
+        result.setReply("号源查询暂时出现波动，请稍后重试或改走普通挂号。");
         result.setSummary("no_slot_available");
         result.setToolName(state.getLastFailedTool());
         result.setObservation(observation);
         Map<String, Object> patch = buildQueryPatch(state, false);
         patch.put("errorCode", MultiAgentErrorCode.REGISTRATION_SYSTEM_ERROR);
         patch.put("retryable", true);
-        patch.put("errorMessage", "查询号源时出现波动，请稍后重试或改走普通挂号。");
+        patch.put("errorMessage", "号源查询暂时出现波动，请稍后重试或改走普通挂号。");
         patch.put("badCaseType", "schedule_tool_failed");
         result.setMemoryPatch(patch);
         return result;
@@ -323,8 +472,6 @@ public class ScheduleAgentWorker implements AgentWorker {
 
     private AgentResult buildSuccessResult(QueryState state, Map<String, Object> observation) {
         AgentResult result = buildResult("schedule-agent", HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK);
-        result.setReply("已为你选中可挂号源，开始校验挂号条件。");
-        result.setSummary("slot_selected");
         result.setToolName("searchScheduleSlots");
         result.setObservation(observation);
         result.setMemoryPatch(buildQueryPatch(state, true));
@@ -333,6 +480,51 @@ public class ScheduleAgentWorker implements AgentWorker {
         toolInput.put("doctorId", state.getDoctorId());
         toolInput.put("date", state.getDate());
         result.setToolInput(toolInput);
+
+        // Build doctor list reply
+        List<Candidate> candidates = state.getAllCandidates();
+        String deptName = StringUtils.hasText(state.getDeptName()) ? state.getDeptName() : "该科室";
+        String dateText = StringUtils.hasText(state.getDate()) ? state.getDate() : "该日";
+        String targetGender = StringUtils.hasText(state.getDoctorGender()) ? state.getDoctorGender()
+                : ("女".equals(state.getPatientGender()) ? "女" : null);
+        boolean hasFemale = false;
+        StringBuilder listBuilder = new StringBuilder();
+        listBuilder.append("已为您找到 ").append(dateText).append(" ").append(deptName).append(" 的可挂号医生");
+        if (StringUtils.hasText(targetGender)) {
+            listBuilder.append("（女医生优先）");
+        }
+        listBuilder.append("：\n");
+        Map<Integer, String> slotNames = new LinkedHashMap<>();
+        slotNames.put(1, "上午");
+        slotNames.put(2, "下午");
+        for (int i = 0; i < candidates.size(); i++) {
+            Candidate c = candidates.get(i);
+            String sexLabel = "女".equals(c.getSex()) ? "女" : ("男".equals(c.getSex()) ? "男" : "--");
+            if ("女".equals(c.getSex())) hasFemale = true;
+            String jobText = StringUtils.hasText(c.getJob()) ? c.getJob() : "";
+            String slotText = slotNames.getOrDefault(c.getSlot(), "时段" + c.getSlot());
+            listBuilder.append("· ").append(StringUtils.hasText(c.getDoctorName()) ? c.getDoctorName() : "--");
+            listBuilder.append("(").append(sexLabel).append(")");
+            if (StringUtils.hasText(jobText)) listBuilder.append(" ").append(jobText);
+            listBuilder.append(" ").append(slotText).append("有号");
+            if (StringUtils.hasText(c.getAmount())) listBuilder.append(" ¥").append(c.getAmount());
+            listBuilder.append("\n");
+        }
+        // Note if no female doctors when preference is female
+        if (StringUtils.hasText(targetGender) && !hasFemale) {
+            listBuilder.append(deptName).append("当前无女医生出诊，以上为全部可挂号医生。\n");
+        }
+        Candidate best = candidates.get(0);
+        if (StringUtils.hasText(targetGender) && targetGender.equals(best.getSex())) {
+            listBuilder.append("\n已按").append(targetGender).append("医生偏好优先展示，默认选中").append(best.getDoctorName()).append("。如需换其他医生请告诉我。");
+        } else if (StringUtils.hasText(targetGender) && hasFemale) {
+            listBuilder.append("\n已优先展示").append(targetGender).append("医生，默认选中").append(best.getDoctorName()).append("。如需换其他医生请告诉我。");
+        } else {
+            listBuilder.append("\n已默认选中").append(best.getDoctorName()).append("。如需换其他医生请告诉我。");
+        }
+
+        result.setReply(listBuilder.toString());
+        result.setSummary("slot_selected");
         return result;
     }
 
@@ -400,6 +592,7 @@ public class ScheduleAgentWorker implements AgentWorker {
                 candidate.setWorkPlanId(intValue(schedule.get("workPlanId")));
                 candidate.setScheduleId(intValue(schedule.get("scheduleId")));
                 candidate.setSlot(intValue(schedule.get("slot")));
+                candidate.setSlotsRemaining(remain);
                 return candidate;
             }
         }
@@ -499,10 +692,14 @@ public class ScheduleAgentWorker implements AgentWorker {
         private Integer doctorId;
         private String doctorName;
         private String date;
+        private String doctorGender;
+        private String doctorAgePreference;
         private ArrayList<HashMap> departments;
         private ArrayList<HashMap> subDepartments;
         private ArrayList<HashMap> doctors;
         private Candidate candidate;
+        private List<Candidate> allCandidates;
+        private String patientGender;
         private boolean hasToolFailure;
         private String lastFailedTool;
 
@@ -562,6 +759,22 @@ public class ScheduleAgentWorker implements AgentWorker {
             this.date = date;
         }
 
+        public String getDoctorGender() {
+            return doctorGender;
+        }
+
+        public void setDoctorGender(String doctorGender) {
+            this.doctorGender = doctorGender;
+        }
+
+        public String getDoctorAgePreference() {
+            return doctorAgePreference;
+        }
+
+        public void setDoctorAgePreference(String doctorAgePreference) {
+            this.doctorAgePreference = doctorAgePreference;
+        }
+
         public ArrayList<HashMap> getDepartments() {
             return departments;
         }
@@ -594,6 +807,22 @@ public class ScheduleAgentWorker implements AgentWorker {
             this.candidate = candidate;
         }
 
+        public List<Candidate> getAllCandidates() {
+            return allCandidates;
+        }
+
+        public void setAllCandidates(List<Candidate> allCandidates) {
+            this.allCandidates = allCandidates;
+        }
+
+        public String getPatientGender() {
+            return patientGender;
+        }
+
+        public void setPatientGender(String patientGender) {
+            this.patientGender = patientGender;
+        }
+
         public boolean hasToolFailure() {
             return hasToolFailure;
         }
@@ -619,6 +848,9 @@ public class ScheduleAgentWorker implements AgentWorker {
         private Integer slot;
         private Integer workPlanId;
         private Integer scheduleId;
+        private String job;
+        private String sex;
+        private int slotsRemaining;
 
         Map<String, Object> toOrderPayload() {
             Map<String, Object> order = new HashMap<>();
@@ -687,5 +919,12 @@ public class ScheduleAgentWorker implements AgentWorker {
         public void setScheduleId(Integer scheduleId) {
             this.scheduleId = scheduleId;
         }
+
+        public String getJob() { return job; }
+        public void setJob(String job) { this.job = job; }
+        public String getSex() { return sex; }
+        public void setSex(String sex) { this.sex = sex; }
+        public int getSlotsRemaining() { return slotsRemaining; }
+        public void setSlotsRemaining(int slotsRemaining) { this.slotsRemaining = slotsRemaining; }
     }
 }

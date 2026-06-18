@@ -13,8 +13,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,7 +33,7 @@ public class HttpModelIntentParser implements ModelIntentParser {
     }
 
     @Override
-    public Optional<ModelIntentResult> parse(String text, String sessionId) {
+    public Optional<ModelIntentResult> parse(String text, String sessionId, List<String> departments) {
         log.info("NLU parse called, enabled={}, text={}",
                 properties.isModelParserEnabled(), text != null ? text.substring(0, Math.min(30, text.length())) : "null");
         if (!properties.isModelParserEnabled() || !StringUtils.hasText(text) || !StringUtils.hasText(properties.getModelParserEndpoint())) {
@@ -55,6 +55,9 @@ public class HttpModelIntentParser implements ModelIntentParser {
             request.put("text", text);
             if (StringUtils.hasText(sessionId)) {
                 request.put("sessionId", sessionId);
+            }
+            if (departments != null && !departments.isEmpty()) {
+                request.put("departments", departments);
             }
             byte[] body = objectMapper.writeValueAsBytes(request);
             try (OutputStream outputStream = connection.getOutputStream()) {

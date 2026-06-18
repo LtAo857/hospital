@@ -48,7 +48,7 @@
 
 ### 修改
 
-#### 1. `model-inference-demo/inference_demo/parser.py`
+#### 1. `nlu-service/hospital_nlu/parser.py`
 
 | 改动 | 说明 |
 |------|------|

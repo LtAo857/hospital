@@ -3,10 +3,10 @@ from typing import Optional
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from inference_demo.parser import IntentSlotParser
+from hospital_nlu.parser import IntentSlotParser
 
 
-app = FastAPI(title="Hospital NLU Inference Demo", version="0.1.0")
+app = FastAPI(title="Hospital NLU Inference", version="1.0.0")
 parser = IntentSlotParser()
 
 

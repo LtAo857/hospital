@@ -81,7 +81,7 @@ public class MultiAgentRagService {
                     answer.setMode(retrieval.getMode());
                     answer.setFallbackReason("llm_empty");
                 } else {
-                    answer = new RagAnswer(llmResult.answer, snippets, true);
+                    answer = new RagAnswer(cleanResponse(llmResult.answer), snippets, true);
                     answer.setMode(retrieval.getMode());
                     answer.setPromptTokens(llmResult.promptTokens);
                     answer.setCompletionTokens(llmResult.completionTokens);
@@ -111,7 +111,7 @@ public class MultiAgentRagService {
             body.set("temperature", 0.2D);
             JSONArray messages = new JSONArray();
             messages.add(new JSONObject().set("role", "system").set("content",
-                    "你是医院挂号多 Agent 的说明助手。你只能依据提供的知识片段和当前 memory 回答，禁止编造号源、医生排班、价格、就诊卡状态或挂号结果。回答用中文，2到4句。"));
+                    "你是医院挂号多 Agent 的说明助手。你只能依据提供的知识片段和当前上下文回答，禁止编造号源、医生排班、价格、就诊卡状态或挂号结果。回答用中文，2到4句。不要输出你的内部推理过程、过滤逻辑，不要解释为什么采纳或不采纳某些知识片段，不要引用\"当前 memory\"等内部变量。"));
             messages.add(new JSONObject().set("role", "user").set("content", buildPrompt(question, memory, snippets)));
             body.set("messages", messages);
             HttpRequest request = HttpRequest.post(agentProperties.getBaseUrl())
@@ -148,7 +148,33 @@ public class MultiAgentRagService {
                                List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets) {
         StringBuilder builder = new StringBuilder();
         builder.append("用户问题: ").append(question == null ? "" : question).append("\n");
-        builder.append("当前 memory: ").append(JSONUtil.toJsonStr(memory == null ? new HashMap<String, Object>() : memory)).append("\n");
+        builder.append("当前上下文: ");
+        if (memory != null && !memory.isEmpty()) {
+            List<String> ctxParts = new ArrayList<>();
+            String symptom = stringValue(memory.get("symptom"));
+            if (StringUtils.hasText(symptom)) {
+                ctxParts.add("症状=" + symptom);
+            }
+            String dept = firstText(memory.get("deptName"), memory.get("recommendedDeptName"));
+            if (StringUtils.hasText(dept)) {
+                ctxParts.add("科室=" + dept);
+            }
+            String gender = stringValue(memory.get("patientGender"));
+            if (StringUtils.hasText(gender)) {
+                ctxParts.add("患者性别=" + gender);
+            }
+            String doctorGender = stringValue(memory.get("doctorGender"));
+            if (StringUtils.hasText(doctorGender)) {
+                ctxParts.add("医生性别偏好=" + doctorGender);
+            }
+            if (memory.get("pendingOrder") instanceof Map) {
+                ctxParts.add("有待确认号源");
+            }
+            builder.append(String.join("，", ctxParts));
+        } else {
+            builder.append("无");
+        }
+        builder.append("\n");
         builder.append("知识片段:\n");
         for (int i = 0; i < snippets.size(); i++) {
             MultiAgentKnowledgeBase.KnowledgeSnippet snippet = snippets.get(i);
@@ -158,7 +184,7 @@ public class MultiAgentRagService {
                     .append(snippet.getContent())
                     .append("\n");
         }
-        builder.append("要求: 结合当前 memory 和知识片段，给出压缩解释；如果 memory 中已有 deptSubName、doctorName、date、pendingOrder，可以顺带解释当前推荐路径，但不要虚构实时业务事实。\n");
+        builder.append("要求: 结合当前上下文和知识片段，给出压缩解释；如果上下文中已有症状、科室、医生、日期、待确认号源，可以顺带解释当前推荐路径，但不要虚构实时业务事实。不要输出你的内部推理过程或解释为什么过滤某些信息。\n");
         return truncate(builder.toString());
     }
 
@@ -195,6 +221,14 @@ public class MultiAgentRagService {
         putIfHasText(safe, "doctorName", memory.get("doctorName"));
         putIfHasText(safe, "date", memory.get("date"));
         putIfHasText(safe, "requestedView", memory.get("requestedView"));
+        putIfHasText(safe, "symptom", memory.get("symptom"));
+        putIfHasText(safe, "symptoms", memory.get("symptoms"));
+        putIfHasText(safe, "patientGender", memory.get("patientGender"));
+        putIfHasText(safe, "doctorGender", memory.get("doctorGender"));
+        putIfHasText(safe, "doctorAgePreference", memory.get("doctorAgePreference"));
+        putIfHasText(safe, "recommendedDeptName", memory.get("recommendedDeptName"));
+        putIfHasText(safe, "medicalConsultRiskLevel", memory.get("medicalConsultRiskLevel"));
+        putIfHasText(safe, "medicalConsultAdvice", memory.get("medicalConsultAdvice"));
         if (memory.get("pendingOrder") instanceof Map) {
             Map<?, ?> pendingOrder = (Map<?, ?>) memory.get("pendingOrder");
             Map<String, Object> summary = new LinkedHashMap<String, Object>();
@@ -272,6 +306,23 @@ public class MultiAgentRagService {
 
     private boolean isRetryableStatus(int status) {
         return status == 429 || status >= 500;
+    }
+
+    private String cleanResponse(String text) {
+        if (!StringUtils.hasText(text)) {
+            return text;
+        }
+        // Strip LLM internal reasoning patterns that should never reach users
+        text = text.replaceAll("当前\\s*memory\\s*中[^，。；,!！\\n]*[，。；,!！]", "");
+        text = text.replaceAll("当前\\s*memory\\s*中[^。！\\n]*[。！]", "");
+        text = text.replaceAll("与\\S+无关[，。]*故不采纳该推荐[。]*", "");
+        text = text.replaceAll("所有分诊建议均严格依据[^。]*[。]", "");
+        text = text.replaceAll("不采纳[^。！\\n]*[。！]", "");
+        text = text.replaceAll("未提供[^。！\\n]*[。！]", "");
+        // Remove repeated punctuation
+        text = text.replaceAll("[。！]{2,}", "。");
+        text = text.replaceAll("\\s+", " ");
+        return text.trim();
     }
 
     private int estimateTokens(String text) {

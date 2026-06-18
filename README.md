@@ -31,7 +31,7 @@ hospital
 ├── patient-wx               # 患者端小程序（UniApp）
 ├── sql                      # 数据库建表SQL
 ├── docs                     # 部署文档
-├── model-inference-demo     # 模型微调与推理加速演示（面试用）
+├── nlu-service              # NLU 推理服务（意图识别 + 槽位提取）
 ├── Minio                    # 静态资源（图片等）
 └── video                    # 视频相关资源
 ```
@@ -306,20 +306,30 @@ cd docs/jmeter
 - 多 Agent 加固说明：
   `docs/agent/multi-agent-hardening.md`
 
-## Model Inference Demo（模型微调与推理加速演示）
+## NLU 推理服务（nlu-service）
 
-- 独立的面试验证 Demo，展示如何在不修改主挂号流程的前提下引入 NLU 模型能力
+- 生产级 NLU 服务，为多 Agent 挂号流程提供意图识别与槽位提取
 - 设计原则：模型只做意图识别与槽位提取，不接入真实排班、挂号写操作与就诊卡校验
+- 模块结构：
+  - `hospital_nlu/parser.py` — 编排入口 + LLM 调用 + system prompt
+  - `hospital_nlu/rules.py` — 规则引擎纯函数（意图检测、槽位提取、jieba 模糊匹配）
+  - `hospital_nlu/constants.py` — 关键词列表、13 种症状同义词、科室映射
+  - `hospital_nlu/neo4j.py` — Neo4j 知识图谱查询（症状→科室关联）
 - 入口：
   - FastAPI 版：`uvicorn app:app --host 127.0.0.1 --port 8001`
   - 零依赖版：`python server_stdlib.py --host 127.0.0.1 --port 8001`
-- 接口：`POST /infer`，输入用户文本，输出结构化 JSON（intent / slots / confidence / accelerations）
-- 核心解析器：`model-inference-demo/inference_demo/parser.py`（规则驱动 + 可选 DashScope LLM，双模式一键切换）
+- 接口：`POST /infer`，输入用户文本，输出结构化 JSON（intent / slots / confidence / symptomDeptGraph）
+- 核心能力：
+  - LLM + 规则引擎双模式，LLM 失败自动回退，`self.llm_enabled` 一键切换
+  - 意图修正：LLM 返回 `unknown`/`unsupported` 但文本含挂号关键词时自动修正为 `registration`
+  - 科室三级兜底：图谱查询 → 症状映射 → 文本提取，确保显式科室不丢失
+  - 多症状并行提取 + `symptomDeptGraph` 图谱透传，Java 侧做跨科室校验
+  - `hasConsultDemand` 咨询深度标记，区分挂号请求与咨询请求
+  - 高危意图拦截（DANGEROUS_KEYWORDS 黑名单 + LLM prompt 双重识别）
 - 探索性 Demo：
-  - `model-inference-demo/inference_demo/langgraph_demo.py` — LangGraph 图编排 Demo（StateGraph + 条件边 + checkpointer）
-  - `model-inference-demo/inference_demo/langchain_demo.py` — LangChain Agent Demo（@tool 装饰器 + ReAct 循环）
-  - 运行方式：`python -m inference_demo.langgraph_demo` / `python -m inference_demo.langchain_demo`
-  - 目的：理解 LangGraph 显式图编排 vs LangChain Agent 自主工具调用的区别，面试时有对比体感
+  - `hospital_nlu/langgraph_demo.py` — LangGraph 图编排 Demo（StateGraph + 条件边 + checkpointer）
+  - `hospital_nlu/langchain_demo.py` — LangChain Agent Demo（@tool 装饰器 + ReAct 循环）
+  - 运行方式：`python -m hospital_nlu.langgraph_demo` / `python -m hospital_nlu.langchain_demo`
 - 评估与压测（均不依赖外部 API）：
   ```powershell
   python scripts/eval.py
@@ -327,9 +337,16 @@ cd docs/jmeter
   python server_stdlib.py --self-test
   ```
 - 文档：
-  - `model-inference-demo/docs/fine-tune-plan.md` — Qwen + LoRA/QLoRA 微调方案
-  - `model-inference-demo/docs/inference-acceleration.md` — vLLM / Ollama / 量化 推理加速方案
-  - `model-inference-demo/docs/integration-with-hospital.md` — 与 Java 多 Agent 系统的集成方案（超时兜底、置信度阈值、规则引擎回退）
+  - `nlu-service/docs/fine-tune-plan.md` — Qwen + LoRA/QLoRA 微调方案
+  - `nlu-service/docs/inference-acceleration.md` — vLLM / Ollama / 量化 推理加速方案
+  - `nlu-service/docs/integration-with-hospital.md` — 与 Java 多 Agent 系统的集成方案（超时兜底、置信度阈值、规则引擎回退）
+
+- 模型链路四步走（面试框架）：
+  - **微调**：Qwen + LoRA/QLoRA + LLaMA-Factory
+  - **加速**：vLLM / Ollama / INT4 量化
+  - **部署**：Docker + 独立 `/infer` 服务，HTTP 解耦 Java
+  - **推理**：线上 NLU 解析，模型只出 intent + slots，写操作由 Java 控制
+  - 当前现状：部署和推理已落地（Python `/infer` + Java HTTP + DashScope qwen-plus）
 - 面试要点：
   - 微调：中文小模型 + SFT + LoRA/QLoRA + LLaMA-Factory，训练数据从挂号会话日志抽取
   - 推理加速：vLLM serving 层（KV-cache / continuous batching），暴露 OpenAI 兼容 API
@@ -375,6 +392,8 @@ agent:
 - **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Coordinator 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
 - **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（13 个标准症状、100+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子""胳膊疼""嘴巴疼"也能映射到正确科室。另有三阶段提取策略——Phase 1 词典精确匹配、Phase 2 jieba + 同义词模糊匹配、Phase 3 正则通用提取（`膝盖疼` `脖子酸` `肩膀不舒服` 等词典未收录的症状保留原文透传下游，不丢数据）
 - **LLM 空科室修正**：LLM 返回 `department: null` 时不再直接透传，先通过症状名精确/子串匹配补全科室（如 LLM 返回 `symptom:"口腔疼"` 但 `department:null`，自动补全为口腔科）
+- **跨话题会话隔离**：Coordinator 检测到症状切换时自动清除不兼容的旧科室和 stale 图谱数据，防止上一轮话题数据污染本轮回复
+- **RAG 防泄漏与清洗**：RAG prompt 用结构化上下文替代原始 JSON dump；LLM 系统提示词禁止输出内部推理/过滤逻辑；Java 侧 `cleanResponse()` 正则后处理兜底 strip 泄漏文本
 - **NLU→Schedule 字段映射**：NLU 返回的 `department` 统一映射为 `deptName`，Coordinator 将其写入 session memory，ScheduleAgentWorker 直接从 memory 取科室名查科室 ID
 
 ### 与大厂 Agent 架构对比
@@ -419,7 +438,9 @@ agent:
 - 能力边界补充：
   ScheduleAgentWorker 内部已重构为顺序流水线 5 步（科室匹配→子科室→日期→医生排班→号源时段），无循环决策；前端页面展示的是流程结果、步骤和卡片
 - 解释型 RAG：
-  当用户询问“为什么推荐这个”等解释类问题时，后端会从 `docs/agent/*.md` 检索说明片段，并补充“知识来源”卡片；当前知识源已不再使用硬编码片段。
+  当用户询问”为什么推荐这个”等解释类问题时，后端会从 `docs/agent/*.md` 检索说明片段，并补充”知识来源”卡片；当前知识源已不再使用硬编码片段。RAG prompt 已改为结构化上下文（非原始 JSON dump），LLM 系统提示词禁止输出内部推理过程，Java 侧 `cleanResponse()` 正则兜底 strip 泄漏文本。
+- 会话记忆隔离：
+  Coordinator 检测到症状切换时自动清除不兼容旧科室（deptName/deptId/deptSubId/deptSubName）和 stale 图谱数据（symptomDeptGraph），防止上一轮话题数据污染本轮回复。
 - 混合检索与降级：
   explain 链路已升级为“关键词 + 可选 embedding”的最小混合检索；默认可使用本地 `local-hash` embedding，失败时会自动回落到关键词片段回答。
 - 运行观测：

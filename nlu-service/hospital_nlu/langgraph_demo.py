@@ -17,7 +17,7 @@ LangGraph 挂号 Agent 探索性 Demo
   confirm ──(确认)──> execute
 
 运行方式：
-  python -m inference_demo.langgraph_demo
+  python -m hospital_nlu.langgraph_demo
 """
 
 from __future__ import annotations

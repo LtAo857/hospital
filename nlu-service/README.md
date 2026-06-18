@@ -1,29 +1,22 @@
-# Model Inference Demo
+# Hospital NLU Inference
 
-This is an independent interview demo for the hospital registration project.
-It shows how fine-tuning and inference acceleration can be introduced without
-making the main registration workflow depend on a model.
-
-The demo focuses on NLU:
-
-- intent classification
-- slot extraction
-- structured JSON output
-- evaluation and benchmark scripts
-- fine-tuning and accelerated inference design docs
-
-The production boundary is intentional: the model only understands user text.
-Real doctors, schedules, cards, duplicate registration checks, and final writes
-must still come from the Java business system and MySQL.
+The NLU service for the hospital registration system.
+Provides intent classification and slot extraction via HTTP API.
 
 ## Layout
 
 ```text
-model-inference-demo/
+nlu-service/
   app.py
   requirements.txt
-  inference_demo/
+  server_stdlib.py
+  hospital_nlu/
     parser.py
+    rules.py
+    constants.py
+    neo4j.py
+    langchain_demo.py
+    langgraph_demo.py
   data/
     sft_samples.jsonl
     eval.jsonl
@@ -44,7 +37,7 @@ model-inference-demo/
 FastAPI version:
 
 ```powershell
-cd model-inference-demo
+cd nlu-service
 pip install -r requirements.txt
 uvicorn app:app --host 127.0.0.1 --port 8001 --reload
 ```
@@ -52,7 +45,7 @@ uvicorn app:app --host 127.0.0.1 --port 8001 --reload
 No-dependency standard-library version:
 
 ```powershell
-cd model-inference-demo
+cd nlu-service
 python server_stdlib.py --host 127.0.0.1 --port 8001
 ```
 
@@ -81,9 +74,9 @@ Response:
     "timePreference": null
   },
   "confidence": 0.95,
-  "source": "demo_rules",
-  "engine": "local-rule-demo",
-  "model": "hospital-nlu-demo-v1",
+  "source": "rules",
+  "engine": "local-rule",
+  "model": "hospital-nlu-v1",
   "latencyMs": 1,
   "accelerations": [
     "structured-output",
@@ -115,16 +108,19 @@ How it works:
 
 - First call the LLM (OpenAI-compatible API) with a dynamic system prompt that injects the current department list
 - If LLM returns valid JSON and confidence ≥ `LLM_MIN_CONFIDENCE`, use the LLM result directly
-- If LLM fails, times out, or returns low confidence → **automatically fall back to the rule engine** (confidence=0.0)
-- If rule engine also can't confidently identify intent → `confidence: 0.0` is returned, Java Coordinator returns "NLU 服务暂不可用" with a manual registration redirect
+- **Intent override**: LLM returns `unknown`/`unsupported` but text contains registration keywords (挂/预约/号等) → auto-correct to `registration`
+- **Department fallback**: Neo4j graph query → symptom map → text extraction, 3-level cascade ensures explicitly mentioned departments are not lost
+- If LLM fails, times out, or returns low confidence → **automatically fall back to the rule engine**
+- Rule engine: jieba tokenization + symptom synonym fuzzy matching (13 standard symptoms, 80+ colloquial variants)
+- If neither engine can confidently identify intent → `confidence: 0.0`, Java Coordinator returns "NLU 服务暂不可用" with a manual registration redirect
 - The API response format is identical either way — callers don't need to know which engine ran
 
 Response metadata:
 
 ```json
 {
-  "source": "llm",           // or "demo_rules" when fallback
-  "engine": "llm-remote",    // or "local-rule-demo" when fallback
+  "source": "llm",           // or "rules" when fallback
+  "engine": "llm-remote",    // or "local-rule" when fallback
   "model": "qwen-plus",      // the actual model used
   "confidence": 0.95
 }
@@ -136,7 +132,7 @@ The parser, evaluator, local benchmark, and `server_stdlib.py` use only the
 Python standard library.
 
 ```powershell
-cd model-inference-demo
+cd nlu-service
 python scripts/eval.py
 python scripts/benchmark.py --mode local --requests 200
 python server_stdlib.py --self-test
@@ -145,7 +141,7 @@ python server_stdlib.py --self-test
 ## Build Demo Model File
 
 ```powershell
-cd model-inference-demo
+cd nlu-service
 python scripts/train.py
 ```
 

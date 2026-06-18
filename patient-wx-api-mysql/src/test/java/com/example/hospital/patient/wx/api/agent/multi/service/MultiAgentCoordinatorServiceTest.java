@@ -12,21 +12,26 @@ import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentErrorCode
 import com.example.hospital.patient.wx.api.agent.multi.model.MultiAgentStage;
 import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentKnowledgeBase;
 import com.example.hospital.patient.wx.api.agent.multi.rag.MultiAgentRagService;
+import com.example.hospital.patient.wx.api.agent.multi.nlu.ModelIntentParser;
+import com.example.hospital.patient.wx.api.agent.multi.nlu.ModelIntentResult;
 import com.example.hospital.patient.wx.api.agent.multi.worker.AgentWorker;
+import com.example.hospital.patient.wx.api.agent.multi.service.MultiAgentDepartmentCatalogService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 class MultiAgentCoordinatorServiceTest {
 
     @Test
-    void shouldCompleteFlowAndPersistDoneState() {
+    void shouldCompleteFlowAndPersistDoneState() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(6);
 
@@ -34,7 +39,6 @@ class MultiAgentCoordinatorServiceTest {
         Mockito.when(memoryService.load("session-1")).thenReturn(new HashMap<String, Object>());
 
         List<AgentWorker> workers = Arrays.asList(
-                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.HANDOFF, MultiAgentStage.SLOT_QUERY, "triage ok", null),
                 fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK, "slot ok", new HashMap<String, Object>() {{
                     put("pendingOrder", new HashMap<String, Object>() {{
                         put("deptSubId", 10);
@@ -51,7 +55,7 @@ class MultiAgentCoordinatorServiceTest {
                 }})
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-1");
         request.setMessage("挂号");
@@ -73,7 +77,7 @@ class MultiAgentCoordinatorServiceTest {
     }
 
     @Test
-    void shouldExposeFallbackCardForLoginRequiredFailure() {
+    void shouldExposeFallbackCardForLoginRequiredFailure() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(2);
 
@@ -81,7 +85,7 @@ class MultiAgentCoordinatorServiceTest {
         Mockito.when(memoryService.load("session-2")).thenReturn(new HashMap<String, Object>());
 
         List<AgentWorker> workers = Arrays.asList(
-                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.FAIL, MultiAgentStage.MANUAL_FALLBACK, "请先登录", new HashMap<String, Object>() {{
+                fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.FAIL, MultiAgentStage.MANUAL_FALLBACK, "请先登录", new HashMap<String, Object>() {{
                     put("errorCode", MultiAgentErrorCode.REGISTRATION_LOGIN_REQUIRED);
                     put("retryable", false);
                     put("errorMessage", "确认挂号前请先登录小程序。");
@@ -89,7 +93,7 @@ class MultiAgentCoordinatorServiceTest {
                 }})
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-2");
         request.setMessage("挂号");
@@ -107,7 +111,7 @@ class MultiAgentCoordinatorServiceTest {
     }
 
     @Test
-    void shouldBuildToolLogsAndFlowsForScheduleWorkerContract() {
+    void shouldBuildToolLogsAndFlowsForScheduleWorkerContract() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(3);
 
@@ -115,7 +119,6 @@ class MultiAgentCoordinatorServiceTest {
         Mockito.when(memoryService.load("session-3")).thenReturn(new HashMap<String, Object>());
 
         List<AgentWorker> workers = Arrays.asList(
-                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.HANDOFF, MultiAgentStage.SLOT_QUERY, "识别完成", null),
                 fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK, "已选中号源", new HashMap<String, Object>() {{
                     put("pendingOrder", new HashMap<String, Object>() {{
                         put("deptSubId", 10);
@@ -129,7 +132,7 @@ class MultiAgentCoordinatorServiceTest {
                 }})
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-3");
         request.setMessage("明天口腔科");
@@ -141,12 +144,12 @@ class MultiAgentCoordinatorServiceTest {
         Assertions.assertEquals("查询号源时段", response.getToolLogs().get(0).getName());
         Assertions.assertEquals("已选中可挂号源", response.getToolLogs().get(0).getSummary());
         Assertions.assertFalse(response.getAgentFlows().isEmpty());
-        Assertions.assertEquals("号源查询 Agent", response.getAgentFlows().get(1).getTitle());
-        Assertions.assertTrue(response.getAgentFlows().get(1).getSummary().contains("已选中可挂号源"));
+        Assertions.assertEquals("号源查询 Agent", response.getAgentFlows().get(0).getTitle());
+        Assertions.assertTrue(response.getAgentFlows().get(0).getSummary().contains("已选中可挂号源"));
     }
 
     @Test
-    void shouldAppendRequestedViewCardsAndExplainCard() {
+    void shouldAppendRequestedViewCardsAndExplainCard() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(2);
 
@@ -159,10 +162,10 @@ class MultiAgentCoordinatorServiceTest {
         }});
 
         List<AgentWorker> workers = Arrays.asList(
-                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.FINISH, MultiAgentStage.DONE, "已为你准备入口", null)
+                fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.FINISH, MultiAgentStage.DONE, "已为你准备入口", null)
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-4");
         request.setMessage("查看我的挂号");
@@ -176,7 +179,7 @@ class MultiAgentCoordinatorServiceTest {
     }
 
     @Test
-    void shouldUseRagAnswerForExplanationRequest() {
+    void shouldUseRagAnswerForExplanationRequest() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(2);
 
@@ -190,10 +193,10 @@ class MultiAgentCoordinatorServiceTest {
         }});
 
         List<AgentWorker> workers = Arrays.asList(
-                fixedWorker(MultiAgentStage.INTENT_PARSE, HandoffAction.FINISH, MultiAgentStage.DONE, "我先结合当前挂号上下文和知识库为你解释一下。", null)
+                fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.FINISH, MultiAgentStage.DONE, "我先结合当前挂号上下文和知识库为你解释一下。", null)
         );
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-5");
         request.setMessage("为什么推荐这个");
@@ -207,7 +210,7 @@ class MultiAgentCoordinatorServiceTest {
     }
 
     @Test
-    void shouldRejectForgedConfirmationBeforeCallingWorker() {
+    void shouldRejectForgedConfirmationBeforeCallingWorker() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(2);
 
@@ -215,9 +218,9 @@ class MultiAgentCoordinatorServiceTest {
         Mockito.when(memoryService.load("session-6")).thenReturn(new HashMap<String, Object>());
 
         AgentWorker worker = Mockito.mock(AgentWorker.class);
-        Mockito.when(worker.stage()).thenReturn(MultiAgentStage.INTENT_PARSE);
+        Mockito.when(worker.stage()).thenReturn(MultiAgentStage.SLOT_QUERY);
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), Arrays.asList(worker));
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, Arrays.asList(worker));
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-6");
         request.setAction("create_registration");
@@ -241,7 +244,7 @@ class MultiAgentCoordinatorServiceTest {
     }
 
     @Test
-    void shouldRejectInvalidChatPayloadBeforeCallingWorker() {
+    void shouldRejectInvalidChatPayloadBeforeCallingWorker() throws Exception {
         MultiAgentProperties properties = new MultiAgentProperties();
         properties.setMaxHops(2);
 
@@ -249,9 +252,9 @@ class MultiAgentCoordinatorServiceTest {
         Mockito.when(memoryService.load("session-7")).thenReturn(new HashMap<String, Object>());
 
         AgentWorker worker = Mockito.mock(AgentWorker.class);
-        Mockito.when(worker.stage()).thenReturn(MultiAgentStage.INTENT_PARSE);
+        Mockito.when(worker.stage()).thenReturn(MultiAgentStage.SLOT_QUERY);
 
-        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService, buildTestRagService(), Arrays.asList(worker));
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, Arrays.asList(worker));
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-7");
         request.setPayload(new HashMap<String, Object>() {{
@@ -265,6 +268,31 @@ class MultiAgentCoordinatorServiceTest {
         Assertions.assertEquals("payload_invalid", response.getMemory().get("badCaseType"));
         Assertions.assertNotNull(response.getMemory().get("badFields"));
         Mockito.verify(worker, Mockito.never()).execute(Mockito.any(AgentContext.class));
+    }
+
+    private MultiAgentCoordinatorService buildCoordinator(MultiAgentProperties properties,
+                                                           MultiAgentMemoryService memoryService,
+                                                           List<AgentWorker> workers) throws Exception {
+        MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService,
+                buildTestRagService(), null, workers);
+        injectModelIntentParser(service);
+        return service;
+    }
+
+    private void injectModelIntentParser(MultiAgentCoordinatorService service) throws Exception {
+        ModelIntentParser parser = Mockito.mock(ModelIntentParser.class);
+        Map<String, Object> slots = new HashMap<>();
+        slots.put("department", "口腔科");
+        ModelIntentResult result = new ModelIntentResult();
+        result.setIntent("registration");
+        result.setSlots(slots);
+        result.setConfidence(0.9);
+        result.setSource("llm");
+        Mockito.when(parser.parse(Mockito.anyString(), Mockito.anyString(), Mockito.anyList()))
+                .thenReturn(Optional.of(result));
+        Field field = MultiAgentCoordinatorService.class.getDeclaredField("modelIntentParser");
+        field.setAccessible(true);
+        field.set(service, parser);
     }
 
     private MultiAgentRagService buildTestRagService() {

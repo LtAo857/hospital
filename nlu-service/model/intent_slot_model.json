@@ -1,6 +1,6 @@
 {
-  "name": "hospital-nlu-demo-v1",
-  "engine": "local-rule-demo",
+  "name": "hospital-nlu-v1",
+  "engine": "local-rule",
   "departments": [
     "儿科",
     "口腔科",

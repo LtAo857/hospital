@@ -3,6 +3,7 @@ package com.example.hospital.patient.wx.api.agent.multi.nlu;
 import lombok.Data;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -14,5 +15,6 @@ public class ModelIntentResult {
     private String engine;
     private String model;
     private Long latencyMs;
+    private Map<String, List<String>> symptomDeptGraph;
 }
 

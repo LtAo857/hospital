@@ -12,6 +12,7 @@ public final class AgentUiAction {
     public static final String VIEW_USER_CARD = "view_user_card";
     public static final String VIEW_REGISTRATIONS = "view_registrations";
     public static final String EXPLAIN_RECOMMENDATION = "explain_recommendation";
+    public static final String MEDICAL_CONSULT = "medical_consult";
 
     private AgentUiAction() {
     }

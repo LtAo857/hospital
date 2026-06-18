@@ -5,7 +5,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict
 
-from inference_demo.parser import IntentSlotParser
+from hospital_nlu.parser import IntentSlotParser
 
 
 parser = IntentSlotParser()
@@ -32,7 +32,8 @@ class Handler(BaseHTTPRequestHandler):
             if not text:
                 self._send_json({"error": "text is required"}, status=400)
                 return
-            result = parser.parse(text)
+            departments = payload.get("departments")
+            result = parser.parse(text, departments)
             print(f"[infer] result={json.dumps(result, ensure_ascii=False)}")
             self._send_json(result)
         except json.JSONDecodeError:

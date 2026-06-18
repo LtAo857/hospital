@@ -1,12 +1,13 @@
 package com.example.hospital.api.service.impl;
 
-
 import cn.hutool.core.map.MapUtil;
 import com.example.hospital.api.common.PageUtils;
 import com.example.hospital.api.db.dao.MedicalDeptDao;
 import com.example.hospital.api.db.pojo.MedicalDeptEntity;
 import com.example.hospital.api.exception.HospitalException;
 import com.example.hospital.api.service.MedicalDeptService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +19,13 @@ import java.util.Map;
 
 @Service
 public class MedicalDeptServiceImpl implements MedicalDeptService {
+    private static final String DEPARTMENT_CACHE_KEY = "multi_agent:nlu:departments";
+
     @Resource
     private MedicalDeptDao medicalDeptDao;
+
+    @Autowired(required = false)
+    private RedisTemplate<Object, Object> redisTemplate;
 
     @Override
     public ArrayList<HashMap> searchAll() {
@@ -73,6 +79,7 @@ public class MedicalDeptServiceImpl implements MedicalDeptService {
     @Transactional
     public void insert(MedicalDeptEntity entity) {
         medicalDeptDao.insert(entity);
+        invalidateDepartmentCache();
     }
 
     @Override
@@ -85,6 +92,7 @@ public class MedicalDeptServiceImpl implements MedicalDeptService {
     @Transactional
     public void update(MedicalDeptEntity entity) {
         medicalDeptDao.update(entity);
+        invalidateDepartmentCache();
     }
 
     @Override
@@ -93,9 +101,19 @@ public class MedicalDeptServiceImpl implements MedicalDeptService {
         long count = medicalDeptDao.searchSubCount(ids);
         if (count == 0) {
             medicalDeptDao.deleteByIds(ids);
+            invalidateDepartmentCache();
         } else {
             throw new HospitalException("科室存在关联诊室，无法删除记录");
         }
     }
-}
 
+    private void invalidateDepartmentCache() {
+        if (redisTemplate == null) {
+            return;
+        }
+        try {
+            redisTemplate.delete(DEPARTMENT_CACHE_KEY);
+        } catch (Exception ignored) {
+        }
+    }
+}

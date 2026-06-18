@@ -9,7 +9,7 @@ of the registration workflow.
 patient-wx
   -> patient-wx-api-mysql /agent/multi/chat
   -> TriageAgentWorker
-  -> optional model-inference-demo /infer
+  -> optional nlu-service /infer
   -> ScheduleAgentWorker queries MySQL facts
   -> PolicyAgentWorker validates business rules
   -> ExecutionAgentWorker writes only after server-side confirmation

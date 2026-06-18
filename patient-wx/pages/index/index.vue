@@ -9,7 +9,7 @@
 			<u-icon name="arrow-right" size="18" color="#1296db"></u-icon>
 		</view>
 
-		<view class="agent-entry react-entry" @tap="goReactAgent">
+<!-- 		<view class="agent-entry react-entry" @tap="goReactAgent">
 			<view>
 				<text class="agent-title">传统Agent挂号助手</text>
 				<text class="agent-desc">第二套 ReAct 架构，逐轮调用工具完成查询、确认和挂号</text>
@@ -23,7 +23,7 @@
 				<text class="agent-desc">第三套 Claude Code 风格架构，先规划再自动串行推进到可确认结果</text>
 			</view>
 			<u-icon name="arrow-right" size="18" color="#1f7a5d"></u-icon>
-		</view>
+		</view> -->
 
 		<view class="doctor-container">
 			<view class="title-row">

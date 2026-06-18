@@ -35,7 +35,7 @@ class ScheduleAgentWorkerTest {
         Assertions.assertEquals(HandoffAction.ASK_USER, result.getHandoffAction());
         Assertions.assertEquals(MultiAgentStage.SLOT_QUERY, result.getNextStage());
         Assertions.assertEquals("missing_slots_input", result.getSummary());
-        Assertions.assertEquals("请先告诉我诊室和日期，例如：明天口腔科。", result.getReply());
+        Assertions.assertEquals("请告诉我想挂哪个科室，例如：明天口腔科。", result.getReply());
     }
 
     @Test
@@ -58,7 +58,9 @@ class ScheduleAgentWorkerTest {
 
         ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
         AgentContext context = new AgentContext();
-        context.setPayload(new HashMap<String, Object>());
+        context.setPayload(new HashMap<String, Object>() {{
+            put("deptName", "口腔科");
+        }});
         context.setMemory(new HashMap<String, Object>());
         context.setUserMessage("口腔科挂号");
 
@@ -103,7 +105,9 @@ class ScheduleAgentWorkerTest {
         ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
         AgentContext context = new AgentContext();
         context.setPayload(new HashMap<String, Object>() {{
+            put("deptId", 1);
             put("deptSubId", 10);
+            put("deptName", "口腔科");
             put("date", "2026-04-20");
         }});
         context.setMemory(new HashMap<String, Object>());
@@ -114,7 +118,7 @@ class ScheduleAgentWorkerTest {
         Assertions.assertEquals(MultiAgentStage.SLOT_QUERY, result.getNextStage());
         Assertions.assertEquals("no_slot_available", result.getSummary());
         Assertions.assertEquals("searchScheduleSlots", result.getToolName());
-        Assertions.assertEquals("暂时没有找到可用号源，请换个日期或诊室再试。", result.getReply());
+        Assertions.assertEquals("2026-04-20 口腔科 暂无可挂号医生，建议换个日期或尝试其他相关科室。", result.getReply());
     }
 
     @Test
@@ -141,6 +145,7 @@ class ScheduleAgentWorkerTest {
         ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
         AgentContext context = new AgentContext();
         context.setPayload(new HashMap<String, Object>() {{
+            put("deptId", 1);
             put("deptSubId", 10);
             put("doctorId", 9);
             put("date", "2026-04-20");
@@ -163,6 +168,7 @@ class ScheduleAgentWorkerTest {
         ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
         AgentContext context = new AgentContext();
         context.setPayload(new HashMap<String, Object>() {{
+            put("deptId", 1);
             put("deptSubId", 10);
             put("date", "2026-04-20");
         }});
@@ -194,6 +200,7 @@ class ScheduleAgentWorkerTest {
         ScheduleAgentWorker worker = new ScheduleAgentWorker(medicalDeptAgentTools, registrationAgentTools);
         AgentContext context = new AgentContext();
         context.setPayload(new HashMap<String, Object>() {{
+            put("deptId", 1);
             put("deptSubId", 10);
             put("date", "2026-04-20");
         }});

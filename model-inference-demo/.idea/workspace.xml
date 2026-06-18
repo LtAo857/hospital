@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="f7a8acfb-9be3-4674-b4ab-9d65a370d60e" name="更改" comment="">
+      <change beforePath="$PROJECT_DIR$/../.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/../.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/../CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/agent/multi-agent-refactor-v2.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/agent/multi-agent-refactor-v2.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../docs/agent/system-prompt.md" beforeDir="false" afterPath="$PROJECT_DIR$/../docs/agent/system-prompt.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../hospital-api-mysql/src/main/java/com/example/hospital/api/service/impl/MedicalDeptServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../hospital-api-mysql/src/main/java/com/example/hospital/api/service/impl/MedicalDeptServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/eval.jsonl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/sft_samples.jsonl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/fine-tune-plan.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/inference-acceleration.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/integration-with-hospital.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inference_demo/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inference_demo/langchain_demo.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inference_demo/langgraph_demo.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/inference_demo/parser.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/model/intent_slot_model.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/benchmark.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/eval.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/server_stdlib.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/HttpModelIntentParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/HttpModelIntentParser.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentParser.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentParser.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentResult.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentResult.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/rag/MultiAgentRagService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/rag/MultiAgentRagService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/ScheduleAgentWorker.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/worker/ScheduleAgentWorker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/support/AgentUiAction.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/support/AgentUiAction.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/resources/mapper/DoctorWorkPlanDao.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/main/resources/mapper/DoctorWorkPlanDao.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/test/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/test/java/com/example/hospital/patient/wx/api/agent/multi/service/MultiAgentCoordinatorServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx-api-mysql/src/test/java/com/example/hospital/patient/wx/api/agent/multi/worker/ScheduleAgentWorkerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx-api-mysql/src/test/java/com/example/hospital/patient/wx/api/agent/multi/worker/ScheduleAgentWorkerTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../patient-wx/pages/index/index.vue" beforeDir="false" afterPath="$PROJECT_DIR$/../patient-wx/pages/index/index.vue" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3FI9m3uIHXSiwRgLGqJr77nn1Wd" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.app.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "D:/Code/code/Java/hospital/hospital/model-inference-demo",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "MavenSettings"
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration name="app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="model-inference-demo" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/app.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.app" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-c59985aa861c-c2ffad84badb-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-261.24374.152" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="f7a8acfb-9be3-4674-b4ab-9d65a370d60e" name="更改" comment="" />
+      <created>1781751871604</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1781751871604</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

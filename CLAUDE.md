@@ -76,7 +76,8 @@
 - 当前已补充的解释与兜底能力：推荐理由说明卡、普通挂号兜底入口
 - 当前确认写操作已收紧为服务端闭环：只有命中 `awaitingConfirmation + pendingOrder` 且确认参数与待确认快照一致时，才允许继续进入执行阶段；伪造确认或篡改关键字段会被拦下并清理待确认态
 - 当前多 Agent 聊天入口仍是弱类型 `payload`，但已补共享规范化与结构化校验：非法整数、非法日期、非法金额不会直接抛异常，而会返回结构化错误并补 `badCaseType/badFields`
-- 当前解释型 RAG 仅用于规则说明与推荐理由解释，知识源来自 `docs/agent/*.md`；实时号源、医生排班、就诊卡状态与挂号结果仍以真实工具和 MySQL 事实为准
+- 当前解释型 RAG 仅用于规则说明与推荐理由解释，知识源来自 `docs/agent/*.md`；实时号源、医生排班、就诊卡状态与挂号结果仍以真实工具和 MySQL 事实为准；RAG prompt 已改为结构化上下文，LLM 系统提示词禁止输出内部推理，Java 侧 `cleanResponse()` 正则兜底 strip 泄漏文本
+- 当前会话记忆已补症状切换隔离：Coordinator 检测到新旧症状不一致时，若旧 `deptName` 不在新症状预期科室列表中，自动清除 `deptName/deptId/deptSubId/deptSubName/recommendedDeptName` 和 stale `symptomDeptGraph`，防止跨话题数据污染
 - 当前挂号写路径已把 `requestId` 作为真正的回放/幂等键使用；成功可复用结果，处理中会拦截重复提交，参数不一致的重放会被拒绝
 - 当前 `ScheduleAgentWorker` / `PolicyAgentWorker` 的只读工具调用已补“最多重试一次 + 确定性降级”；写工具 `createRegistrationOrder` 不自动重试，避免真实二次下单
 - 前端可见区块：当前步骤、Agent 执行流程、可执行卡片、错误态提示
@@ -123,8 +124,12 @@
 
 关键文件：
 
-- Python NLU 服务：`model-inference-demo/inference_demo/parser.py`
-- Python 启动：`model-inference-demo/server_stdlib.py`
+- Python NLU 包：`nlu-service/hospital_nlu/`
+  - `parser.py` — 编排入口 + LLM 调用 + system prompt
+  - `rules.py` — 规则引擎纯函数（意图检测、槽位提取、模糊匹配）
+  - `constants.py` — 关键词列表、症状同义词、科室映射
+  - `neo4j.py` — Neo4j 图谱查询
+- Python 启动：`nlu-service/server_stdlib.py`（零依赖）或 `nlu-service/app.py`（FastAPI）
 - Java NLU 接口：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/ModelIntentParser.java`
 - Java HTTP 实现：`patient-wx-api-mysql/src/main/java/com/example/hospital/patient/wx/api/agent/multi/nlu/HttpModelIntentParser.java`
 - Java 调用入口：`MultiAgentCoordinatorService.parseNlu()` → `HttpModelIntentParser.parse()`
@@ -137,8 +142,15 @@
 - LLM 超时或低置信度自动回退 Python 规则引擎，规则引擎也无法识别时返回"NLU 服务暂不可用，请改走普通挂号流程"并附带手动挂号跳转卡片
 - Python 侧支持规则引擎 / 真 LLM 双模式，`parser.py` 中改 `self.llm_enabled` 即可切换
 - Java 侧通过 `@Autowired(required = false)` 可选注入，Python 没起也不报错
-- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Coordinator 收到 `dangerous` 意图直接阻断返回，不进入后续 Worker
-- **症状模糊匹配**：Python 规则引擎新增 jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（11 个标准症状、80+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子"也能映射到正确科室
+- **意图修正**：LLM 返回 `medical_consult`/`unknown`/`unsupported` 但文本含挂号关键词时，自动修正为 `registration`；Java 侧同步防御：意图为 `unknown` 但已提取到 `deptName` 时仍进入 Worker 流水线
+- **科室三级兜底**：图谱查询 → 症状映射表 → 文本直接提取，确保显式指定的科室不丢失
+- **高危意图拦截**：Python 侧 `DANGEROUS_KEYWORDS` 黑名单 + LLM prompt 双重识别危险操作（删库、批量修改、提权、注入等），Coordinator 收到 `dangerous` 意图直接阻断返回
+- **症状模糊匹配**：jieba 分词 + `SYMPTOM_SYNONYMS` 同义词词典（13 个标准症状、80+ 口语变体），用户说"烧心反酸""脑袋疼""拉肚子"也能映射到正确科室
+- **多症状并行**：`symptoms` 数组支持胸疼+头疼等多症状同时提取，各症状独立查图谱生成 `symptomDeptGraph`，Java 侧做跨科室校验提醒
+- **咨询深度标记**：`hasConsultDemand` 字段区分纯挂号与带咨询需求的请求，后者触发更深度的 RAG 分析
+- **医生名提取过滤**：正则匹配后排除"女医生""男医生"等性别偏好模式，避免误识别为医生名
+- **跨话题会话隔离**：Coordinator 在 NLU 解析后检测症状是否切换，若新症状的预期科室不包含旧 `deptName` 则自动清除 `deptName/deptId/deptSubId/deptSubName` 及 stale `symptomDeptGraph`，防止上一轮话题的科室/图谱数据污染本轮回复
+- **RAG 防泄漏与清洗**：RAG `buildPrompt` 不再 dump 内存完整 JSON，改为结构化上下文（症状=X 科室=Y ...）；LLM 系统提示词明确禁止输出内部推理过程、过滤逻辑和"当前 memory"等内部变量引用；Java 侧 `cleanResponse()` 正则后处理兜底，strip `当前 memory 中...` `与X无关...` `所有分诊建议均严格依据...` `不采纳...` `未提供...` 等泄漏模式
 
 - 完整模型链路四步走（面试框架）：
   - **微调**：LoRA/QLoRA + LLaMA-Factory → 挂号意图识别模型

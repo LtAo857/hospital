@@ -11,8 +11,8 @@ MODEL_PATH = ROOT / "model" / "intent_slot_model.json"
 
 
 BASE_MODEL: Dict[str, Any] = {
-    "name": "hospital-nlu-demo-v1",
-    "engine": "local-rule-demo",
+    "name": "hospital-nlu-v1",
+    "engine": "local-rule",
     "departments": [
         "口腔科",
         "呼吸内科",
