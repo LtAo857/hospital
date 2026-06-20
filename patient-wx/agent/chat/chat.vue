@@ -67,14 +67,14 @@
 			<view :id="scrollAnchor"></view>
 		</scroll-view>
 
-		<view class="quick-actions">
+<!-- 		<view class="quick-actions">
 			<view class="quick-btn" @tap="sendAction('welcome')">首页</view>
 			<view class="quick-btn" @tap="sendAction('start_registration')">开始挂号</view>
 			<view class="quick-btn" @tap="sendAction('view_user_card')">就诊卡</view>
 			<view class="quick-btn" @tap="sendAction('view_messages')">消息</view>
 			<view class="quick-btn" @tap="sendAction('view_registrations')">我的挂号</view>
 			<view class="quick-btn" @tap="sendAction('explain_recommendation')">推荐解释</view>
-		</view>
+		</view> -->
 
 		<view class="composer">
 			<input class="composer-input" v-model="inputText" confirm-type="send" placeholder="例如：帮我挂明天内科的号" @confirm="submitText" />
@@ -261,9 +261,12 @@ export default {
 
 <style lang="less">
 .page {
-	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
 	background: #f5f7fb;
 	padding: 24rpx;
+	padding-bottom: 0;
 	box-sizing: border-box;
 }
 .hero-card,
@@ -286,7 +289,8 @@ export default {
 	line-height: 1.6;
 }
 .message-list {
-	height: 760rpx;
+	flex: 1;
+	overflow-y: auto;
 }
 .message-row {
 	display: flex;
@@ -436,12 +440,12 @@ export default {
 .step-status.waiting {
 	color: #ed6c02;
 }
-.quick-actions {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 16rpx;
-	margin: 20rpx 0;
-}
+// .quick-actions {
+// 	display: grid;
+// 	grid-template-columns: repeat(3, 1fr);
+// 	gap: 16rpx;
+// 	margin: 20rpx 0;
+// }
 .quick-btn {
 	background: #fff;
 	border-radius: 16rpx;
@@ -455,6 +459,9 @@ export default {
 	display: flex;
 	gap: 16rpx;
 	align-items: center;
+	padding: 20rpx 0;
+	padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+	flex-shrink: 0;
 }
 .composer-input {
 	flex: 1;

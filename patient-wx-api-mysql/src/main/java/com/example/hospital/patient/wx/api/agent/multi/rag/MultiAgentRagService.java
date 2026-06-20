@@ -100,6 +100,96 @@ public class MultiAgentRagService {
         return answer;
     }
 
+    /**
+     * Neo4j → LLM synthesis: feed graph disease data directly to LLM for natural language output.
+     * No RAG retrieval — the graph IS the knowledge source.
+     */
+    public String synthesizeFromGraph(Map<String, Object> diseaseInfo, String question) {
+        if (diseaseInfo == null || diseaseInfo.isEmpty() || !StringUtils.hasText(question)) {
+            return null;
+        }
+        if (!agentProperties.isLlmEnabled() || !StringUtils.hasText(agentProperties.getApiKey())) {
+            return null;
+        }
+        try {
+            LlmCallResult result = callSynthesisLlm(diseaseInfo, question);
+            if (result != null && StringUtils.hasText(result.answer)) {
+                return cleanResponse(result.answer);
+            }
+        } catch (Exception e) {
+            // fallback to structured text
+        }
+        return null;
+    }
+
+    private LlmCallResult callSynthesisLlm(Map<String, Object> diseaseInfo, String question) {
+        MultiAgentProperties props = multiAgentProperties == null ? new MultiAgentProperties() : multiAgentProperties;
+        int attempts = Math.max(0, props.getRagHttpRetryCount()) + 1;
+        for (int i = 0; i < attempts; i++) {
+            JSONObject body = new JSONObject();
+            body.set("model", agentProperties.getModel());
+            body.set("temperature", 0.3D);
+            JSONArray messages = new JSONArray();
+            messages.add(new JSONObject().set("role", "system").set("content",
+                    "你是医疗知识助手。你只能依据提供的<疾病数据>回答用户问题，不得编造任何信息。回答用中文，2到5句，平实自然。"));
+            messages.add(new JSONObject().set("role", "user").set("content",
+                    buildSynthesisPrompt(diseaseInfo, question)));
+            body.set("messages", messages);
+            HttpRequest request = HttpRequest.post(agentProperties.getBaseUrl())
+                    .header("Content-Type", "application/json")
+                    .timeout(agentProperties.getTimeoutMillis())
+                    .body(body.toString());
+            if (StringUtils.hasText(agentProperties.getApiKey())) {
+                request.header("Authorization", "Bearer " + agentProperties.getApiKey());
+            }
+            HttpResponse httpResponse = request.execute();
+            if (httpResponse.getStatus() < 200 || httpResponse.getStatus() >= 300) {
+                if (!isRetryableStatus(httpResponse.getStatus()) || i == attempts - 1) {
+                    return null;
+                }
+                continue;
+            }
+            JSONObject root = JSONUtil.parseObj(httpResponse.body());
+            JSONArray choices = root.getJSONArray("choices");
+            if (choices == null || choices.isEmpty()) {
+                return null;
+            }
+            JSONObject message = choices.getJSONObject(0).getJSONObject("message");
+            String answer = message == null ? null : message.getStr("content");
+            JSONObject usage = root.getJSONObject("usage");
+            return new LlmCallResult(answer,
+                    usage == null ? estimateTokens(question) : usage.getInt("prompt_tokens", estimateTokens(question)),
+                    usage == null ? estimateTokens(answer) : usage.getInt("completion_tokens", estimateTokens(answer)));
+        }
+        return null;
+    }
+
+    private String buildSynthesisPrompt(Map<String, Object> d, String question) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<疾病数据>\n");
+        sb.append("疾病名称: ").append(stringValue(d.get("name"))).append("\n");
+        String desc = stringValue(d.get("desc"));
+        if (StringUtils.hasText(desc)) sb.append("简介: ").append(desc).append("\n");
+        String cause = stringValue(d.get("cause"));
+        if (StringUtils.hasText(cause)) sb.append("病因: ").append(cause).append("\n");
+        String drugs = stringValue(d.get("drugs"));
+        if (StringUtils.hasText(drugs)) sb.append("常用药物: ").append(drugs).append("\n");
+        String cure = stringValue(d.get("cure_way"));
+        if (StringUtils.hasText(cure)) sb.append("治疗方式: ").append(cure).append("\n");
+        String prevent = stringValue(d.get("prevent"));
+        if (StringUtils.hasText(prevent)) sb.append("预防措施: ").append(prevent).append("\n");
+        String doEat = stringValue(d.get("do_eat"));
+        if (StringUtils.hasText(doEat)) sb.append("适宜饮食: ").append(doEat).append("\n");
+        String notEat = stringValue(d.get("not_eat"));
+        if (StringUtils.hasText(notEat)) sb.append("禁忌饮食: ").append(notEat).append("\n");
+        String check = stringValue(d.get("check"));
+        if (StringUtils.hasText(check)) sb.append("相关检查: ").append(check).append("\n");
+        sb.append("</疾病数据>\n\n");
+        sb.append("<用户问题>\n").append(question).append("\n</用户问题>\n\n");
+        sb.append("<注意>\n严格依据疾病的属性信息回答，不要编造。如果疾病数据中某个字段为空，跳过该方面即可，不要提及。\n</注意>\n");
+        return sb.toString();
+    }
+
     private LlmCallResult callLlm(String question,
                                   Map<String, Object> memory,
                                   List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets) {
@@ -111,7 +201,7 @@ public class MultiAgentRagService {
             body.set("temperature", 0.2D);
             JSONArray messages = new JSONArray();
             messages.add(new JSONObject().set("role", "system").set("content",
-                    "你是医院挂号多 Agent 的说明助手。你只能依据提供的知识片段和当前上下文回答，禁止编造号源、医生排班、价格、就诊卡状态或挂号结果。回答用中文，2到4句。不要输出你的内部推理过程、过滤逻辑，不要解释为什么采纳或不采纳某些知识片段，不要引用\"当前 memory\"等内部变量。"));
+                    "你是医院挂号多Agent的说明助手。你只能依据<知识片段>和<上下文>中的结构化信息回答，禁止编造号源、医生排班、价格、就诊卡状态或挂号结果。回答用中文，2到4句。不要输出内部推理过程、过滤逻辑，不要解释为什么采纳或不采纳某些知识片段，不要引用\"当前memory\"等内部变量。不要输出<知识片段>中未提供的信息。"));
             messages.add(new JSONObject().set("role", "user").set("content", buildPrompt(question, memory, snippets)));
             body.set("messages", messages);
             HttpRequest request = HttpRequest.post(agentProperties.getBaseUrl())
@@ -147,44 +237,56 @@ public class MultiAgentRagService {
                                Map<String, Object> memory,
                                List<MultiAgentKnowledgeBase.KnowledgeSnippet> snippets) {
         StringBuilder builder = new StringBuilder();
-        builder.append("用户问题: ").append(question == null ? "" : question).append("\n");
-        builder.append("当前上下文: ");
+        // XML-structured prompt — constrains LLM to only restate provided facts
+        builder.append("<指令>\n");
+        builder.append("你是医院挂号多Agent的说明助手。结合下文的<上下文>和<知识片段>，用2到4句中文回答<用户问题>。");
+        builder.append("只能依据提供的知识片段回答，不得编造号源、医生排班、价格、就诊卡状态或挂号结果。");
+        builder.append("不得输出你的内部推理过程、过滤逻辑，不得引用\"当前memory\"等内部变量。\n");
+        builder.append("</指令>\n\n");
+
+        builder.append("<上下文>\n");
         if (memory != null && !memory.isEmpty()) {
-            List<String> ctxParts = new ArrayList<>();
             String symptom = stringValue(memory.get("symptom"));
             if (StringUtils.hasText(symptom)) {
-                ctxParts.add("症状=" + symptom);
+                builder.append("症状: ").append(symptom).append("\n");
             }
             String dept = firstText(memory.get("deptName"), memory.get("recommendedDeptName"));
             if (StringUtils.hasText(dept)) {
-                ctxParts.add("科室=" + dept);
+                builder.append("科室: ").append(dept).append("\n");
             }
             String gender = stringValue(memory.get("patientGender"));
             if (StringUtils.hasText(gender)) {
-                ctxParts.add("患者性别=" + gender);
+                builder.append("患者性别: ").append(gender).append("\n");
             }
             String doctorGender = stringValue(memory.get("doctorGender"));
             if (StringUtils.hasText(doctorGender)) {
-                ctxParts.add("医生性别偏好=" + doctorGender);
+                builder.append("医生性别偏好: ").append(doctorGender).append("\n");
             }
             if (memory.get("pendingOrder") instanceof Map) {
-                ctxParts.add("有待确认号源");
+                builder.append("状态: 有待确认号源\n");
             }
-            builder.append(String.join("，", ctxParts));
         } else {
-            builder.append("无");
+            builder.append("(无)\n");
         }
-        builder.append("\n");
-        builder.append("知识片段:\n");
-        for (int i = 0; i < snippets.size(); i++) {
-            MultiAgentKnowledgeBase.KnowledgeSnippet snippet = snippets.get(i);
-            builder.append(i + 1).append(". ")
-                    .append(snippet.getTitle())
-                    .append("：")
-                    .append(snippet.getContent())
-                    .append("\n");
+        builder.append("</上下文>\n\n");
+
+        builder.append("<知识片段>\n");
+        if (snippets != null && !snippets.isEmpty()) {
+            for (int i = 0; i < snippets.size(); i++) {
+                MultiAgentKnowledgeBase.KnowledgeSnippet snippet = snippets.get(i);
+                builder.append(i + 1).append(". 【").append(snippet.getTitle())
+                        .append("】").append(snippet.getContent()).append("\n");
+            }
+        } else {
+            builder.append("(无匹配片段)\n");
         }
-        builder.append("要求: 结合当前上下文和知识片段，给出压缩解释；如果上下文中已有症状、科室、医生、日期、待确认号源，可以顺带解释当前推荐路径，但不要虚构实时业务事实。不要输出你的内部推理过程或解释为什么过滤某些信息。\n");
+        builder.append("</知识片段>\n\n");
+
+        builder.append("<用户问题>\n").append(question == null ? "" : question).append("\n</用户问题>\n\n");
+
+        builder.append("<注意>\n");
+        builder.append("结合上下文和知识片段，给出压缩解释。如果上下文中已有症状、科室、医生、日期、待确认号源，可以顺带解释当前推荐路径，但不要虚构实时业务事实。\n");
+        builder.append("</注意>\n");
         return truncate(builder.toString());
     }
 

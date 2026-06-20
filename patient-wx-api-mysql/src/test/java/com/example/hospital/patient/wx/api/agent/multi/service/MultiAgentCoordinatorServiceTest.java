@@ -165,7 +165,7 @@ class MultiAgentCoordinatorServiceTest {
                 fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.FINISH, MultiAgentStage.DONE, "已为你准备入口", null)
         );
 
-        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers, "registration", null, null);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-4");
         request.setMessage("查看我的挂号");
@@ -196,7 +196,7 @@ class MultiAgentCoordinatorServiceTest {
                 fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.FINISH, MultiAgentStage.DONE, "我先结合当前挂号上下文和知识库为你解释一下。", null)
         );
 
-        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers);
+        MultiAgentCoordinatorService service = buildCoordinator(properties, memoryService, workers, "explain_recommendation", null, null);
         AgentChatRequest request = new AgentChatRequest();
         request.setSessionId("session-5");
         request.setMessage("为什么推荐这个");
@@ -273,18 +273,30 @@ class MultiAgentCoordinatorServiceTest {
     private MultiAgentCoordinatorService buildCoordinator(MultiAgentProperties properties,
                                                            MultiAgentMemoryService memoryService,
                                                            List<AgentWorker> workers) throws Exception {
+        return buildCoordinator(properties, memoryService, workers, "registration", "口腔科", null);
+    }
+
+    private MultiAgentCoordinatorService buildCoordinator(MultiAgentProperties properties,
+                                                           MultiAgentMemoryService memoryService,
+                                                           List<AgentWorker> workers,
+                                                           String intent, String deptName, String date) throws Exception {
         MultiAgentCoordinatorService service = new MultiAgentCoordinatorService(properties, memoryService,
                 buildTestRagService(), null, workers);
-        injectModelIntentParser(service);
+        injectModelIntentParser(service, intent, deptName, date);
         return service;
     }
 
     private void injectModelIntentParser(MultiAgentCoordinatorService service) throws Exception {
+        injectModelIntentParser(service, "registration", "口腔科", null);
+    }
+
+    private void injectModelIntentParser(MultiAgentCoordinatorService service, String intent, String deptName, String date) throws Exception {
         ModelIntentParser parser = Mockito.mock(ModelIntentParser.class);
         Map<String, Object> slots = new HashMap<>();
-        slots.put("department", "口腔科");
+        if (deptName != null) slots.put("department", deptName);
+        if (date != null) slots.put("date", date);
         ModelIntentResult result = new ModelIntentResult();
-        result.setIntent("registration");
+        result.setIntent(intent);
         result.setSlots(slots);
         result.setConfidence(0.9);
         result.setSource("llm");
@@ -340,5 +352,55 @@ class MultiAgentCoordinatorServiceTest {
                 return result;
             }
         };
+    }
+
+    @Test
+    void shouldResolveFreshDateWhenPreviousQueryHasDifferentDate() throws Exception {
+        MultiAgentProperties properties = new MultiAgentProperties();
+        properties.setMaxHops(4);
+
+        MultiAgentMemoryService memoryService = Mockito.mock(MultiAgentMemoryService.class);
+        final Map<String, Object> persistedMemory = new HashMap<>();
+        Mockito.when(memoryService.load("session-date")).thenAnswer(inv -> new HashMap<>(persistedMemory));
+        Mockito.doAnswer(inv -> {
+            persistedMemory.clear();
+            persistedMemory.putAll(inv.getArgument(1));
+            return null;
+        }).when(memoryService).save(Mockito.eq("session-date"), Mockito.anyMap());
+
+        // First query "明天"
+        List<AgentWorker> workers1 = Arrays.asList(
+                fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK,
+                        "2026-06-20 骨科 暂无可挂号医生", new HashMap<String, Object>() {{
+                            put("deptName", "骨科");
+                            put("date", "2026-06-20");
+                            put("pendingOrder", null);
+                            put("awaitingConfirmation", false);
+                        }}, "schedule-agent", "searchScheduleSlots", "no_slot_available", null)
+        );
+        MultiAgentCoordinatorService service1 = buildCoordinator(properties, memoryService, workers1, "query_doctor", "骨科", "明天");
+        AgentChatRequest req1 = new AgentChatRequest();
+        req1.setSessionId("session-date");
+        req1.setMessage("骨科明天哪些医生有号源");
+        service1.chat(req1, 1001);
+
+        // Second query "今天" — must not reuse stale 2026-06-20
+        List<AgentWorker> workers2 = Arrays.asList(
+                fixedWorker(MultiAgentStage.SLOT_QUERY, HandoffAction.HANDOFF, MultiAgentStage.POLICY_CHECK,
+                        "2026-06-19 骨科 暂无可挂号医生", new HashMap<String, Object>() {{
+                            put("deptName", "骨科");
+                            put("date", "2026-06-19");
+                            put("pendingOrder", null);
+                            put("awaitingConfirmation", false);
+                        }}, "schedule-agent", "searchScheduleSlots", "no_slot_available", null)
+        );
+        MultiAgentCoordinatorService service2 = buildCoordinator(properties, memoryService, workers2, "query_doctor", "骨科", "今天");
+        AgentChatRequest req2 = new AgentChatRequest();
+        req2.setSessionId("session-date");
+        req2.setMessage("骨科今天哪些医生有号源");
+        AgentChatResponse r2 = service2.chat(req2, 1001);
+
+        Assertions.assertTrue(r2.getReply().contains("2026-06-19"),
+                "Second reply should resolve 今天 to 2026-06-19, not reuse stale 2026-06-20. Got: " + r2.getReply());
     }
 }

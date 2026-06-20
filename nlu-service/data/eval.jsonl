@@ -2,7 +2,7 @@
 {"text":"后天上午想挂呼吸内科","expected":{"intent":"registration","slots":{"department":"呼吸内科","date":"后天","timePreference":"上午"}}}
 {"text":"我咳嗽发烧，明天能挂哪个科","expected":{"intent":"registration","slots":{"symptom":"咳嗽","department":"呼吸内科","date":"明天"}}}
 {"text":"今天下午胃疼，想看消化内科","expected":{"intent":"registration","slots":{"symptom":"胃疼","department":"消化内科","date":"今天","timePreference":"下午"}}}
-{"text":"张医生明天还有号吗","expected":{"intent":"registration","slots":{"doctorName":"张","date":"明天"}}}
+{"text":"张医生明天还有号吗","expected":{"intent":"query_doctor","slots":{"doctorName":"张","date":"明天"}}}
 {"text":"看看我的消息","expected":{"intent":"query_message","slots":{}}}
 {"text":"查一下我的就诊卡","expected":{"intent":"query_user_card","slots":{}}}
 {"text":"为什么推荐这个医生","expected":{"intent":"explain_recommendation","slots":{}}}

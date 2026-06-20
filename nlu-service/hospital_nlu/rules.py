@@ -1,9 +1,29 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
+
+import ahocorasick
 
 from . import constants
+
+
+# Build Aho-Corasick automaton once at module load for O(n) multi-pattern matching.
+_KEYWORD_SET: Set[str] = set()
+for _kw_list in [
+    constants.REGISTRATION_KEYWORDS,
+    constants.DANGEROUS_KEYWORDS,
+    constants.CONSULT_DEMAND_KEYWORDS,
+    constants.URGENT_KEYWORDS,
+    constants.MEDICAL_QA_KEYWORDS,
+    constants.DEPARTMENT_QUERY_PATTERNS,
+]:
+    _KEYWORD_SET.update(_kw_list)
+
+_AHO = ahocorasick.Automaton()
+for _kw in _KEYWORD_SET:
+    _AHO.add_word(_kw, _kw)
+_AHO.make_automaton()
 
 
 def _has_text(value: Any) -> bool:
@@ -14,8 +34,19 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", "", text.strip())
 
 
+def _matches(text: str) -> Set[str]:
+    """Return all matched keywords in text via Aho-Corasick (O(n))."""
+    if not text:
+        return set()
+    return {match[1] for match in _AHO.iter(text)}
+
+
 def _contains_any(text: str, keywords: List[str]) -> bool:
-    return any(keyword in text for keyword in keywords)
+    """Check if any keyword is in text using Aho-Corasick automaton (O(n))."""
+    if not text:
+        return False
+    matched = _matches(text)
+    return any(kw in matched for kw in keywords)
 
 
 def normalize_departments(departments: Optional[List[str]], fallback: List[str]) -> List[str]:
@@ -49,16 +80,18 @@ def detect_intent(
         return "query_message"
     if _contains_any(text, ["就诊卡", "诊疗卡", "信息卡"]):
         return "query_user_card"
-    if _contains_any(text, ["胸痛", "胸疼", "胸闷"]) and not _contains_any(text, constants.REGISTRATION_KEYWORDS):
-        return "medical_consult"
-    if _contains_any(text, constants.CONSULT_HINT_KEYWORDS) and (
-        extract_symptom(text, symptom_department_map) or extract_department(text, departments)
-    ):
-        return "medical_consult"
+    # Doctor query: presence of doctor keywords without strong registration action verbs
+    # (挂/预约). "骨科明天哪些医生有号源" is a query, not a registration.
+    if _contains_any(text, ["医生", "大夫", "主任"]) and not _contains_any(text, ["挂", "预约"]):
+        return "query_doctor"
+    # Medical QA: user asking about drugs/treatment/prevention without registration intent
+    if _contains_any(text, constants.MEDICAL_QA_KEYWORDS) and not _contains_any(text, constants.REGISTRATION_KEYWORDS):
+        return "medical_qa"
+    # Department inquiry: "挂什么科/有哪些科室" is asking for information, not booking
+    if _contains_any(text, constants.DEPARTMENT_QUERY_PATTERNS):
+        return "query_department"
     if _contains_any(text, constants.REGISTRATION_KEYWORDS):
         return "registration"
-    if _contains_any(text, ["医生", "大夫", "主任"]):
-        return "query_doctor"
     if extract_department(text, departments) or extract_symptom(text, symptom_department_map):
         return "registration"
     return "unknown"
@@ -234,4 +267,33 @@ def extract_population(text: str) -> Optional[str]:
         return "孕妇"
     if any(kw in text for kw in ["成人", "成年人", "大人"]):
         return "成人"
+    return None
+
+
+def _load_disease_names() -> list[str]:
+    """Load known disease names from auto-generated file (populated by build_disease_layer.py)."""
+    import os
+    names_path = os.path.join(os.path.dirname(__file__), "disease_names.txt")
+    if not os.path.exists(names_path):
+        # Fallback list used before build_disease_layer.py is first run
+        return [
+            "感冒", "肺炎", "支气管炎", "口腔炎", "胃炎", "胃溃疡",
+            "溃疡性结肠炎", "偏头痛", "头痛", "颈椎病", "肩周炎",
+            "心肌梗死", "急性冠脉综合征", "冠心病", "乳腺增生",
+            "荨麻疹", "湿疹", "中耳炎", "结膜炎", "骨折",
+        ]
+    with open(names_path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
+
+
+_KNOWN_DISEASES: list[str] = _load_disease_names()
+
+
+def extract_disease_name(text: str) -> Optional[str]:
+    """Extract a known disease name from user text."""
+    if not _has_text(text):
+        return None
+    for disease in _KNOWN_DISEASES:
+        if disease in text:
+            return disease
     return None

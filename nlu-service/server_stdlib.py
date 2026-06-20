@@ -25,7 +25,11 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            body = self.rfile.read(length).decode("utf-8")
+            raw = self.rfile.read(length)
+            try:
+                body = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                body = raw.decode("gbk")
             print(f"[infer] body={body}")
             payload = json.loads(body) if body else {}
             text = str(payload.get("text", "")).strip()

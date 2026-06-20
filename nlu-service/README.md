@@ -126,7 +126,7 @@ Response metadata:
 }
 ```
 
-## Evaluate Without API Dependencies
+## Evaluate Without API Dependencies 
 
 The parser, evaluator, local benchmark, and `server_stdlib.py` use only the
 Python standard library.

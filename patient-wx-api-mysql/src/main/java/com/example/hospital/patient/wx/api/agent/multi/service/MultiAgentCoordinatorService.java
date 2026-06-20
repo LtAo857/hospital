@@ -120,8 +120,68 @@ public class MultiAgentCoordinatorService {
             if (!nluPatch.containsKey("symptomDeptGraph")) {
                 nluPatch.put("symptomDeptGraph", null);
             }
+            if (!nluPatch.containsKey("symptomDiseaseInfo")) {
+                nluPatch.put("symptomDiseaseInfo", null);
+            }
+        }
+        // When user starts a new query with a different dept/date, clear stale pipeline state
+        // from a previous conversation. Two cases:
+        // 1) pendingOrder exists with different dept/date → reset to INTENT_PARSE
+        // 2) no pendingOrder but memory has stale resolved date (e.g. "2026-06-20") that
+        //    differs from the NLU raw value ("今天") → force-clear so putTextIfAbsent re-homes
+        boolean newQueryHasParams = StringUtils.hasText(stringValue(nluPatch.get("deptName")))
+                || StringUtils.hasText(stringValue(nluPatch.get("date")));
+        if (newQueryHasParams) {
+            String newDept = stringValue(nluPatch.get("deptName"));
+            String newDate = stringValue(nluPatch.get("date"));
+            boolean needReset = false;
+
+            if (memory.get("pendingOrder") instanceof Map) {
+                Map<?, ?> pending = (Map<?, ?>) memory.get("pendingOrder");
+                String oldDept = stringValue(pending.get("deptSubName"));
+                String oldDate = stringValue(pending.get("date"));
+                if ((StringUtils.hasText(newDept) && !newDept.equals(oldDept))
+                        || (StringUtils.hasText(newDate) && !newDate.equals(oldDate))) {
+                    needReset = true;
+                }
+            }
+
+            // Also detect stale resolved date/dept in memory itself (e.g. "今天" vs "2026-06-20")
+            if (!needReset) {
+                String memDept = stringValue(memory.get("deptName"));
+                String memDate = stringValue(memory.get("date"));
+                boolean deptStale = StringUtils.hasText(newDept) && !newDept.equals(memDept);
+                boolean dateStale = StringUtils.hasText(newDate) && !newDate.equals(memDate);
+                if (deptStale || dateStale) {
+                    // Force-overwrite only the keys that actually changed; don't null out
+                    // deptName when the NLU only provided a fresh date (e.g. "今天呢").
+                    if (deptStale) nluPatch.put("deptName", newDept);
+                    if (dateStale) nluPatch.put("date", newDate);
+                    needReset = true;
+                }
+            }
+
+            if (needReset) {
+                nluPatch.put("stage", MultiAgentStage.INTENT_PARSE.name());
+                nluPatch.put("pendingOrder", null);
+                nluPatch.put("confirmed", null);
+                nluPatch.put("awaitingConfirmation", null);
+                nluPatch.put("deptId", null);
+                nluPatch.put("deptSubId", null);
+                nluPatch.put("deptSubName", null);
+                nluPatch.put("doctorId", null);
+            }
         }
         applyMemoryPatch(memory, nluPatch);
+
+        // Sync NLU-fresh values back into payload so buildTrustedState doesn't pick up
+        // stale pre-NLU values that composePayload copied from old memory.
+        if (StringUtils.hasText(stringValue(nluPatch.get("date")))) {
+            payload.put("date", nluPatch.get("date"));
+        }
+        if (StringUtils.hasText(stringValue(nluPatch.get("deptName")))) {
+            payload.put("deptName", nluPatch.get("deptName"));
+        }
 
         // Non-registration intents are handled directly without entering the worker pipeline
         String nluDirectReply = handleNluDirectIntent(modelIntent, safeRequest, payload, memory);
@@ -164,6 +224,17 @@ public class MultiAgentCoordinatorService {
             }
             applyMemoryPatch(memory, result.getMemoryPatch());
             appendTrace(context, result, i + 1);
+
+            // query_doctor / query_department / context follow-up: stop after ScheduleAgentWorker
+            // shows the doctor list or department suggestion instead of proceeding to POLICY_CHECK.
+            if (isQueryOnlyIntent(memory, context)
+                    && result.getHandoffAction() == HandoffAction.HANDOFF
+                    && MultiAgentStage.POLICY_CHECK.equals(result.getNextStage())) {
+                memory.put("awaitingConfirmation", false);
+                memory.put("pendingOrder", null);
+                finalStage = MultiAgentStage.DONE;
+                break;
+            }
 
             if (result.getHandoffAction() == HandoffAction.HANDOFF && result.getNextStage() != null) {
                 context.setStage(result.getNextStage());
@@ -357,17 +428,50 @@ public class MultiAgentCoordinatorService {
                     ? (Map<String, List<String>>) memory.get("symptomDeptGraph")
                     : null;
 
+            // Graph-retrieved disease facts (replaces LLM RAG for symptom analysis)
+            @SuppressWarnings("unchecked")
+            Map<String, List<Map<String, String>>> diseaseInfo = memory.get("symptomDiseaseInfo") instanceof Map
+                    ? (Map<String, List<Map<String, String>>>) memory.get("symptomDiseaseInfo")
+                    : null;
+
             for (int i = 0; i < symptoms.size(); i++) {
                 String sym = symptoms.get(i);
                 if (!StringUtils.hasText(sym)) continue;
-                // RAG analysis: deeper question when user has consult demand
-                String ragQuestion = hasConsultDemand
-                        ? sym + "是什么原因引起的，常见注意事项和就医建议是什么？"
-                        : sym + "是什么原因引起的，常见注意事项是什么？";
-                MultiAgentRagService.RagAnswer symAnswer = ragService.answer(ragQuestion, memory);
-                if (symAnswer != null && StringUtils.hasText(symAnswer.getAnswer())) {
+
+                // Build symptom analysis from graph disease facts (no LLM hallucination risk)
+                StringBuilder symText = new StringBuilder();
+                if (diseaseInfo != null && diseaseInfo.containsKey(sym)) {
+                    List<Map<String, String>> diseases = diseaseInfo.get(sym);
+                    for (int j = 0; j < diseases.size() && j < 2; j++) {
+                        Map<String, String> d = diseases.get(j);
+                        if (j == 0) {
+                            symText.append("「").append(sym).append("」");
+                        }
+                        String desc = d.get("description");
+                        if (StringUtils.hasText(desc)) {
+                            symText.append(" 常见相关疾病：").append(d.get("name")).append("——").append(desc);
+                        }
+                        if (hasConsultDemand) {
+                            String cause = d.get("cause");
+                            if (StringUtils.hasText(cause)) {
+                                symText.append(" ").append(cause);
+                            }
+                        }
+                    }
+                }
+                if (symText.length() == 0 && ragService != null) {
+                    // Fallback to RAG only when Neo4j has no disease data for this symptom
+                    String ragQuestion = hasConsultDemand
+                            ? sym + "是什么原因引起的，常见注意事项和就医建议是什么？"
+                            : sym + "是什么原因引起的，常见注意事项是什么？";
+                    MultiAgentRagService.RagAnswer symAnswer = ragService.answer(ragQuestion, memory);
+                    if (symAnswer != null && StringUtils.hasText(symAnswer.getAnswer())) {
+                        symText.append(symAnswer.getAnswer().trim());
+                    }
+                }
+                if (symText.length() > 0) {
                     if (i > 0) symptomAnalysis.append("\n");
-                    symptomAnalysis.append(symAnswer.getAnswer().trim());
+                    symptomAnalysis.append(symText.toString().trim());
                 }
 
                 // Resolve recommended departments for this symptom
@@ -409,9 +513,30 @@ public class MultiAgentCoordinatorService {
                 if (crossDeptReminders.length() > 0) {
                     symptomAnalysis.append("\n\n【科室提醒】").append(crossDeptReminders);
                 }
+                // Chest pain always gets a safety overlay regardless of hasConsultDemand,
+                // so that even bare "胸痛" without consult keywords triggers a warning.
+                boolean hasChestPain = false;
+                for (String sym : symptoms) {
+                    if (containsAny(sym, "胸痛", "胸疼", "胸闷")) {
+                        hasChestPain = true;
+                        break;
+                    }
+                }
+                if (hasChestPain) {
+                    String chestWarning = "【安全提醒】胸痛可能是心脏急症的警示信号。如伴有气短、大汗、放射痛或晕厥，请立即前往急诊，不要仅依赖线上判断。";
+                    symptomAnalysis.insert(0, chestWarning + "\n\n");
+                }
                 memory.put("symptomAnalysisGenerated", true);
                 String analysis = symptomAnalysis.toString();
-                reply = analysis + (StringUtils.hasText(reply) ? "\n\n" + reply : "");
+                // When analysis has meaningful content and the pipeline reply is just
+                // asking for department/date, don't concatenate — it's confusing.
+                boolean isAskDeptPrompt = StringUtils.hasText(reply)
+                        && (reply.contains("请告诉我想挂哪个科室"));
+                if (isAskDeptPrompt) {
+                    reply = analysis + "\n\n告诉我日期，我来查号源。";
+                } else {
+                    reply = analysis + (StringUtils.hasText(reply) ? "\n\n" + reply : "");
+                }
             }
         }
 
@@ -446,6 +571,70 @@ public class MultiAgentCoordinatorService {
         memory.put("ragCompletionTokens", ragAnswer.getCompletionTokens());
         memory.put("ragCacheHit", ragAnswer.isCacheHit());
         return ragAnswer.getAnswer();
+    }
+
+    // ── Medical QA: Neo4j → LLM synthesis ──
+
+    private String handleMedicalQa(String question, Map<String, Object> memory) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> diseaseInfo = memory.get("diseaseInfo") instanceof Map
+                ? (Map<String, Object>) memory.get("diseaseInfo")
+                : null;
+
+        if (diseaseInfo == null || diseaseInfo.isEmpty()) {
+            return "抱歉，我目前的知识库中暂时没有查到该疾病的相关信息。你可以尝试询问具体的疾病名称，例如：感冒吃什么药？";
+        }
+
+        // Answer already formatted by Python NLU from Neo4j data — no second LLM needed.
+        String pythonAnswer = stringValue(memory.get("medicalQaAnswer"));
+        if (StringUtils.hasText(pythonAnswer)) {
+            return pythonAnswer;
+        }
+
+        if (ragService == null) {
+            return formatDiseaseInfoText(diseaseInfo, question);
+        }
+
+        try {
+            String synthesized = ragService.synthesizeFromGraph(diseaseInfo, question);
+            if (StringUtils.hasText(synthesized)) {
+                return synthesized;
+            }
+        } catch (Exception e) {
+            // LLM synthesis failed — use structured fallback
+        }
+        return formatDiseaseInfoText(diseaseInfo, question);
+    }
+
+    private String formatDiseaseInfoText(Map<String, Object> d, String question) {
+        StringBuilder sb = new StringBuilder();
+        String name = stringValue(d.get("name"));
+        sb.append("关于「").append(name).append("」：\n");
+        String desc = stringValue(d.get("desc"));
+        if (StringUtils.hasText(desc)) {
+            sb.append("简介：").append(desc).append("\n");
+        }
+        String drugs = stringValue(d.get("drugs"));
+        if (StringUtils.hasText(drugs)) {
+            sb.append("常用药物：").append(drugs).append("\n");
+        }
+        String cureWay = stringValue(d.get("cure_way"));
+        if (StringUtils.hasText(cureWay)) {
+            sb.append("治疗方式：").append(cureWay).append("\n");
+        }
+        String prevent = stringValue(d.get("prevent"));
+        if (StringUtils.hasText(prevent)) {
+            sb.append("预防建议：").append(prevent).append("\n");
+        }
+        String doEat = stringValue(d.get("do_eat"));
+        if (StringUtils.hasText(doEat)) {
+            sb.append("推荐饮食：").append(doEat).append("\n");
+        }
+        String notEat = stringValue(d.get("not_eat"));
+        if (StringUtils.hasText(notEat)) {
+            sb.append("忌食：").append(notEat).append("\n");
+        }
+        return sb.toString();
     }
 
     private void appendFallbackCards(AgentChatResponse response, Map<String, Object> memory) {
@@ -893,6 +1082,21 @@ public class MultiAgentCoordinatorService {
         } else if (hasSymptoms) {
             patch.put("symptomDeptGraph", null); // clear stale graph from previous topic
         }
+        if (result.getSymptomDiseaseInfo() != null && !result.getSymptomDiseaseInfo().isEmpty()) {
+            patch.put("symptomDiseaseInfo", new LinkedHashMap<>(result.getSymptomDiseaseInfo()));
+        } else if (hasSymptoms) {
+            patch.put("symptomDiseaseInfo", null);
+        }
+        if (result.getDiseaseInfo() != null && !result.getDiseaseInfo().isEmpty()) {
+            patch.put("diseaseInfo", new LinkedHashMap<>(result.getDiseaseInfo()));
+        } else {
+            patch.put("diseaseInfo", null);
+        }
+        if (StringUtils.hasText(result.getMedicalQaAnswer())) {
+            patch.put("medicalQaAnswer", result.getMedicalQaAnswer());
+        } else {
+            patch.put("medicalQaAnswer", null);
+        }
         return parsed;
     }
 
@@ -904,6 +1108,7 @@ public class MultiAgentCoordinatorService {
         if (AgentUiAction.EXPLAIN_RECOMMENDATION.equals(action)) {
             memory.put("requestedView", AgentUiAction.EXPLAIN_RECOMMENDATION);
             memory.put("ragQuestion", firstText(request.getMessage(), "为什么推荐当前结果"));
+            memory.put("awaitingConfirmation", false);
             return "我先结合当前挂号上下文和知识库为你解释一下。";
         }
         if (AgentUiAction.VIEW_REGISTRATIONS.equals(action)) {
@@ -938,8 +1143,10 @@ public class MultiAgentCoordinatorService {
         Map<String, Object> r = new HashMap<>(payload);
         r.put("confirmed", memory.get("awaitingConfirmation") != null && booleanValue(memory.get("awaitingConfirmation")));
 
-        // Direct create: all registration params present with confirmation
-        if (isDirectCreate(request.getAction(), r)) {
+        // Direct create: explicit card action with all registration params + confirmation.
+        // Free-text messages (no action) must go through NLU first so intents like
+        // "explain_recommendation" / "query_message" can short-circuit before the pipeline.
+        if (StringUtils.hasText(request.getAction()) && isDirectCreate(request.getAction(), r)) {
             memory.put("confirmed", true);
             return null; // proceed to worker pipeline (will go to POLICY_CHECK)
         }
@@ -953,7 +1160,7 @@ public class MultiAgentCoordinatorService {
         if (!modelIntent.isPresent()) {
             if (!StringUtils.hasText(request.getMessage())) {
                 memory.put("errorCode", null);
-                return "你好，我是挂号助手。请告诉我你想挂哪个科室、哪一天，例如：明天口腔科。";
+                return "你好，我是挂号助手。请告诉我你想挂哪个科室、哪一天，我来帮你查询号源。";
             }
             memory.put("errorCode", null);
             memory.put("nluUnavailable", true);
@@ -968,6 +1175,11 @@ public class MultiAgentCoordinatorService {
             return "无法处理该请求，请重新输入。";
         }
 
+        // Medical QA: Neo4j graph → LLM synthesis
+        if ("medical_qa".equals(intent)) {
+            return handleMedicalQa(request.getMessage(), memory);
+        }
+
         // Direct non-registration intents
         if ("query_message".equals(intent)) {
             memory.put("requestedView", AgentUiAction.VIEW_MESSAGES);
@@ -977,30 +1189,12 @@ public class MultiAgentCoordinatorService {
             memory.put("requestedView", AgentUiAction.VIEW_USER_CARD);
             return "可以先查看就诊卡状态；如果还没建卡，我也会给你补建卡入口。";
         }
-        if ("medical_consult".equals(intent)) {
-            if (medicalConsultService == null) {
-                memory.put("errorCode", null);
-                return "我先帮你做一个保守的胸痛分诊判断，但当前咨询服务暂时不可用。";
-            }
-            // Clear stale registration data to prevent previous dept from polluting consult
-            memory.remove("deptName");
-            memory.remove("deptId");
-            memory.remove("deptSubId");
-            memory.remove("deptSubName");
-            memory.remove("recommendedDeptName");
-            memory.remove("pendingOrder");
-            memory.remove("awaitingConfirmation");
-            memory.remove("confirmed");
-            MedicalConsultService.ConsultResult consultResult = medicalConsultService.consult(request.getMessage(), memory);
-            applyConsultPatch(memory, consultResult);
-            memory.put("requestedView", AgentUiAction.MEDICAL_CONSULT);
-            return consultResult == null || !StringUtils.hasText(consultResult.getReply())
-                    ? "我先帮你做一个保守的胸痛分诊判断。"
-                    : consultResult.getReply();
-        }
         if ("explain_recommendation".equals(intent)) {
             memory.put("requestedView", AgentUiAction.EXPLAIN_RECOMMENDATION);
             memory.put("ragQuestion", firstText(request.getMessage(), "为什么推荐当前结果"));
+            // Don't show the confirm button while the user is asking "why" —
+            // keep pendingOrder for RAG context but clear the awaiting flag.
+            memory.put("awaitingConfirmation", false);
             return "我先结合当前挂号上下文和知识库为你解释一下。";
         }
         if ("unsupported".equals(intent) || "unknown".equals(intent)) {
@@ -1012,7 +1206,18 @@ public class MultiAgentCoordinatorService {
             return "当前多 Agent 仅支持挂号相关操作，请告诉我科室和日期。";
         }
 
-        // registration / query_doctor → proceed to worker pipeline
+        // registration / query_doctor / query_department → proceed to worker pipeline.
+        // For registration: if the user is only consulting (hasConsultDemand=true, no
+        // registration action words like 挂/预约), skip the pipeline and let
+        // enrichReplyByRag produce the symptom analysis directly.
+        if ("registration".equals(intent)) {
+            boolean hasRegKeyword = containsAny(request.getMessage(), "挂", "预约", "号", "号源", "看诊", "就诊");
+            if (hasRegKeyword) {
+                memory.put("hasConsultDemand", false);
+            } else if (booleanValue(memory.get("hasConsultDemand"))) {
+                return "我先结合你的症状信息为你分析一下。";
+            }
+        }
         return null;
     }
 
@@ -1030,6 +1235,29 @@ public class MultiAgentCoordinatorService {
         if (patch.get(key) != null) return;
         String text = firstText(value);
         if (StringUtils.hasText(text)) patch.put(key, text);
+    }
+
+    private boolean isQueryOnlyIntent(Map<String, Object> memory, AgentContext context) {
+        String intent = stringValue(memory.get("nluIntent"));
+        // Explicit doctor/slot/department query
+        if ("query_doctor".equals(intent) || "query_department".equals(intent)) return true;
+        // NLU couldn't classify ("今天呢", "后天呢", etc.) but user isn't asking to register —
+        // they're just changing a parameter in the current context.
+        if ("unknown".equals(intent)
+                && context != null
+                && !containsAny(context.getUserMessage(), "挂", "预约")
+                && StringUtils.hasText(stringValue(memory.get("deptName")))) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean containsAny(String text, String... keywords) {
+        if (!StringUtils.hasText(text)) return false;
+        for (String kw : keywords) {
+            if (text.contains(kw)) return true;
+        }
+        return false;
     }
 
     private String fallbackReply(MultiAgentStage stage) {

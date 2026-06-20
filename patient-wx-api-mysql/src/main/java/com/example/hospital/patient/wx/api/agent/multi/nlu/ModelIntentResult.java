@@ -16,5 +16,8 @@ public class ModelIntentResult {
     private String model;
     private Long latencyMs;
     private Map<String, List<String>> symptomDeptGraph;
+    private Map<String, List<Map<String, String>>> symptomDiseaseInfo;
+    private Map<String, Object> diseaseInfo;
+    private String medicalQaAnswer;
 }
 

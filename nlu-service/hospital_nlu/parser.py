@@ -52,7 +52,7 @@ class IntentSlotParser:
             intent = llm_result.get("intent", "unknown")
             slots = llm_result.get("slots", {})
             confidence = llm_result.get("confidence", 0.5)
-            if intent in ("medical_consult", "unknown", "unsupported") and rules._contains_any(
+            if intent in ("unknown", "unsupported") and rules._contains_any(
                 rules._normalize(text), constants.REGISTRATION_KEYWORDS
             ):
                 intent = "registration"
@@ -84,7 +84,17 @@ class IntentSlotParser:
                 "doctorAgePreference": rules.extract_doctor_age_preference(normalized),
                 "population": rules.extract_population(normalized),
             }
-            confidence = 0.0
+            # Useful slots or a strong intent both count as "we understood enough" —
+            # context follow-ups like "今天呢" or "帮她挂" rely on session memory.
+            has_slot = bool(
+                slots.get("date") or slots.get("department")
+                or slots.get("doctorName") or all_symptoms
+            )
+            has_strong_intent = intent in (
+                "registration", "query_doctor", "query_department", "explain_recommendation",
+                "query_message", "query_user_card",
+            )
+            confidence = 0.9 if (has_slot or has_strong_intent) else 0.0
 
         if not isinstance(slots, dict):
             slots = {}
@@ -133,8 +143,9 @@ class IntentSlotParser:
             if dept_from_text:
                 slots["department"] = dept_from_text
 
-        # Symptom-dept graph for Java cross-validation
+        # Build symptom-dept graph and disease info for cross-validation (both LLM & rules paths)
         symptom_dept_graph: Dict[str, List[str]] = {}
+        symptom_disease_info: Dict[str, List[Dict[str, str]]] = {}
         for sym in slots.get("symptoms", []):
             if not sym:
                 continue
@@ -143,8 +154,24 @@ class IntentSlotParser:
                 symptom_dept_graph[sym] = [d["department"] for d in graph_depts]
             elif sym in self.symptom_department_map:
                 symptom_dept_graph[sym] = [self.symptom_department_map[sym]]
+            diseases = self.neo4j.query_disease_by_symptom(sym)
+            if diseases:
+                symptom_disease_info[sym] = diseases
 
-        # Consult depth flag
+        # Medical QA: extract disease entity, query Neo4j, and format answer in Python
+        # so Java doesn't need a second LLM call.
+        disease_info = None
+        medical_qa_answer = None
+        if intent == "medical_qa":
+            disease_name = slots.get("diseaseName") or rules.extract_disease_name(normalized_text)
+            if disease_name:
+                slots["diseaseName"] = disease_name
+                disease_info = self.neo4j.query_disease_full(disease_name)
+                if disease_info:
+                    medical_qa_answer = self._format_disease_answer(disease_info)
+
+        # Consult depth flag — registration and consultation can co-exist.
+        # e.g. "胸疼，明天挂号，开什么药" → both book & ask about medication.
         has_consult = bool(
             slots.get("symptoms")
             and rules._contains_any(normalized_text, constants.CONSULT_DEMAND_KEYWORDS)
@@ -162,7 +189,10 @@ class IntentSlotParser:
             "model": engine_model,
             "latencyMs": latency_ms,
             "symptomDeptGraph": symptom_dept_graph,
-            "accelerations": ["structured-output", "business-fallback-ready"],
+            "symptomDiseaseInfo": symptom_disease_info,
+            "diseaseInfo": disease_info,
+            "medicalQaAnswer": medical_qa_answer,
+            "accelerations": ["structured-output", "business-fallback-ready", "graph-disease-facts", "medical-qa"],
         }
 
     # ── LLM ──────────────────────────────────────────────────
@@ -246,9 +276,10 @@ class IntentSlotParser:
         prompt += (
             "\n"
             "意图类型：\n"
-            "- registration: 挂号、预约、看诊、查号源\n"
-            "- medical_consult: 胸痛、胸闷、心慌、气短等症状咨询，先做分诊再推荐医生\n"
-            "- query_doctor: 查医生信息\n"
+            "- registration: 发起挂号/预约行为（如'我要挂内科''帮我预约明天的号'）。注意：'挂什么科/挂哪个科/看什么科/有哪些科室'是询问科室建议，不是挂号，应归为query_department\n"
+            "- medical_qa: 询问吃什么药、怎么治、如何预防、注意事项、做什么检查等医疗知识问答（不含挂号意图）\n"
+            "- query_department: 询问科室建议（如'挂什么科''看什么科''有哪些科室''我该挂哪个科'）\n"
+            "- query_doctor: 查医生信息、查号源、医生排班、某科室有哪些医生（如'张医生明天有号吗''心内科有哪些医生'）\n"
             "- query_message: 查消息、通知、提醒\n"
             "- query_user_card: 查就诊卡、建卡、实名信息\n"
             "- explain_recommendation: 询问为什么推荐、解释理由\n"
@@ -267,6 +298,7 @@ class IntentSlotParser:
             "- doctorGender: 用户明确希望的医生性别，女/男/null；只有明确偏好才填\n"
             "- doctorAgePreference: 用户对医生年龄的偏好，年长/年轻/null（未提及填null）\n"
             "- population: 患者人群，儿童/成人/孕妇/老人/null\n"
+            "- diseaseName: 用户询问的疾病名称（仅medical_qa意图时提取）\n"
             "\n"
             "规则：\n"
             "1. department必须是可用科室列表中的科室，不要编造不存在的科室\n"
@@ -277,7 +309,8 @@ class IntentSlotParser:
             "6. 没有把握的字段填null，不要编造\n"
             "7. confidence取值0.0~1.0，基于你对该结果的确定程度\n"
             "8. 只输出JSON，不要任何额外文字\n"
-            "9. 重要：用户提到挂/挂号/预约/号/看诊+具体科室时，意图必须是registration而不是medical_consult。medical_consult仅用于纯症状咨询不含挂号诉求。\n"
+            "9. 所有症状相关咨询统一归类为registration，系统内部通过hasConsultDemand区分挂号与纯咨询。但用户问'挂什么科/看什么科/有哪些科室'时是询问科室建议，不是挂号，应归为query_department。\n"
+            "10. 用户提到挂/挂号/预约/号/看诊等挂号行为词（非询问'挂什么科'）时，hasConsultDemand应为false。\n"
         )
         return prompt
 
@@ -304,6 +337,25 @@ class IntentSlotParser:
         pop_hint = f"(人群:{pop})" if pop else ""
         for d in departments:
             lines.append(f"  症状「{symptom}」{pop_hint} → {d['department']}(得分:{d['totalScore']:.1f})")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_disease_answer(d: dict) -> str:
+        """Format Neo4j disease data into a readable answer — no LLM needed."""
+        name = d.get("name", "")
+        lines = [f"关于「{name}」："]
+        if d.get("desc"):
+            lines.append(f"简介：{d['desc']}")
+        if d.get("drugs"):
+            lines.append(f"常用药物：{d['drugs']}")
+        if d.get("cure_way"):
+            lines.append(f"治疗方式：{d['cure_way']}")
+        if d.get("prevent"):
+            lines.append(f"预防建议：{d['prevent']}")
+        if d.get("do_eat"):
+            lines.append(f"推荐饮食：{d['do_eat']}")
+        if d.get("not_eat"):
+            lines.append(f"忌食：{d['not_eat']}")
         return "\n".join(lines)
 
     @staticmethod

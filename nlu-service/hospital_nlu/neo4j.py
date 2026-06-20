@@ -63,3 +63,58 @@ class Neo4jManager:
                 return departments
         except Exception:
             return []
+
+    def query_disease_by_symptom(self, symptom_name: str, limit: int = 3) -> List[Dict[str, Any]]:
+        """Query diseases linked to a symptom with their descriptions and causes."""
+        driver = self.get_driver()
+        if driver is None:
+            return []
+        try:
+            with driver.session() as session:
+                cypher = (
+                    "MATCH (s:Symptom {name: $symptom})-[:HAS_DISEASE]->(d:Disease) "
+                    "RETURN d.name AS name, d.desc AS description, d.cause AS cause "
+                    "LIMIT $limit"
+                )
+                result = session.run(cypher, symptom=symptom_name, limit=limit)
+                diseases = []
+                for record in result:
+                    diseases.append({
+                        "name": record["name"],
+                        "description": record["description"] or "",
+                        "cause": record["cause"] or "",
+                    })
+                return diseases
+        except Exception:
+            return []
+
+    def query_disease_full(self, disease_name: str) -> Optional[Dict[str, Any]]:
+        """Return all attributes of a disease by name."""
+        driver = self.get_driver()
+        if driver is None:
+            return None
+        try:
+            with driver.session() as session:
+                cypher = (
+                    "MATCH (d:Disease {name: $name}) "
+                    "RETURN d.name AS name, d.desc AS desc, d.cause AS cause, "
+                    "d.drugs AS drugs, d.cure_way AS cure_way, d.prevent AS prevent, "
+                    "d.do_eat AS do_eat, d.not_eat AS not_eat, d.check AS check"
+                )
+                result = session.run(cypher, name=disease_name)
+                record = result.single()
+                if record is None:
+                    return None
+                return {
+                    "name": record["name"],
+                    "desc": record["desc"] or "",
+                    "cause": record["cause"] or "",
+                    "drugs": record["drugs"] or "",
+                    "cure_way": record["cure_way"] or "",
+                    "prevent": record["prevent"] or "",
+                    "do_eat": record["do_eat"] or "",
+                    "not_eat": record["not_eat"] or "",
+                    "check": record["check"] or "",
+                }
+        except Exception:
+            return None

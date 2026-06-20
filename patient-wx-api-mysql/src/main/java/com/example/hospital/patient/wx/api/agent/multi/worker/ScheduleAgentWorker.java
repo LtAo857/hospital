@@ -54,7 +54,7 @@ public class ScheduleAgentWorker implements AgentWorker {
         // 1. Match department by name → get deptId
         if (state.getDeptId() == null) {
             if (!StringUtils.hasText(state.getDeptName())) {
-                return buildAskUserResult(state, observation, "请告诉我想挂哪个科室，例如：明天口腔科。");
+                return buildAskUserResult(state, observation, "请告诉我想挂哪个科室、哪一天，我来帮你查询号源。");
             }
             TerminalOutcome outcome = matchDepartment(state, observation);
             if (outcome == TerminalOutcome.ASK_USER) {
@@ -431,7 +431,7 @@ public class ScheduleAgentWorker implements AgentWorker {
     }
 
     private AgentResult buildAskUserResult(QueryState state, Map<String, Object> observation) {
-        return buildAskUserResult(state, observation, "请告诉我想挂哪个科室、哪天，例如：明天口腔科。");
+        return buildAskUserResult(state, observation, "请告诉我想挂哪个科室、哪一天，我来帮你查询号源。");
     }
 
     private AgentResult buildAskUserResult(QueryState state, Map<String, Object> observation, String reply) {

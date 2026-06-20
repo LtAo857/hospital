@@ -80,7 +80,19 @@
       "Bash(ls \"D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\nlu-service\\\\\\\\hospital_nlu\\\\\\\\\")",
       "Bash(ls \"D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\model-inference-demo\\\\\\\\\")",
       "Bash(ls D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\nlu-service\\\\\\\\ *)",
-      "Bash(ls -la \"D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\model-inference-demo\\\\\\\\\")"
+      "Bash(ls -la \"D:\\\\\\\\Code\\\\\\\\code\\\\\\\\Java\\\\\\\\hospital\\\\\\\\hospital\\\\\\\\model-inference-demo\\\\\\\\\")",
+      "Bash(taskkill /PID 40860 /F)",
+      "Bash(powershell *)",
+      "Bash(nohup python *)",
+      "Bash(echo \"PID: $!\")",
+      "Read(//mnt/d/Code/code/Java/hospital/**)",
+      "Read(//mnt/D/Code/code/Java/hospital/**)",
+      "Bash(taskkill *)",
+      "Bash(where cypher-shell *)",
+      "Bash(tasklist //FI \"PID eq 34932\")",
+      "Bash(echo \"NLU service starting, PID: $!\")",
+      "Bash(grep \"^高血压$\" \"D:/Code/code/Java/hospital/hospital/nlu-service/hospital_nlu/disease_names.txt\")",
+      "Bash(C:/Users/hs/AppData/Local/Python/Python313/python.exe hospital_nlu/server_stdlib.py)"
     ]
   }
 }

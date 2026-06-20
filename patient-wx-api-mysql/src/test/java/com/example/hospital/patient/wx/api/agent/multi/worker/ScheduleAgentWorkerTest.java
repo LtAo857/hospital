@@ -35,7 +35,7 @@ class ScheduleAgentWorkerTest {
         Assertions.assertEquals(HandoffAction.ASK_USER, result.getHandoffAction());
         Assertions.assertEquals(MultiAgentStage.SLOT_QUERY, result.getNextStage());
         Assertions.assertEquals("missing_slots_input", result.getSummary());
-        Assertions.assertEquals("请告诉我想挂哪个科室，例如：明天口腔科。", result.getReply());
+        Assertions.assertEquals("请告诉我想挂哪个科室、哪一天，我来帮你查询号源。", result.getReply());
     }
 
     @Test

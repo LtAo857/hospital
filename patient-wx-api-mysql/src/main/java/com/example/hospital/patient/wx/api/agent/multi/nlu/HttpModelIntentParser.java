@@ -72,11 +72,9 @@ public class HttpModelIntentParser implements ModelIntentParser {
             ModelIntentResult result = objectMapper.readValue(readAll(connection.getInputStream()), ModelIntentResult.class);
             log.info("NLU result: intent={}, confidence={}, source={}",
                     result.getIntent(), result.getConfidence(), result.getSource());
-            if (result.getConfidence() < properties.getModelParserMinConfidence()) {
-                log.info("NLU confidence {} below threshold {}, ignored",
-                        result.getConfidence(), properties.getModelParserMinConfidence());
-                return Optional.empty();
-            }
+            // Accept all NLU results. Quality control is handled by the Python side
+            // (LLM → rule-engine fallback + slot/intent-based confidence scoring).
+            // The Coordinator makes final routing decisions with full session context.
             return Optional.of(result);
         } catch (Exception e) {
             log.warn("NLU HTTP call failed: {}", e.getMessage());
